@@ -1,0 +1,5 @@
+*.md
+deploy.bat
+.git
+.gitignore
+.vercelignore
