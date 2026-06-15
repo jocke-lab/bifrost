@@ -31,21 +31,14 @@
      so a section may share a name with a module (e.g. 'customers'). Two maps
      are kept: byId (modules) and sectionById (sections). ─────────────────── */
   const SECTIONS = [
-    { id: 'me',        label: 'My Day',     icon: '☀️', zone: 'YOU',     children: ['my-day', 'vitals'] },
-    { id: 'nftsite',   label: 'NFT Site',   icon: '🪙', zone: 'NFT PLATFORM', children: ['nft-site'] },
-    { id: 'overview',  label: 'Overview',   icon: '🛰️', zone: 'COMPANY', children: ['command'] },
-    { id: 'finance',   label: 'Finance',    icon: '💰', zone: 'COMPANY', children: ['ledger', 'revenue', 'billing'] },
-    { id: 'customers', label: 'Customers',  icon: '🤝', zone: 'COMPANY', children: ['customers', 'pipeline', 'partners', 'portal'] },
-    { id: 'ops',       label: 'Operations', icon: '📦', zone: 'COMPANY', children: ['inventory', 'orders', 'projects'] },
-    { id: 'team',      label: 'Team',       icon: '👥', zone: 'COMPANY', children: ['crew', 'meetings'] },
-    { id: 'comms',     label: 'Comms',      icon: '💬', zone: 'COMPANY', children: ['comms', 'inbox', 'calendar'] },
-    { id: 'growth',    label: 'Growth',     icon: '📈', zone: 'COMPANY', children: ['signal', 'analytics'] },
-    { id: 'platform',  label: 'Platform',   icon: '🖥️', zone: 'SYSTEM',  children: ['automations', 'integrations', 'devlog', 'infra'] },
-    { id: 'connect',   label: 'Connections',icon: '🔌', zone: 'SYSTEM',  children: ['connect'] },
-    { id: 'workspace', label: 'Workspace',  icon: '🗄️', zone: 'SYSTEM',  children: ['vault', 'sign', 'audit', 'settings'] }
+    { id: 'home',     label: 'Dashboard',   icon: '🛰️', zone: 'HOME',         children: ['command'] },
+    { id: 'vitals',   label: 'Vitals',      icon: '❤️', zone: 'HOME',         children: ['vitals'] },
+    { id: 'nftsite',  label: 'NFT Site',    icon: '🪙', zone: 'NFT PLATFORM', children: ['nft-site'] },
+    { id: 'connect',  label: 'Connections', icon: '🔌', zone: 'TOOLS',        children: ['connect'] },
+    { id: 'tools',    label: 'Tools',       icon: '🛠️', zone: 'TOOLS',        children: ['sign', 'settings'] }
   ];
   // zones rendered in this order, with the human label shown above each group
-  const ZONES = ['YOU', 'NFT PLATFORM', 'COMPANY', 'SYSTEM'];
+  const ZONES = ['HOME', 'NFT PLATFORM', 'TOOLS'];
 
   /* ── tiny DOM utils ─────────────────────────────────────────────────── */
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -393,46 +386,49 @@
     return { createdAt: ts, updatedAt: ts, createdBy: createdBy || 'system', updatedBy: createdBy || 'system', source: source || 'system' };
   }
 
-  // ── A.5 team seed (deterministic) ──────────────────────────────────────
+  // ── owner record — the single real operator of this deck ────────────────
+  // Body metrics persist in localStorage('helm.body') so Vitals + the Dashboard
+  // share one source of truth across reloads.
+  function loadBody() {
+    try { const b = JSON.parse(localStorage.getItem('helm.body')); return (b && typeof b === 'object') ? b : {}; }
+    catch (e) { return {}; }
+  }
+  function loadProfile() {
+    try { const p = JSON.parse(localStorage.getItem('helm.profile')); return (p && typeof p === 'object') ? p : {}; }
+    catch (e) { return {}; }
+  }
   function seedTeam() {
-    const T = [
-      ['u-arvid', 'Arvid Arvidsson', 'owner',   'Founder / CEO',     '🜨', 'arvid@northwind-helm.se', 'available'],
-      ['u-mira',  'Mira Lindqvist',  'admin',   'COO',               '✦', 'mira@northwind-helm.se',  'meeting'],
-      ['u-ola',   'Ola Forsberg',    'finance', 'Head of Finance',   '▲', 'ola@northwind-helm.se',   'focus'],
-      ['u-sofia', 'Sofia Berg',      'member',  'Head of Sales',     '◆', 'sofia@northwind-helm.se', 'available'],
-      ['u-noah',  'Noah Ek',         'member',  'Lead Engineer',     '⬡', 'noah@northwind-helm.se',  'focus'],
-      ['u-lena',  'Lena Holm',       'member',  'Ops & Logistics',   '◈', 'lena@northwind-helm.se',  'available'],
-      ['u-kai',   'Kai Nyström',     'member',  'Marketing',         '✧', 'kai@northwind-helm.se',   'away'],
-      ['u-isa',   'Isa Dahl',        'viewer',  'Customer Success',  '○', 'isa@northwind-helm.se',   'available']
-    ];
-    return T.map(([id, name, role, title, emoji, email, presence]) => ({
-      id, name, role, title, accent: emoji, email,
-      mailIdentities: [email],
+    const b = loadBody();
+    const p = loadProfile();
+    const name = p.name || 'Arvid Arvidsson';
+    return [{
+      id: 'u-arvid', name, role: 'owner', title: p.title || 'Owner',
+      accent: '🜨', email: 'arivd.arvidsson@gmail.com',
+      mailIdentities: ['arivd.arvidsson@gmail.com'],
       permissions: [],
       status: 'active',
-      presence,
+      presence: 'available',
       avatar: data.initials(name),
-      employment: { startDate: '2025-01-15', type: 'full-time', salary: 0, leaveBalance: 25 },
-      body: { weightKg: null, heightCm: null, age: null, sex: null },
-      connections: { google: true, slack: true, whoop: false, googleFit: false },
+      body: { weightKg: b.weightKg ?? null, heightCm: b.heightCm ?? null, age: b.age ?? null, sex: b.sex ?? null },
+      connections: {},
       notificationPrefs: {},
-      ...meta(id, 'system', '2025-01-15T08:00:00.000Z')
-    }));
+      ...meta('u-arvid', 'system')
+    }];
   }
 
   function seedOrg() {
     return {
-      id: 'org-northwind',
-      name: 'Northwind Labs AB',
+      id: 'org-opulence-tech',
+      name: 'Opulence Tech',
       logoUrl: null,
-      addresses: [{ line1: 'Kungsgatan 12', city: 'Norrköping', zip: '602 21', country: 'SE' }],
+      addresses: [{ line1: '', city: 'Norrköping', zip: '', country: 'SE' }],
       country: 'SE',
-      identifiers: { orgNo: '559123-4567', vat: 'SE559123456701' },
+      identifiers: {},
       primaryContactId: 'u-arvid',
-      fiscalCurrency: 'SEK',
+      fiscalCurrency: 'EUR',
       fiscalYearStart: '01-01',
-      connectedServices: ['fortnox', 'stripe', 'tink'],
-      ...meta('u-arvid', 'system', '2025-01-15T08:00:00.000Z')
+      connectedServices: [],
+      ...meta('u-arvid', 'system')
     };
   }
 
@@ -875,15 +871,8 @@
     ['ROAS', '3.4×', 'up', 'signal']
   ];
   function buildTape() {
-    const track = $('.tape-track'); if (!track) return;
-    const chips = TAPE.map(([k, v, sig, route]) =>
-      `<span class="tape-chip" data-route="${route || ''}">
-        <span class="sig ${sig}"></span><span class="k">${k}</span><span class="v">${v}</span></span>`).join('');
-    track.innerHTML = chips + chips; // duplicate for seamless scroll
-    track.addEventListener('click', e => {
-      const chip = e.target.closest('.tape-chip');
-      if (chip && chip.dataset.route && byId[chip.dataset.route]) show(chip.dataset.route);
-    });
+    // Removed the fake KPI ticker — keep the deck clean and real.
+    const tape = $('.tape'); if (tape) tape.style.display = 'none';
   }
 
   /* ── live flight log (shell-owned, simulated, deterministic-ish) ────── */
@@ -973,13 +962,10 @@
   /* COMMAND PALETTE (⌘K) — shell owned                                     */
   /* ====================================================================== */
   const QUICK_ACTIONS = [
-    { title: 'Pay invoice #2294', sub: 'Ledger · $4,200 to Northwind AB', hint: '↵', ico: '💸', run: () => { fireMoney(); toast('Invoice #2294 paid', 'success'); } },
-    { title: 'Ship order #1043', sub: 'Orders · PostNord label', hint: '↵', ico: '🚀', run: () => toast('Order #1043 marked shipped', 'success') },
-    { title: 'Email overdue customers', sub: 'Billing · 6 accounts · chase sequence', hint: '↵', ico: '✉️', run: () => toast('Chase emails queued to 6 customers', 'info') },
-    { title: 'Reorder SKU AX-12', sub: 'Inventory · below par', hint: '↵', ico: '📦', run: () => toast('Purchase order drafted for AX-12', 'success') },
-    { title: 'Run daily briefing', sub: 'Copilot · what needs you today', hint: '↵', ico: '🛰️', run: () => toast('Generating daily briefing…', 'info') },
-    { title: 'Company Overview', sub: 'Command Deck · whole-company canvas', hint: '⤢', ico: '⤢', run: () => openOverview() },
-    { title: 'Open notifications', sub: 'Notification Center · what needs you', hint: '🔔', ico: '🔔', run: () => openNotif() }
+    { title: 'NFT Site — control center', sub: 'Collections · NFC · orders · support', hint: '↵', ico: '🪙', run: () => show('nft-site') },
+    { title: 'Dashboard', sub: 'KPIs · attention queue · sales', hint: '↵', ico: '🛰️', run: () => show('command') },
+    { title: 'Sign a PDF', sub: 'Upload & sign a document', hint: '↵', ico: '🖊️', run: () => show('sign') },
+    { title: 'Connections', sub: 'Slack · Google · wearables', hint: '↵', ico: '🔌', run: () => show('connect') }
   ];
   let cmdkArmed = 0, cmdkResults = [];
 
@@ -1001,7 +987,7 @@
       .map(a => Object.assign({ kind: 'action' }, a));
     cmdkResults = (q ? acts.concat(secs, mods) : acts.slice(0, 3).concat(secs, mods));
     cmdkArmed = 0;
-    if (!cmdkResults.length) { list.innerHTML = '<div class="cmdk-empty">No matches. Try “pay”, “ship”, “revenue”…</div>'; return; }
+    if (!cmdkResults.length) { list.innerHTML = '<div class="cmdk-empty">No matches. Try “NFT”, “vitals”, “connect”…</div>'; return; }
     let html = '';
     const actItems = cmdkResults.filter(r => r.kind === 'action');
     const secItems = cmdkResults.filter(r => r.kind === 'section');
@@ -1076,14 +1062,6 @@
       return `<button class="id-presence${k === presence ? ' active' : ''}" data-presence="${k}">
         <span class="pdot ${pm.dot}"></span>${esc(pm.label)}</button>`;
     }).join('');
-    const teamRows = session.team.map(p => {
-      const pm = PRESENCE_META[p.presence] || PRESENCE_META.available;
-      return `<button class="id-person${p.id === me.id ? ' active' : ''}" data-user="${esc(p.id)}">
-        <span class="av"><span class="pdot ${pm.dot} corner"></span>${esc(p.avatar)}</span>
-        <span class="id-meta"><span class="id-name">${esc(p.name)}</span><span class="id-role">${esc(p.title)} · ${esc(p.role)}</span></span>
-        ${p.id === me.id ? '<span class="id-check">✓</span>' : ''}
-      </button>`;
-    }).join('');
     box.innerHTML = `
       <div class="idmenu-head">
         <div class="idmenu-me">
@@ -1098,10 +1076,6 @@
         <div class="idmenu-label">Presence</div>
         <div class="id-presence-row">${presenceRow}</div>
       </div>
-      <div class="idmenu-sec">
-        <div class="idmenu-label">Switch identity</div>
-        <div class="id-people">${teamRows}</div>
-      </div>
       <div class="idmenu-foot">
         <button class="btn btn-ghost btn-sm id-profile">View my profile</button>
       </div>`;
@@ -1109,10 +1083,6 @@
     $$('.id-presence', box).forEach(b => b.addEventListener('click', () => {
       session.setPresence(b.dataset.presence);
       renderIdMenu();
-    }));
-    $$('.id-person', box).forEach(b => b.addEventListener('click', () => {
-      session.switchUser(b.dataset.user);
-      closeIdMenu();
     }));
     const prof = $('.id-profile', box);
     prof && prof.addEventListener('click', () => { closeIdMenu(); if (byId['settings']) show('settings'); });
@@ -1310,11 +1280,9 @@
   /* BOOT SEQUENCE                                                          */
   /* ====================================================================== */
   const BOOT_STEPS = [
-    'MOUNTING FINANCE CORE',
-    'LINKING SALES ARRAY',
-    'CALIBRATING OPS GAUGES',
-    'SPINNING UP THE TAPE',
-    'SYNCING FLIGHT LOG',
+    'CONNECTING DATA LAYER',
+    'LOADING NFT PLATFORM',
+    'READING LIVE COUNTS',
     'ARMING COMMAND PALETTE',
     'DECK ONLINE'
   ];
@@ -1346,67 +1314,33 @@
   /* ====================================================================== */
   function wireShell() {
     buildDock();
-    buildTape();
-    buildFlightLog();
 
-    // seed the identity-derived stores, then paint the chip + bell
-    seedAudit();
-    seedNotifications();
     refreshProfileChip();
-    refreshBell();
 
     // search box opens palette
     const sb = $('.topbar-search');
     sb && sb.addEventListener('click', openCmdk);
 
-    // notifications bell -> Notification Center drawer (per-user feed + badge)
-    const bell = $('.icon-btn[data-act="bell"]');
-    bell && bell.addEventListener('click', openNotif);
-
     // person switcher — profile chip opens the identity popover
     const chip = $('.profile-chip');
     chip && chip.addEventListener('click', openIdMenu);
 
-    // identity popover + notification + overview overlay close affordances
+    // identity popover close affordance
     const idScrim = $('.idmenu-scrim'); idScrim && idScrim.addEventListener('click', closeIdMenu);
-    const nScrim = $('.notif-scrim'); nScrim && nScrim.addEventListener('click', closeNotif);
-    const nClose = $('.notif-close'); nClose && nClose.addEventListener('click', closeNotif);
-    const ovScrim = $('.overview-scrim'); ovScrim && ovScrim.addEventListener('click', closeOverview);
-    const ovClose = $('.overview-close'); ovClose && ovClose.addEventListener('click', closeOverview);
 
-    // session reactions: keep chip/bell/notifications/personal-views in sync
+    // session reactions: keep chip + personal views in sync
     session.on('helm:user', () => {
       refreshProfileChip();
-      refreshBell();
       refreshPersonalModules();
-      if ($('.notif') && $('.notif').classList.contains('open')) renderNotif();
       if ($('.idmenu') && $('.idmenu').classList.contains('open')) renderIdMenu();
     });
     session.on('helm:presence', () => {
       refreshProfileChip();
       if ($('.idmenu') && $('.idmenu').classList.contains('open')) renderIdMenu();
     });
-    // live audit → personal views may want to refresh their unread badge
-    audit.on(() => { refreshBell(); });
-
-    // rail collapse
-    const railToggle = $('.icon-btn[data-act="rail"]');
-    railToggle && railToggle.addEventListener('click', () => $('.rail') && $('.rail').classList.toggle('open'));
 
     // theme swatches
     $$('.swatch').forEach(s => s.addEventListener('click', () => setTheme(s.dataset.theme)));
-
-    // copilot send (decorative but responsive)
-    const co = $('.copilot-input');
-    if (co) {
-      const send = () => {
-        const inp = $('input', co); if (!inp.value.trim()) return;
-        toast('Copilot is thinking…', 'info'); inp.value = '';
-        setTimeout(() => toast('Briefing ready in Command Deck', 'success'), 1100);
-      };
-      $('button', co).addEventListener('click', send);
-      $('input', co).addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
-    }
 
     // command palette wiring
     const cmdkInput = $('.cmdk-input input');
@@ -1440,7 +1374,9 @@
 
   /* boot orchestration */
   function boot() {
-    setTheme('aurora');
+    let savedTheme = 'aurora';
+    try { savedTheme = localStorage.getItem('helm.theme') || 'aurora'; } catch (e) {}
+    setTheme(THEMES[savedTheme] ? savedTheme : 'aurora');
     startCanvas();
     setInterval(tickClock, 1000); tickClock();
     runBoot(() => {
@@ -1450,7 +1386,7 @@
       // initial route: hash if valid+registered, else 'my-day' (the morning page), else 'command'
       const hash = location.hash.slice(1);
       const first = (hash && byId[hash]) ? hash
-        : (byId['my-day'] ? 'my-day' : (byId['command'] ? 'command' : (modules[0] && modules[0].id)));
+        : (byId['command'] ? 'command' : (modules[0] && modules[0].id));
       if (first) show(first);
       // health weather after the deck is live
       setWeather(86);

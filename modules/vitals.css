@@ -167,3 +167,10 @@
   .vitals-who{display:none}
   .vitals-trend-foot{grid-template-columns:repeat(2,1fr)}
 }
+
+/* ── v2 additions: TDEE targets + live wearable metric tiles ─────────────── */
+.vitals-target-rows{margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.vitals-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;padding:4px 2px 2px}
+.vitals-metric{background:var(--bg2,rgba(255,255,255,.03));border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:14px 12px;text-align:center}
+.vitals-metric b{display:block;font-family:var(--font-display,inherit);font-size:24px;font-weight:600;color:var(--text,#fff);line-height:1.1}
+.vitals-metric span{display:block;margin-top:5px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-faint,#8aa4bc)}
