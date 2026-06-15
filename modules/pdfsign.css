@@ -53,3 +53,24 @@
 .psign-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
 .psign-legal { font-size: 11px; color: var(--muted, #8aa4bc); max-width: 40ch; }
 .row.gap-sm { display: inline-flex; gap: 8px; }
+
+/* ── shared PDF viewer + signer overlay (pdfsign-core.js) ─────────────────── */
+.pdfx-overlay{position:fixed;inset:0;z-index:6000;background:rgba(4,7,14,.72);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;padding:26px}
+.pdfx-shell{width:min(1000px,96vw);height:92vh;display:flex;flex-direction:column;
+  background:var(--bg2,#0d131f);border:1px solid var(--border-hi,rgba(255,255,255,.12));border-radius:16px;overflow:hidden;
+  box-shadow:0 40px 100px rgba(0,0,0,.6)}
+.pdfx-bar{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));
+  background:linear-gradient(180deg,rgba(255,255,255,.03),transparent)}
+.pdfx-title{font-family:var(--font-display,'Space Grotesk',sans-serif);font-weight:600;color:var(--text,#eaf2fb);font-size:15px;flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pdfx-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pdfx-btn{border:1px solid var(--border-hi,rgba(255,255,255,.14));background:rgba(255,255,255,.05);color:var(--text,#eaf2fb);
+  border-radius:9px;padding:7px 12px;font-size:12.5px;cursor:pointer;transition:filter .15s,background .15s}
+.pdfx-btn:hover{background:rgba(255,255,255,.10)}
+.pdfx-btn.go{border:none;color:#04121a;font-weight:600;background:linear-gradient(120deg,#7C5CFF,#19D3FF 55%,#46E6A6)}
+.pdfx-btn.ghost{background:transparent;color:var(--text-faint,#8aa4bc)}
+.pdfx-body{flex:1;min-height:0;overflow:auto;background:#1b2230}
+.pdfx-frame{width:100%;height:100%;border:0;background:#525659}
+.pdfx-hint{padding:8px 14px;font-size:12px;color:var(--accent1,#19D3FF);background:rgba(25,211,255,.08);border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
+.pdfx-overlay.signer .pdfx-body{padding:20px;display:flex;flex-direction:column;align-items:center;gap:18px}

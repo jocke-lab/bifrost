@@ -366,7 +366,7 @@
       if (isDraft) acts.push(`<button class="acc-mini go" data-inv-send="${esc(row.id)}">Send</button>`);
       if (isDraft) acts.push(`<button class="acc-mini" data-inv-edit="${esc(row.id)}">Edit</button>`);
       if (!isDraft && row.status !== 'paid' && row.status !== 'void' && row.status !== 'voided') acts.push(`<button class="acc-mini go" data-inv-paid="${esc(row.id)}" data-remaining="${remaining}">Mark paid</button>`);
-      if (!isDraft) acts.push(`<button class="acc-mini" data-inv-pdf="${esc(row.id)}">Download PDF</button>`);
+      if (!isDraft) acts.push(`<button class="acc-mini" data-inv-pdf="${esc(row.id)}">View PDF</button>`);
       if (isDraft) acts.push(`<button class="acc-mini danger" data-inv-del="${esc(row.id)}">Delete</button>`);
       else if (row.status !== 'void' && row.status !== 'voided') acts.push(`<button class="acc-mini danger" data-inv-void="${esc(row.id)}">Void</button>`);
       return `<tr>
@@ -585,25 +585,40 @@
     return { invoice, org: (prof && prof.org) || {}, customer: full.customer || {} };
   }
 
-  async function previewInvoicePDF(invoiceId) {
-    if (!hasFaktura()) { H.toast('PDF engine (faktura.js) not loaded yet', 'warn'); return; }
-    H.toast('Building PDF preview…', 'info');
-    try {
-      const { invoice, org, customer } = await loadInvoiceBundle(invoiceId);
-      if (typeof window.Faktura.download === 'function') {
-        await window.Faktura.download(invoice, org, customer);
-      } else {
-        const bytes = await window.Faktura.build(invoice, org, customer);
-        openBlobPDF(bytes, (invoice.number || 'draft') + '.pdf');
+  // upload signed/built PDF bytes back to the invoice (stored as its PDF)
+  async function saveInvoicePDF(invoiceId, bytes) {
+    const b64 = bytesToB64(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+    return api('invoices/' + invoiceId + '/pdf', { method: 'POST', body: { base64: b64 } });
+  }
+  // open our signing tool on these bytes; on save, store the signed PDF on the invoice
+  function signInvoiceBytes(invoiceId, bytes, number, viewer) {
+    if (!window.PdfSign) { H.toast('Signer not loaded', 'warn'); return; }
+    window.PdfSign.openSigner(bytes, {
+      title: 'Sign faktura ' + (number || ''),
+      fileName: 'Faktura-' + (number || 'utkast') + '.pdf',
+      saveLabel: '✓ Save signed to invoice',
+      onSave: async (signed) => {
+        const r = await saveInvoicePDF(invoiceId, signed);
+        if (r && r.ok) { if (viewer && viewer.setBytes) viewer.setBytes(signed); H.toast('Signed PDF saved to the invoice ✓', 'success'); }
+        else H.toast('Signed, but saving failed: ' + ((r && r.error) || 'error'), 'warn');
       }
-    } catch (e) { H.toast('Preview failed: ' + e.message, 'danger'); }
+    });
   }
 
-  function openBlobPDF(bytes, name) {
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  // Review = VIEW the PDF in-site (not download). Build it fresh, open the viewer.
+  async function previewInvoicePDF(invoiceId) {
+    if (!hasFaktura()) { H.toast('PDF engine (faktura.js) not loaded yet', 'warn'); return; }
+    if (!window.PdfView) { H.toast('Viewer not loaded', 'warn'); return; }
+    H.toast('Building PDF…', 'info');
+    try {
+      const { invoice, org, customer } = await loadInvoiceBundle(invoiceId);
+      const bytes = await window.Faktura.build(invoice, org, customer);
+      const number = invoice.number || 'utkast';
+      window.PdfView.open({
+        bytes, title: 'Faktura ' + number, fileName: 'Faktura-' + number + '.pdf',
+        onSign: (curBytes, viewer) => signInvoiceBytes(invoiceId, curBytes, invoice.number, viewer)
+      });
+    } catch (e) { H.toast('Preview failed: ' + e.message, 'danger'); }
   }
 
   // Send: assigns number + posts the issue voucher, THEN builds the PDF with the
@@ -635,9 +650,12 @@
   async function downloadStoredPDF(invoiceId) {
     H.toast('Fetching PDF…', 'info');
     const r = await api('invoices/' + invoiceId + '/pdf');
-    if (r && r.ok && r.pdf_url) { window.open(r.pdf_url, '_blank', 'noopener'); }
+    if (r && r.ok && r.pdf_url) {
+      if (window.PdfView) window.PdfView.open({ url: r.pdf_url, title: 'Faktura (lagrad)', fileName: 'Faktura.pdf' });
+      else window.open(r.pdf_url, '_blank', 'noopener');
+    }
     else if (hasFaktura()) { previewInvoicePDF(invoiceId); }  // fall back to a fresh build
-    else H.toast(r && r.error ? r.error : 'No stored PDF — Preview to build one.', 'warn');
+    else H.toast(r && r.error ? r.error : 'No stored PDF — view Preview to build one.', 'warn');
   }
 
   function openMarkPaidInvoice(invoiceId, remaining, body) {
