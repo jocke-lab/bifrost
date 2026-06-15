@@ -41,7 +41,12 @@
       try { const s = window.DB && window.DB.auth ? await window.DB.auth.getSession() : null; token = s && s.access_token; } catch (e) {}
       const headers = Object.assign({}, opts.headers || {});
       if (token) headers.Authorization = 'Bearer ' + token;
-      const r = await fetch(path, Object.assign({}, opts, { headers }));
+      // NFT-admin calls go to the Supabase Edge Function (it holds the service role automatically — no key needed anywhere).
+      const ADMIN_RES = ['dealers', 'collections', 'coins', 'certificates', 'nfc', 'ops', 'accounting', 'console'];
+      let target = path;
+      const mm = path.match(/^\/api\/([a-z-]+)(.*)$/);
+      if (mm && ADMIN_RES.includes(mm[1])) { target = 'https://mumnyvmxyzsgducbbvxi.supabase.co/functions/v1/admin/' + mm[1] + (mm[2] || ''); headers.apikey = 'sb_publishable__oUKNAdEnZrqxyxvkUadmQ_tjdg74my'; }
+      const r = await fetch(target, Object.assign({}, opts, { headers }));
       const t = await r.text();
       let data; try { data = JSON.parse(t); } catch (e) { return { ok: false, _offline: true }; }
       if (r.status === 401 || r.status === 403 || data.unauthorized || data.forbidden) { data.unauthorized = true; openSignIn(); }
@@ -311,8 +316,7 @@
 
   // ── Accounting tab: live P&L (volume, platform revenue, royalties, payouts) ──
   async function paintAccounting(body) {
-    const st = await apiCall('/api/status');
-    if (!(st && st.integrations && st.integrations.nft_admin)) { body.innerHTML = `<div class="nft-adm-warn">📊 Accounting needs <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel.${st && st._offline ? ' The API runs on the live site only.' : ''}</div>`; return; }
+    if (!(await gate(body, 'Accounting', '📊'))) return;
     body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading P&amp;L…</div>`;
     const r = await apiCall('/api/accounting');
     if (!r.ok) { body.innerHTML = `<div class="nft-warn">${esc(r.error || 'could not load')}</div>`; return; }
@@ -327,9 +331,7 @@
 
   // ── NFC Cards tab: manage every chip — register, link, unlink, deactivate ──
   async function paintNfc(body) {
-    const st = await apiCall('/api/status');
-    const configured = !!(st && st.integrations && st.integrations.nft_admin);
-    if (!configured) { body.innerHTML = `<div class="nft-adm-warn">🏷️ NFC card management needs <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel.${st && st._offline ? ' The API runs on the live site only.' : ''}</div>`; return; }
+    if (!(await gate(body, 'NFC card management', '🏷️'))) return;
     body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading NFC cards…</div>`;
     const r = await apiCall('/api/nfc');
     if (!r.ok) { body.innerHTML = `<div class="nft-warn">${esc(r.error || 'could not load')}</div>`; return; }
@@ -368,9 +370,7 @@
 
   // ── Support tab: handle any trade dispute, issue, chat, counterfeit, withdrawal ──
   async function paintSupport(body) {
-    const st = await apiCall('/api/status');
-    const configured = !!(st && st.integrations && st.integrations.nft_admin);
-    if (!configured) { body.innerHTML = `<div class="nft-adm-warn">🛟 Support &amp; dispute tools need <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel.${st && st._offline ? ' The API runs on the live site (bifrostlkl.com), not this local preview.' : ''}</div>`; return; }
+    if (!(await gate(body, 'Support & dispute tools', '🛟'))) return;
     body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading support queue…</div>`;
     const ops = await apiCall('/api/ops');
     if (!ops.ok) { body.innerHTML = `<div class="nft-warn">${esc(ops.error || 'could not load')}</div>`; return; }
@@ -416,9 +416,11 @@
 
   // shared gate: returns true if the service key is configured, else paints the notice
   async function gate(body, label, icon) {
-    const st = await apiCall('/api/status');
-    if (st && st.integrations && st.integrations.nft_admin) return true;
-    body.innerHTML = `<div class="nft-adm-warn">${icon} ${label} needs <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel.${st && st._offline ? ' The API runs on the live site only.' : ''}</div>`;
+    let token = null;
+    try { const s = window.DB && window.DB.auth ? await window.DB.auth.getSession() : null; token = s && s.access_token; } catch (e) {}
+    if (token) return true;
+    body.innerHTML = `<div class="nft-adm-warn">${icon} ${label} — <button class="nft-adm-mini" data-si>🔐 sign in</button> to manage (one-time, just your email — no keys).</div>`;
+    const btn = body.querySelector('[data-si]'); if (btn) btn.onclick = () => openSignIn();
     return false;
   }
 
@@ -461,12 +463,8 @@
 
   // ── Admin tab: the full operator "circle" (writes via the serverless API) ──
   async function paintAdmin(body) {
-    const st = await apiCall('/api/status');
-    const configured = !!(st && st.integrations && st.integrations.nft_admin);
-    const banner = configured
-      ? `<div class="nft-adm-ok">● Admin connected — these actions write live to the platform.</div>`
-      : `<div class="nft-adm-warn">🔒 Admin writes need <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel (project <b>bifrost</b> → Settings → Environment Variables). Every form below works the instant it's added.${st && st._offline ? ' Note: the API only runs on the live site (bifrostlkl.com), not this local preview.' : ''}</div>`;
-    body.innerHTML = `${banner}<div class="nft-adm-grid" id="nft-adm"><div class="nft-loading"><span class="nft-spin"></span> Loading…</div></div>`;
+    if (!(await gate(body, 'Admin', '⚙️'))) return;
+    body.innerHTML = `<div class="nft-adm-ok">● Admin — these actions write live to the platform.</div><div class="nft-adm-grid" id="nft-adm"><div class="nft-loading"><span class="nft-spin"></span> Loading…</div></div>`;
     const host = body.querySelector('#nft-adm');
     const [dz, cz] = await Promise.all([apiCall('/api/dealers'), apiCall('/api/collections')]);
     const dealers = (dz && dz.dealers) || [], collections = (cz && cz.collections) || [];
