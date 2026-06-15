@@ -18,8 +18,11 @@
     { id: 'sales',       label: 'Sales',       icon: '💶' },
     { id: 'accounting',  label: 'Accounting',  icon: '📊' },
     { id: 'nfc',         label: 'NFC Cards',   icon: '🏷️' },
+    { id: 'cards',       label: 'Card orders', icon: '📮' },
     { id: 'support',     label: 'Support',     icon: '🛟' },
-    { id: 'admin',       label: 'Admin',       icon: '⚙️' }
+    { id: 'chain',       label: 'Chain',       icon: '⛓️' },
+    { id: 'admin',       label: 'Admin',       icon: '⚙️' },
+    { id: 'audit',       label: 'Audit',       icon: '📜' }
   ];
 
   let active = 'overview';
@@ -122,8 +125,11 @@
       if (active === 'sales')       return void await paintSales(body);
       if (active === 'accounting')  return void await paintAccounting(body);
       if (active === 'nfc')         return void await paintNfc(body);
+      if (active === 'cards')       return void await paintCards(body);
       if (active === 'support')     return void await paintSupport(body);
+      if (active === 'chain')       return void await paintChain(body);
       if (active === 'admin')       return void await paintAdmin(body);
+      if (active === 'audit')       return void await paintAudit(body);
     } catch (e) { body.innerHTML = `<div class="nft-warn">Failed to load: ${esc(e.message)}</div>`; }
   }
 
@@ -324,6 +330,51 @@
       const r = await apiCall('/api/ops', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'reply', conversation_id: convId, body: t }) });
       if (r.ok) load(); else H.toast('Send failed: ' + (r.error || ''), 'danger');
     });
+  }
+
+  // shared gate: returns true if the service key is configured, else paints the notice
+  async function gate(body, label, icon) {
+    const st = await apiCall('/api/status');
+    if (st && st.integrations && st.integrations.nft_admin) return true;
+    body.innerHTML = `<div class="nft-adm-warn">${icon} ${label} needs <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel.${st && st._offline ? ' The API runs on the live site only.' : ''}</div>`;
+    return false;
+  }
+
+  // ── Chain & gas: mint/transfer queue + platform wallet balance ──
+  async function paintChain(body) {
+    if (!(await gate(body, 'Chain & gas monitor', '⛓️'))) return;
+    body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading chain…</div>`;
+    const r = await apiCall('/api/console?view=chain');
+    if (!r.ok) { body.innerHTML = `<div class="nft-warn">${esc(r.error || 'error')}</div>`; return; }
+    const c = r.counts || {};
+    const kpi = (v, l) => `<div class="nft-kpi"><span class="k">${v}</span><span class="l">${l}</span></div>`;
+    const rows = (r.jobs || []).map(j => `<tr><td><span class="nft-chip">${esc(j.type)}</span></td><td><span class="nft-chip ${j.status === 'done' ? 'ok' : ''}">${esc(j.status)}</span></td><td class="num">${j.attempts}</td><td class="nft-mono">${j.tx_hash ? esc(String(j.tx_hash).slice(0, 12)) + '…' : (j.last_error ? esc(String(j.last_error).slice(0, 32)) : '—')}</td><td>${when(j.created_at)}</td><td>${j.status === 'failed' ? `<button class="nft-adm-mini" data-retry="${esc(j.id)}">Retry</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="6" class="nft-muted">No chain jobs.</td></tr>`;
+    body.innerHTML = `
+      <div class="nft-kpis" style="margin-bottom:16px">${kpi(r.balance_eth != null ? r.balance_eth.toFixed(4) + ' Ξ' : '—', 'Wallet (Base ETH)')}${kpi(c.queued || 0, 'Queued')}${kpi(c.processing || 0, 'Processing')}${kpi(c.done || 0, 'Done')}${kpi(c.failed || 0, 'Failed')}</div>
+      <section class="nft-panel"><h3>Chain jobs <span class="nft-muted">— mint / transfer queue</span></h3><table class="nft-table"><thead><tr><th>Type</th><th>Status</th><th class="num">Attempts</th><th>Tx / error</th><th>Created</th><th></th></tr></thead><tbody>${rows}</tbody></table></section>`;
+    body.querySelectorAll('[data-retry]').forEach(b => b.addEventListener('click', async () => { const rr = await apiCall('/api/console', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'retry_chain', id: b.dataset.retry }) }); if (rr.ok) { H.toast('Re-queued ✓', 'success'); paintChain(body); } else H.toast('Failed: ' + (rr.error || ''), 'danger'); }));
+  }
+
+  // ── Card production: dealer NFC-card orders → approve / ship / deliver ──
+  async function paintCards(body) {
+    if (!(await gate(body, 'Card production', '📮'))) return;
+    body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading card orders…</div>`;
+    const r = await apiCall('/api/console?view=cards');
+    if (!r.ok) { body.innerHTML = `<div class="nft-warn">${esc(r.error || 'error')}</div>`; return; }
+    const next = { requested: 'approved', approved: 'shipped', shipped: 'delivered' };
+    const rows = (r.rows || []).map(o => `<tr><td class="nft-mono">${esc(String(o.dealer_id).slice(0, 8))}</td><td class="num">${o.quantity}</td><td><span class="nft-chip ${o.status === 'delivered' ? 'ok' : ''}">${esc(o.status)}</span></td><td>${esc(o.notes || '')}</td><td>${when(o.created_at)}</td><td>${next[o.status] ? `<button class="nft-adm-mini" data-card="${esc(o.id)}" data-status="${next[o.status]}">Mark ${next[o.status]}</button> ` : ''}${o.status === 'requested' ? `<button class="nft-adm-mini" data-card="${esc(o.id)}" data-status="rejected">Reject</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="6" class="nft-muted">No card orders.</td></tr>`;
+    body.innerHTML = `<section class="nft-panel"><h3>Dealer card-production orders <span class="nft-muted">— the NFC cards you ship to dealers</span></h3><table class="nft-table"><thead><tr><th>Dealer</th><th class="num">Qty</th><th>Status</th><th>Notes</th><th>Created</th><th></th></tr></thead><tbody>${rows}</tbody></table></section>`;
+    body.querySelectorAll('[data-card]').forEach(b => b.addEventListener('click', async () => { const rr = await apiCall('/api/console', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'card_status', id: b.dataset.card, status: b.dataset.status }) }); if (rr.ok) { H.toast(b.dataset.status + ' ✓', 'success'); paintCards(body); } else H.toast('Failed: ' + (rr.error || ''), 'danger'); }));
+  }
+
+  // ── Audit log: every operator/system action ──
+  async function paintAudit(body) {
+    if (!(await gate(body, 'Audit log', '📜'))) return;
+    body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading audit log…</div>`;
+    const r = await apiCall('/api/console?view=audit');
+    if (!r.ok) { body.innerHTML = `<div class="nft-warn">${esc(r.error || 'error')}</div>`; return; }
+    const rows = (r.rows || []).map(a => `<tr><td>${when(a.created_at)}</td><td><span class="nft-chip">${esc(a.action)}</span></td><td class="nft-mono">${a.target ? esc(String(a.target).slice(0, 16)) : '—'}</td><td class="nft-mono">${a.actor_id ? esc(String(a.actor_id).slice(0, 8)) : 'system'}</td></tr>`).join('') || `<tr><td colspan="4" class="nft-muted">No audit entries.</td></tr>`;
+    body.innerHTML = `<section class="nft-panel"><h3>Audit log <span class="nft-muted">— last 200 actions</span></h3><table class="nft-table"><thead><tr><th>When</th><th>Action</th><th>Target</th><th>Actor</th></tr></thead><tbody>${rows}</tbody></table></section>`;
   }
 
   // ── Admin tab: the full operator "circle" (writes via the serverless API) ──
