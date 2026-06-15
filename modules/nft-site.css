@@ -1,104 +1,628 @@
-/* bifrost · NFT Site module — operator console for the NFT trading platform.
-   Uses core design tokens (var(--accent1) etc) with safe fallbacks so it stays
-   on-theme with the aurora palette without depending on unknown utility classes. */
-.nftsite { padding: 4px 2px 48px; }
+/* ============================================================================
+   HELM — nft-site.css
+   OPULENCE Control Center · NFT Site operator console.
+   Unified glass-and-aurora system fusing NEXUS (warm-paper ledger atlas, per-
+   entity hue, magnitude, slide-overs) + Constellation (deep-navy glass, platinum
+   accent, redundant colour+dash status, mono UIDs, SVG node map) re-keyed onto
+   bifrost's dark aurora base (assets/core.css).
 
-.nft-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 18px; }
-.nft-title { font-family: var(--font-display, 'Space Grotesk', sans-serif); font-size: 28px; font-weight: 600; margin: 0; letter-spacing: -.01em; display: flex; align-items: center; gap: 12px; color: var(--text, #eaf2f8); }
-.nft-live { font-size: 11px; font-weight: 600; color: #46E6A6; background: rgba(70, 230, 166, .12); border: 1px solid rgba(70, 230, 166, .3); padding: 3px 9px; border-radius: 999px; letter-spacing: .04em; }
-.nft-live.off { color: var(--warn, #F5A524); background: rgba(245, 165, 36, .12); border-color: rgba(245, 165, 36, .3); }
-.nft-sub { color: var(--muted, #8aa4bc); margin: 6px 0 0; font-size: 13px; }
+   Self-contained: every core token is referenced with a sensible fallback.
+   Two reconciliations baked into the tokens:
+     · bifrost references var(--muted,#8aa4bc) but core only defines
+       --text-muted  →  --muted is DEFINED here so both resolve.
+     · the green #46E6A6 in .nft-live/.nft-chip.ok/.nft-adm-ok is routed through
+       --ok (literal #46E6A6) so existing markup is visually unchanged.
+   ========================================================================== */
 
-.nft-kpis { display: grid; grid-template-columns: repeat(4, minmax(76px, 1fr)); gap: 10px; }
-@media (min-width: 920px) { .nft-kpis { grid-template-columns: repeat(8, minmax(60px, 1fr)); } }
-.nft-kpi { background: rgba(255, 255, 255, .03); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.nft-kpi .k { font-family: var(--font-display, sans-serif); font-size: 20px; font-weight: 600; color: var(--text, #eaf2f8); }
-.nft-kpi .l { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted, #8aa4bc); }
-.nft-kpi.skel { height: 48px; opacity: .35; animation: nftpulse 1.2s infinite; }
-@keyframes nftpulse { 50% { opacity: .12 } }
+/* ── 1. TOKENS ─────────────────────────────────────────────────────────────── */
+/* Declared on BOTH .nftsite and .nft-modal: the JS appends modals/sheets
+   directly to <body> (outside .nftsite), so they need their own token scope or
+   every var() collapses to empty. */
+.nftsite,
+.nft-modal{
+  /* ---- Base canvas (bifrost dark aurora) ---- */
+  /* core (assets/core.css :root) defines --bg/--bg2/--panel/--panel-hi/--border…
+     and they cascade down to here. We restate literals (NOT self-referential
+     var(--x,…), which would create a token cycle and invalidate the value) so
+     this file stays correct even if loaded standalone. */
+  --bg:#05070D;
+  --bg2:#070C14;
+  --canvas:#080B12;
 
-.nft-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border, rgba(255, 255, 255, .08)); margin-bottom: 18px; }
-.nft-tab { background: none; border: none; color: var(--muted, #8aa4bc); font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 10px 10px 0 0; cursor: pointer; display: flex; align-items: center; gap: 7px; border-bottom: 2px solid transparent; }
-.nft-tab:hover { color: var(--text, #eaf2f8); background: rgba(255, 255, 255, .03); }
-.nft-tab.active { color: var(--text, #eaf2f8); border-bottom-color: var(--accent1, #19D3FF); }
+  /* ---- Layered glass surfaces (low → high) ---- */
+  --panel:#0A1019;
+  --panel-hi:#0E1622;
+  --surface-1:rgba(14,21,34,.55);
+  --surface-2:rgba(13,19,31,.72);
+  --surface-3:rgba(12,18,29,.85);
+  --surface-solid:#10131A;
 
-.nft-panel { background: rgba(255, 255, 255, .025); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 16px; padding: 18px; margin-bottom: 18px; }
-.nft-panel h3 { margin: 0 0 14px; font-size: 14px; font-weight: 600; letter-spacing: .02em; color: var(--text, #eaf2f8); }
-.nft-muted { color: var(--muted, #8aa4bc); font-size: 12px; font-weight: 400; }
+  /* ---- Hairlines & borders ---- */
+  --border:#122433;
+  --border-hi:#1C3A44;
+  --border-glass:rgba(255,255,255,.07);
+  --border-glass-strong:rgba(255,255,255,.12);
 
-.nft-grid2 { display: grid; grid-template-columns: 1fr; gap: 18px; }
-@media (min-width: 1000px) { .nft-grid2 { grid-template-columns: 1fr 1fr; } }
+  /* ---- Text tints ---- */
+  --text:#EAF2F8;
+  --t1:#EAF2F8;
+  --text-muted:#8AA4BC;
+  --muted:#8AA4BC;                 /* DEFINE so var(--muted,…) always resolves */
+  --t2:#8AA4BC;
+  --text-faint:#46637A;
+  --t3:#46637A;
 
-.nft-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
-.nft-card { background: rgba(255, 255, 255, .02); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 14px; overflow: hidden; transition: transform .15s, border-color .15s; }
-.nft-card:hover { transform: translateY(-2px); border-color: rgba(25, 211, 255, .35); }
-.nft-cardimg { aspect-ratio: 1; background: rgba(0, 0, 0, .25); display: flex; align-items: center; justify-content: center; }
-.nft-thumb { width: 100%; height: 100%; object-fit: cover; }
-.nft-noimg { color: var(--muted, #557); font-size: 28px; }
-.nft-cardmeta { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
-.nft-cardmeta b { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text, #eaf2f8); display: flex; align-items: center; gap: 6px; }
+  /* ---- Accents (aurora) ---- */
+  --accent1:#19D3FF;
+  --accent2:#4D8DFF;
+  --accent3:#7C5CFF;
+  --accent-grad:linear-gradient(120deg,#7C5CFF,#4D8DFF 40%,#19D3FF 72%,#46E6A6);
+  --accent-soft:rgba(25,211,255,.10);
+  --violet-soft:rgba(124,92,255,.14);
+  --glow:rgba(25,211,255,.09);
 
-.nft-table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--text, #eaf2f8); }
-.nft-table th { text-align: left; color: var(--muted, #8aa4bc); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 6px 10px; border-bottom: 1px solid var(--border, rgba(255, 255, 255, .08)); }
-.nft-table td { padding: 9px 10px; border-bottom: 1px solid rgba(255, 255, 255, .04); }
-.nft-table td.num, .nft-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  /* ---- Platinum metal (Constellation accent, demoted to secondary) ---- */
+  --platinum:#E8E2D4;
+  --platinum-soft:rgba(232,226,212,.10);
 
-.nft-chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(255, 255, 255, .06); border: 1px solid var(--border, rgba(255, 255, 255, .08)); }
-.nft-chip.ok { color: #46E6A6; background: rgba(70, 230, 166, .1); border-color: rgba(70, 230, 166, .25); }
-.nft-mono { font-family: var(--font-mono, 'JetBrains Mono', monospace); font-size: 11px; color: var(--muted, #8aa4bc); }
-.nft-inline { display: flex; align-items: center; gap: 8px; }
-.nft-inline .nft-thumb { width: 28px; height: 28px; border-radius: 6px; }
+  /* ---- Status colours (5-tier, redundant with dash patterns) ---- */
+  --ok:#46E6A6;        --ok-deep:#0F8A6B;  --ok-wash:rgba(70,230,166,.12);
+  --warn:#F5A524;                          --warn-wash:rgba(245,165,36,.13);
+  --danger:#FF4D6D;                        --danger-wash:rgba(255,77,109,.13);
+  --coral:#FF6B5E;                         --coral-wash:rgba(255,107,94,.13);
+  --blue:#5FA8FF;                          --blue-wash:rgba(95,168,255,.12);
+  --violet-st:#A78BFA;                     --violet-st-wash:rgba(167,139,250,.13);
 
-.nft-loading { color: var(--muted, #8aa4bc); padding: 40px; text-align: center; }
-.nft-spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255, 255, 255, .2); border-top-color: var(--accent1, #19D3FF); border-radius: 50%; animation: nftspin .7s linear infinite; vertical-align: middle; margin-right: 8px; }
-@keyframes nftspin { to { transform: rotate(360deg) } }
-.nft-warn { color: var(--warn, #F5A524); padding: 16px; }
-.nft-locked { color: var(--muted, #8aa4bc); padding: 30px; text-align: center; background: rgba(255, 255, 255, .02); border: 1px dashed var(--border, rgba(255, 255, 255, .12)); border-radius: 14px; }
+  /* ---- Rarity ladder (NEXUS) ---- */
+  --rar-common:#8AA4BC; --rar-rare:#5FA8FF; --rar-epic:#A78BFA;
+  --rar-legendary:#F5A524; --rar-mythic:#E8E2D4;
 
-.nft-privgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-.nft-priv { background: rgba(255, 255, 255, .02); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px; opacity: .9; }
-.nft-priv .pv-l { font-weight: 600; font-size: 13px; color: var(--text, #eaf2f8); }
-.nft-priv .pv-lock { font-size: 11px; color: var(--warn, #F5A524); }
-.nft-priv .pv-n { font-size: 11px; color: var(--muted, #8aa4bc); }
+  /* ---- Per-entity hue (injected per collection at runtime) ---- */
+  --h:205;
+  --brand:#19D3FF;
+  --t:.5;
+  --w:50%;
+  --p:50;
 
-/* Admin tab — operator circle forms */
-.nft-adm-ok { color: #46E6A6; background: rgba(70, 230, 166, .1); border: 1px solid rgba(70, 230, 166, .25); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
-.nft-adm-warn { color: var(--warn, #F5A524); background: rgba(245, 165, 36, .1); border: 1px solid rgba(245, 165, 36, .25); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
-.nft-adm-warn code { background: rgba(255, 255, 255, .1); padding: 1px 6px; border-radius: 5px; font-family: var(--font-mono, monospace); font-size: 11px; }
-.nft-adm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
-.nft-adm-card { background: rgba(255, 255, 255, .025); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
-.nft-adm-card h4 { margin: 0 0 4px; font-size: 13px; color: var(--text, #eaf2f8); }
-.nft-in { font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, .04); border: 1px solid var(--border, rgba(255, 255, 255, .12)); color: var(--text, #eaf2f8); width: 100%; }
-.nft-adm-btn { font: inherit; font-size: 13px; padding: 8px 12px; border-radius: 8px; cursor: pointer; background: linear-gradient(120deg, var(--accent3, #7C5CFF), var(--accent1, #19D3FF)); border: none; color: #07111a; font-weight: 600; }
-.nft-adm-btn:hover { filter: brightness(1.08); }
-.nft-adm-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
-.nft-adm-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text, #eaf2f8); padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, .04); }
-.nft-adm-mini { font: inherit; font-size: 11px; padding: 4px 10px; border-radius: 7px; cursor: pointer; background: rgba(255, 255, 255, .07); border: 1px solid var(--border, rgba(255, 255, 255, .14)); color: var(--text, #eaf2f8); }
-.nft-adm-mini:hover { background: rgba(25, 211, 255, .15); }
-.nft-adm-sep { height: 1px; background: var(--border, rgba(255, 255, 255, .08)); margin: 4px 0; }
+  /* ---- Radii ladder ---- */
+  --r-xs:6px;
+  --r-sm:9px;
+  --r-md:12px;
+  --r-lg:16px;
+  --r-xl:20px;
+  --r-2xl:24px;
+  --r-pill:99px;
 
-/* collection drill-down */
-.nft-card-btn { font: inherit; text-align: left; cursor: pointer; padding: 0; color: inherit; width: 100%; }
-.nft-detail-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
-.nft-detail-head h3 { margin: 0; font-size: 16px; color: var(--text, #eaf2f8); }
-.nft-back { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer; background: rgba(255, 255, 255, .05); border: 1px solid var(--border, rgba(255, 255, 255, .12)); color: var(--text, #eaf2f8); }
-.nft-back:hover { background: rgba(255, 255, 255, .1); }
+  /* ---- Multi-layer shadows (deep on dark) ---- */
+  --shadow-sm:0 1px 2px rgba(0,0,0,.5), 0 1px 1px rgba(0,0,0,.4);
+  --shadow-md:0 2px 8px rgba(0,0,0,.5), 0 12px 30px rgba(0,0,0,.45);
+  --shadow-lg:0 8px 24px rgba(0,0,0,.55), 0 28px 70px rgba(0,0,0,.6);
+  --shadow-glow:0 0 0 1px rgba(25,211,255,.18), 0 8px 30px rgba(25,211,255,.12);
+  --inset-top:inset 0 1px 0 rgba(255,255,255,.06);
 
-/* coin → certificate modal */
-.nft-modal { position: fixed; inset: 0; z-index: 600; background: rgba(4, 8, 14, .66); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 20px; }
-.nft-modal.open { display: flex; }
-.nft-modal-box { width: min(520px, 96vw); background: var(--panel, #0c1422); border: 1px solid var(--border, rgba(255, 255, 255, .12)); border-radius: 18px; padding: 18px; box-shadow: 0 24px 80px rgba(0, 0, 0, .6); }
-.nft-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; color: var(--text, #eaf2f8); font-size: 16px; }
-.nft-modal-x { background: none; border: none; color: var(--muted, #8aa4bc); font-size: 16px; cursor: pointer; }
-.nft-cert-list { display: flex; flex-direction: column; gap: 10px; }
-.nft-cert { background: rgba(255, 255, 255, .03); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
-.nft-cert-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.nft-modal-body { max-height: 52vh; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
-.nft-chatbox { display: flex; gap: 8px; margin-top: 12px; }
-.nft-chatbox .nft-in { flex: 1; }
+  /* ---- Backdrop blur ladder ---- */
+  --blur-sm:blur(8px);
+  --blur-md:blur(14px);
+  --blur-lg:blur(20px);
 
-/* atlas / constellation map */
-.nft-map { width: 100%; overflow: hidden; }
-.nft-map svg { width: 100%; height: auto; display: block; }
-.nft-mapnode { cursor: pointer; transition: opacity .15s; }
-.nft-mapnode:hover circle { opacity: 1; filter: drop-shadow(0 0 6px rgba(25, 211, 255, .5)); }
+  /* ---- Focus rings (aurora double-ring) ---- */
+  --focus-ring:0 0 0 2px var(--bg), 0 0 0 4px var(--accent1);
+  --focus-halo:0 0 0 1px var(--accent1), 0 0 0 4px var(--accent-soft);
+
+  /* ---- Type families ---- */
+  --font-display:'Space Grotesk', system-ui, sans-serif;
+  --font-body:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:'JetBrains Mono','IBM Plex Mono', ui-monospace, monospace;
+
+  /* ---- Motion ---- */
+  --ease:cubic-bezier(.2,.7,.2,1);
+  --ease-spring:cubic-bezier(.22,1,.36,1);
+  --dur-fast:.14s; --dur:.2s; --dur-slow:.32s;
+}
+
+/* ── 2. ROOT / SHELL ───────────────────────────────────────────────────────── */
+.nftsite{
+  position:relative;
+  padding:24px;
+  background:
+    radial-gradient(1200px 620px at 82% -8%, rgba(124,92,255,.10), transparent 60%),
+    radial-gradient(960px 540px at -8% 108%, rgba(25,211,255,.07), transparent 55%),
+    radial-gradient(900px 760px at 50% 44%, rgba(28,58,68,.18), transparent 70%),
+    var(--canvas);
+  color:var(--text);
+  font-family:var(--font-body);
+  letter-spacing:.1px;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+.nftsite ::selection{background:var(--accent1);color:var(--bg)}
+.nftsite ::-webkit-scrollbar{width:10px;height:10px}
+.nftsite ::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+.nftsite ::-webkit-scrollbar-thumb:hover{background:var(--border-hi)}
+
+/* ── 3. TYPE UTILITIES ─────────────────────────────────────────────────────── */
+.nftsite .tnum{font-family:var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.nft-mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--muted);letter-spacing:0}
+.nft-mono b{color:var(--text);font-weight:600}
+.nftsite .eyebrow{font:600 11px/1 var(--font-body);letter-spacing:1.4px;text-transform:uppercase;color:var(--accent1)}
+
+/* ── 4. HEADER ─────────────────────────────────────────────────────────────── */
+.nft-head{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:24px;flex-wrap:wrap;margin-bottom:22px;
+}
+.nft-headmain{min-width:0;flex:1 1 auto}
+.nft-title{
+  margin:0;
+  font:600 28px/1.1 var(--font-display);
+  letter-spacing:-.4px;color:var(--text);
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.nft-sub{margin:6px 0 0;font-size:12.5px;color:var(--muted);max-width:64ch}
+
+/* Live / auth chips — breathing dot (Constellation .heartbeat idiom) */
+.nft-live{
+  display:inline-flex;align-items:center;gap:6px;
+  font:600 11px/1 var(--font-body);letter-spacing:.3px;
+  padding:4px 10px;border-radius:var(--r-pill);
+  color:var(--ok);background:var(--ok-wash);
+  border:1px solid color-mix(in srgb, var(--ok) 30%, transparent);
+  white-space:nowrap;
+}
+.nft-live::before{
+  content:"";width:6px;height:6px;border-radius:50%;
+  background:var(--ok);box-shadow:0 0 8px var(--ok);
+  animation:nftbreathe 4s ease-in-out infinite;
+}
+.nft-live.off{
+  color:var(--warn);background:var(--warn-wash);
+  border-color:color-mix(in srgb, var(--warn) 30%, transparent);
+}
+.nft-live.off::before{background:var(--warn);box-shadow:0 0 8px var(--warn);animation:none}
+#nft-auth{cursor:pointer;transition:filter var(--dur)}
+#nft-auth:hover{filter:brightness(1.1)}
+@keyframes nftbreathe{0%,100%{opacity:.4}50%{opacity:1}}
+
+/* KPI grid + tiles */
+.nft-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(min-width:920px){.nft-kpis{grid-template-columns:repeat(8,1fr)}}
+.nft-kpi{
+  position:relative;overflow:hidden;
+  display:flex;flex-direction:column;gap:6px;
+  padding:15px 15px 14px;border-radius:var(--r-md);
+  background:var(--surface-2);backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border:1px solid var(--border-glass);
+  box-shadow:var(--shadow-sm), var(--inset-top);
+  transition:transform var(--dur) var(--ease), box-shadow var(--dur), border-color var(--dur);
+}
+.nft-kpi::before{
+  content:"";position:absolute;inset:0 auto auto 0;width:100%;height:2px;
+  background:var(--accent-grad);opacity:.5;
+}
+.nft-kpi:hover{
+  transform:translateY(-2px);
+  border-color:var(--border-glass-strong);
+  box-shadow:var(--shadow-md), var(--inset-top);
+}
+.nft-kpi .k{
+  font:600 26px/1 var(--font-display);letter-spacing:-.5px;
+  color:var(--text);font-variant-numeric:tabular-nums;
+}
+.nft-kpi .l{
+  font:600 10.5px/1.2 var(--font-body);letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--muted);
+}
+.nft-kpi.skel{min-height:74px}
+.nft-kpi.skel::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.05) 50%,transparent 80%);
+  background-size:200% 100%;animation:nftpulse 1.4s ease-in-out infinite;
+}
+@keyframes nftpulse{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── 5. TABS NAV ───────────────────────────────────────────────────────────── */
+.nft-tabs{
+  display:flex;gap:4px;align-items:center;flex-wrap:wrap;
+  margin:0 0 18px;padding-bottom:0;
+  border-bottom:1px solid var(--border);
+}
+.nft-tab{
+  position:relative;display:inline-flex;align-items:center;gap:7px;
+  padding:9px 14px;border:0;background:transparent;cursor:pointer;
+  border-radius:var(--r-sm) var(--r-sm) 0 0;
+  font:600 12.5px/1 var(--font-body);color:var(--muted);
+  transition:color var(--dur), background var(--dur);
+}
+.nft-tab:hover{color:var(--text);background:var(--surface-1)}
+.nft-tab.active{color:var(--accent1)}
+.nft-tab.active::after{
+  content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:2px;
+  border-radius:2px;background:var(--accent1);
+  box-shadow:0 0 10px var(--accent1), 0 0 4px var(--accent1);
+}
+.nt-ico{font-size:14px;line-height:1;display:inline-grid;place-items:center}
+
+/* Body scroll/paint region */
+.nft-body{position:relative}
+
+/* NFC-tab filter reuse: .nft-tabs gets inline border:0;margin:0 → become full pills */
+.nft-tabs[style] .nft-tab{border-radius:var(--r-pill)}
+.nft-tabs[style] .nft-tab.active{background:var(--accent-soft);color:var(--accent1)}
+.nft-tabs[style] .nft-tab.active::after{display:none}
+
+/* ── 6. PANELS ─────────────────────────────────────────────────────────────── */
+.nft-panel{
+  position:relative;overflow:hidden;
+  padding:20px;margin-bottom:16px;border-radius:var(--r-lg);
+  background:var(--surface-2);backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border:1px solid var(--border-glass);
+  box-shadow:var(--shadow-md), var(--inset-top);
+}
+.nft-panel h3{
+  margin:0 0 14px;
+  font:600 16px/1.2 var(--font-display);letter-spacing:-.2px;color:var(--text);
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+}
+.nft-panel h3 .nft-muted{font:400 12.5px/1.3 var(--font-body);color:var(--muted)}
+.nft-grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+@media(max-width:1080px){.nft-grid2{grid-template-columns:1fr}}
+
+/* ── 7. CARDS ──────────────────────────────────────────────────────────────── */
+.nft-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.nft-card{
+  position:relative;overflow:hidden;text-align:left;
+  border-radius:var(--r-lg);
+  background:var(--surface-2);backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border:1px solid var(--border-glass);
+  box-shadow:var(--shadow-sm), var(--inset-top);
+  transition:transform var(--dur) var(--ease), box-shadow var(--dur), border-color var(--dur);
+}
+.nft-card::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;z-index:2;
+  background:hsl(var(--h) 80% 60%);opacity:.55;
+}
+.nft-card:hover{
+  transform:translateY(-3px);
+  box-shadow:var(--shadow-md), var(--inset-top);
+  border-color:color-mix(in srgb, hsl(var(--h) 80% 60%) 45%, var(--border-glass));
+}
+.nft-card-btn{
+  display:block;width:100%;font:inherit;padding:0;cursor:pointer;
+  color:inherit;background:var(--surface-2);border:0;
+}
+.nft-cardimg{position:relative;aspect-ratio:1/1;overflow:hidden;background:var(--bg2)}
+.nft-thumb{width:100%;height:100%;object-fit:cover;display:block}
+.nft-noimg{
+  display:grid;place-items:center;width:100%;height:100%;
+  font:400 38px/1 var(--font-display);color:var(--text-faint);
+  background:radial-gradient(120% 120% at 50% 20%, hsl(var(--h) 40% 22% /.5), var(--bg2));
+}
+.nft-cardmeta{padding:12px 13px 13px}
+.nft-cardmeta b{
+  display:flex;align-items:center;gap:6px;
+  font:600 14.5px/1.25 var(--font-display);color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.nft-cardmeta .nft-muted{display:block;margin-top:3px;font-size:11.5px;color:var(--muted)}
+
+/* Magnitude option (NEXUS) — lift intensity by --t rather than card size */
+.nft-card[style*="--t"]:hover{box-shadow:var(--shadow-md), var(--inset-top)}
+
+/* Inline thumb + label (dealers) */
+.nft-inline{display:flex;align-items:center;gap:9px;min-width:0}
+.nft-inline .nft-thumb{width:28px;height:28px;border-radius:var(--r-sm);object-fit:cover;flex:none}
+.nft-inline b{font:600 13px/1.2 var(--font-display);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── 8. TABLES ─────────────────────────────────────────────────────────────── */
+.nft-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.nft-table th{
+  position:sticky;top:0;z-index:1;text-align:left;
+  padding:10px 12px;
+  font:600 10.5px/1.2 var(--font-body);letter-spacing:.6px;text-transform:uppercase;
+  color:var(--muted);
+  background:var(--surface-2);backdrop-filter:var(--blur-sm);-webkit-backdrop-filter:var(--blur-sm);
+  border-bottom:1px solid var(--border);
+}
+.nft-table td{padding:11px 12px;color:var(--text);border-bottom:1px solid var(--border);vertical-align:middle}
+.nft-table tbody tr{transition:background var(--dur-fast)}
+.nft-table tbody tr:hover{background:var(--surface-1)}
+.nft-table tbody tr:last-child td{border-bottom:0}
+.nft-table td.num,.nft-table th.num{
+  text-align:right;
+  font-family:var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:-.01em;
+}
+.nft-table td[colspan]{color:var(--muted);text-align:center;padding:18px 12px}
+
+/* ── 9. CHIPS & TEXT UTILITIES ─────────────────────────────────────────────── */
+.nft-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  font:600 11px/1 var(--font-body);
+  padding:3px 9px;border-radius:var(--r-pill);
+  color:var(--muted);background:var(--surface-1);
+  border:1px solid var(--border-glass);white-space:nowrap;
+}
+.nft-chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.9}
+.nft-chip.ok{color:var(--ok);background:var(--ok-wash);border-color:color-mix(in srgb, var(--ok) 30%, transparent)}
+.nft-chip.warn{color:var(--warn);background:var(--warn-wash);border-color:color-mix(in srgb, var(--warn) 30%, transparent)}
+.nft-chip.bad{color:var(--danger);background:var(--danger-wash);border-color:color-mix(in srgb, var(--danger) 30%, transparent)}
+.nft-chip.info{color:var(--blue);background:var(--blue-wash);border-color:color-mix(in srgb, var(--blue) 30%, transparent)}
+.nft-chip.special{color:var(--violet-st);background:var(--violet-st-wash);border-color:color-mix(in srgb, var(--violet-st) 30%, transparent)}
+
+.nft-muted{color:var(--muted);font-size:12.5px}
+
+.nft-warn{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:11px 13px;border-radius:var(--r-md);
+  color:var(--warn);background:var(--warn-wash);
+  border:1px solid color-mix(in srgb, var(--warn) 28%, transparent);
+  font-size:12.5px;line-height:1.4;
+}
+
+.nft-locked{
+  display:flex;align-items:center;gap:7px;
+  padding:11px 13px;border-radius:var(--r-md);
+  color:var(--muted);background:var(--surface-1);
+  border:1px dashed var(--border-hi);font-size:12.5px;
+}
+
+.nft-loading{
+  display:grid;place-items:center;gap:10px;
+  padding:40px;color:var(--muted);font-size:12.5px;
+}
+.nft-spin{
+  width:22px;height:22px;border-radius:50%;
+  border:2.5px solid var(--border-hi);border-top-color:var(--accent1);
+  animation:nftspin .8s linear infinite;
+}
+@keyframes nftspin{to{transform:rotate(360deg)}}
+
+/* ── 10. PRIVILEGE TILES ───────────────────────────────────────────────────── */
+.nft-privgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.nft-priv{
+  display:flex;flex-direction:column;gap:5px;
+  padding:14px;border-radius:var(--r-md);
+  background:var(--surface-1);border:1px solid var(--border-glass);
+  box-shadow:var(--inset-top);
+}
+.nft-priv .pv-l{font:600 13px/1.2 var(--font-display);color:var(--text)}
+.nft-priv .pv-lock{display:inline-flex;align-items:center;gap:5px;font:600 11px/1.2 var(--font-body);color:var(--warn)}
+.nft-priv .pv-n{font-size:11.5px;line-height:1.4;color:var(--muted)}
+
+/* ── 11. ADMIN & CONTROLS ──────────────────────────────────────────────────── */
+.nft-adm-ok{
+  display:flex;align-items:center;gap:8px;
+  padding:11px 14px;margin-bottom:14px;border-radius:var(--r-md);
+  font:600 13px/1.3 var(--font-body);
+  color:var(--ok);background:var(--ok-wash);
+  border:1px solid color-mix(in srgb, var(--ok) 28%, transparent);
+}
+.nft-adm-ok::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);flex:none}
+
+.nft-adm-warn{
+  display:flex;align-items:center;gap:8px;
+  padding:11px 14px;margin-bottom:14px;border-radius:var(--r-md);
+  font:600 13px/1.3 var(--font-body);
+  color:var(--warn);background:var(--warn-wash);
+  border:1px solid color-mix(in srgb, var(--warn) 28%, transparent);
+}
+.nft-adm-warn code{
+  font-family:var(--font-mono);color:var(--text);
+  background:var(--surface-1);padding:1px 6px;border-radius:var(--r-xs);
+}
+
+.nft-adm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.nft-adm-card{
+  display:flex;flex-direction:column;gap:10px;
+  padding:16px;border-radius:var(--r-lg);
+  background:var(--surface-2);backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
+  border:1px solid var(--border-glass);
+  box-shadow:var(--shadow-sm), var(--inset-top);
+}
+.nft-adm-card h4{margin:0 0 2px;font:600 15px/1.2 var(--font-display);color:var(--text)}
+
+.nft-in{
+  width:100%;height:38px;padding:0 12px;
+  border-radius:var(--r-sm);
+  background:var(--bg2);color:var(--text);
+  border:1px solid var(--border);
+  font:400 13px/1 var(--font-body);
+  transition:border-color var(--dur), box-shadow var(--dur), background var(--dur);
+}
+.nft-in::placeholder{color:var(--text-faint)}
+.nft-in:focus{
+  outline:none;border-color:var(--accent1);
+  background:var(--panel-hi);box-shadow:var(--focus-halo);
+}
+textarea.nft-in{height:auto;min-height:84px;padding:10px 12px;resize:vertical;line-height:1.45}
+select.nft-in{
+  appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:30px;
+  background-image:
+    linear-gradient(45deg,transparent 50%,var(--muted) 50%),
+    linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 17px, calc(100% - 11px) 17px;
+  background-size:5px 5px, 5px 5px;
+  background-repeat:no-repeat;
+}
+
+.nft-adm-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:38px;padding:0 16px;border:0;cursor:pointer;
+  border-radius:var(--r-sm);
+  font:600 13px/1 var(--font-body);color:#04121A;
+  background:linear-gradient(120deg, var(--accent3), var(--accent2) 45%, var(--accent1));
+  box-shadow:0 6px 18px rgba(25,211,255,.28);
+  transition:transform var(--dur), box-shadow var(--dur), filter var(--dur);
+}
+.nft-adm-btn:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(25,211,255,.4);filter:brightness(1.04)}
+.nft-adm-btn:active{transform:translateY(0)}
+.nft-adm-btn:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+
+.nft-adm-sep{height:1px;background:var(--border);margin:4px 0;border:0}
+
+.nft-adm-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto;padding-right:2px}
+.nft-adm-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 11px;border-radius:var(--r-sm);
+  background:var(--surface-1);border:1px solid var(--border-glass);
+  transition:background var(--dur-fast);
+}
+.nft-adm-row:hover{background:var(--panel-hi)}
+
+.nft-adm-mini{
+  height:30px;padding:0 11px;border-radius:var(--r-sm);cursor:pointer;
+  font:600 12px/1 var(--font-body);
+  color:var(--text);background:transparent;
+  border:1px solid var(--border-hi);
+  transition:color var(--dur), border-color var(--dur), background var(--dur);
+}
+.nft-adm-mini:hover{color:var(--accent1);border-color:var(--accent1);background:var(--accent-soft)}
+.nft-adm-mini:focus-visible{outline:none;box-shadow:var(--focus-halo)}
+/* danger variant for unlink / deactivate / revoke */
+.nft-adm-mini[data-nfc="deactivate"],
+.nft-adm-mini[data-nfc="unlink"]{
+  color:var(--danger);
+  border-color:color-mix(in srgb, var(--danger) 40%, var(--border-hi));
+}
+.nft-adm-mini[data-nfc="deactivate"]:hover,
+.nft-adm-mini[data-nfc="unlink"]:hover{background:var(--danger-wash);border-color:var(--danger);color:var(--danger)}
+
+/* ── 12. ATLAS / CONSTELLATION MAP ─────────────────────────────────────────── */
+.nft-map{
+  position:relative;overflow:hidden;border-radius:var(--r-lg);
+  background:
+    radial-gradient(1200px 760px at 50% 44%, rgba(28,58,68,.32), transparent 70%),
+    var(--bg2);
+  border:1px solid var(--border-glass);
+  box-shadow:var(--inset-top);
+}
+.nft-map svg{display:block;width:100%;height:auto}
+
+/* connector base; JS sets stroke + stroke-dasharray per status */
+.nft-map line,
+.nft-map path.link{fill:none;stroke-linecap:round;transition:opacity .25s}
+
+/* nodes */
+.nft-mapnode{cursor:pointer}
+.nft-mapnode circle{transition:filter var(--dur), opacity .25s}
+.nft-mapnode:hover circle{filter:drop-shadow(0 0 8px var(--accent1)) drop-shadow(0 0 3px var(--accent1))}
+.nft-mapnode text{
+  fill:var(--muted);font-family:var(--font-display);font-size:12px;
+  paint-order:stroke;stroke:var(--bg2);stroke-width:3.5px;stroke-linejoin:round;
+}
+.nft-mapnode.dim{opacity:.14}
+.nft-mapnode.dimfocus{opacity:.05}
+
+/* hub */
+.nft-hub{fill:var(--accent3)}
+.nft-hub-label{fill:var(--text);font-family:var(--font-display);font-size:13px;letter-spacing:.06em}
+
+/* problem-node + hub pulse rings */
+.nft-pulse{
+  transform-box:fill-box;transform-origin:center;
+  animation:nftpulsering 2.2s ease-out infinite;
+}
+@keyframes nftpulsering{0%{opacity:.5;transform:scale(.7)}70%,100%{opacity:0;transform:scale(1.9)}}
+
+/* ── 13. MODAL / SLIDE-OVER SHEET ──────────────────────────────────────────── */
+.nft-modal{
+  position:fixed;inset:0;z-index:90;display:none;
+  align-items:center;justify-content:center;padding:24px;
+  background:rgba(5,7,13,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+}
+.nft-modal.open{display:flex;animation:nftfade var(--dur) var(--ease)}
+@keyframes nftfade{from{opacity:0}to{opacity:1}}
+
+.nft-modal-box{
+  position:relative;
+  width:min(560px,94vw);max-height:88vh;
+  display:flex;flex-direction:column;overflow:hidden;
+  border-radius:var(--r-xl);
+  background:var(--surface-3);backdrop-filter:var(--blur-lg);-webkit-backdrop-filter:var(--blur-lg);
+  border:1px solid var(--border-glass-strong);
+  box-shadow:var(--shadow-lg), var(--inset-top);
+  transform:translateY(12px) scale(.98);
+  animation:nftpop var(--dur-slow) var(--ease-spring) forwards;
+}
+.nft-modal-box::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;z-index:2;
+  background:var(--accent-grad);opacity:.6;
+}
+@keyframes nftpop{to{transform:none}}
+
+.nft-modal-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:18px 20px;border-bottom:1px solid var(--border);
+}
+.nft-modal-head b{font:600 15px/1.2 var(--font-display);color:var(--text)}
+.nft-modal-x{
+  width:34px;height:34px;flex:none;border:0;cursor:pointer;
+  border-radius:var(--r-sm);display:grid;place-items:center;
+  color:var(--muted);background:transparent;font-size:15px;
+  transition:color var(--dur), background var(--dur);
+}
+.nft-modal-x:hover{background:var(--surface-1);color:var(--text)}
+.nft-modal-body{flex:1;overflow:auto;padding:18px 20px}
+
+/* cert list (also reused for chat messages) */
+.nft-cert-list{display:flex;flex-direction:column;gap:10px}
+.nft-cert{
+  padding:13px 14px;border-radius:var(--r-md);
+  background:var(--surface-1);border:1px solid var(--border-glass);
+}
+.nft-cert-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+
+/* chat */
+.nft-chatbox{
+  display:flex;gap:9px;padding:14px 20px;
+  border-top:1px solid var(--border);
+  background:var(--surface-3);
+}
+.nft-chatbox .nft-in{flex:1}
+
+/* sign-in variant: dock-right slide-over rather than centered */
+.nft-modal.nft-signin{align-items:stretch;justify-content:flex-end;padding:0}
+.nft-modal.nft-signin .nft-modal-box{
+  margin-left:auto;height:100vh;max-height:100vh;width:min(420px,94vw);
+  border-radius:var(--r-2xl) 0 0 var(--r-2xl);
+  transform:translateX(4%);
+  animation:nftslide var(--dur-slow) var(--ease-spring) forwards;
+}
+@keyframes nftslide{to{transform:none}}
+
+/* ── 14. DETAIL HEADER / BACK ──────────────────────────────────────────────── */
+.nft-detail-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.nft-detail-head h3{
+  margin:0;font:600 18px/1.2 var(--font-display);letter-spacing:-.2px;color:var(--text);
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+}
+.nft-detail-head h3 .nft-muted{font:400 12.5px/1.3 var(--font-body);color:var(--muted)}
+.nft-back{
+  display:inline-flex;align-items:center;gap:6px;
+  height:34px;padding:0 13px;border-radius:var(--r-sm);cursor:pointer;
+  font:600 12.5px/1 var(--font-body);color:var(--muted);
+  background:var(--surface-1);border:1px solid var(--border-glass);
+  transition:color var(--dur), border-color var(--dur), background var(--dur);
+}
+.nft-back:hover{color:var(--accent1);border-color:var(--accent1);background:var(--accent-soft)}
+.nft-back:focus-visible{outline:none;box-shadow:var(--focus-halo)}
+
+/* ── 15. VIEW TRANSITIONS · RESPONSIVE · REDUCED MOTION ────────────────────── */
+.nft-body > .view,
+.nft-body > section,
+.nft-body > div{animation:nftview .35s var(--ease) both}
+@keyframes nftview{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+@media(max-width:920px){.nft-kpis{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:680px){
+  .nftsite{padding:16px}
+  .nft-kpis{grid-template-columns:repeat(2,1fr)}
+  .nft-grid2{grid-template-columns:1fr}
+  .nft-title{font-size:24px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .nftsite *{animation-duration:.001s !important;transition-duration:.001s !important}
+  .nft-pulse,.nft-live::before{animation:none}
+  .nft-spin{animation-duration:1.6s !important}
+  .nft-live::before{opacity:.9}
+}
