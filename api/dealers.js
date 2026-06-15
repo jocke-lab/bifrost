@@ -1,7 +1,9 @@
 // /api/dealers — GET list · POST create · PATCH update/approve  (NFT platform)
 const { json, readBody, supa, fail } = require('./_lib');
 const STATUS = ['pending', 'approved', 'suspended'];
-const slugify = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// DB enforces slug ~ ^[a-z0-9-]{2,60}$
+const slugify = s => { const v = String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60); return v.length >= 2 ? v : ('d-' + Date.now().toString(36)); };
+const clampRoy = n => Math.max(0, Math.min(2000, Number(n) || 0));
 
 module.exports = async (req, res) => {
   try {
@@ -14,7 +16,7 @@ module.exports = async (req, res) => {
       if (!b.name) return json(res, 400, { ok: false, error: 'name required' });
       const row = {
         name: b.name, slug: b.slug ? slugify(b.slug) : slugify(b.name),
-        default_royalty_bps: b.royalty_bps != null ? Number(b.royalty_bps) : 500,
+        default_royalty_bps: b.royalty_bps != null ? clampRoy(b.royalty_bps) : 500,
         contact_email: b.contact_email || null, website: b.website || null, bio: b.bio || null
       };
       if (b.status && STATUS.includes(b.status)) row.status = b.status;
