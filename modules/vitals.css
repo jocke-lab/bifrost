@@ -174,3 +174,90 @@
 .vitals-metric{background:var(--bg2,rgba(255,255,255,.03));border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:14px 12px;text-align:center}
 .vitals-metric b{display:block;font-family:var(--font-display,inherit);font-size:24px;font-weight:600;color:var(--text,#fff);line-height:1.1}
 .vitals-metric span{display:block;margin-top:5px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-faint,#8aa4bc)}
+
+/* ════════════════════════════════════════════════════════════════════════
+   v3 — REAL hub-backed tracker: header chip, Today HUD (dynamic budget),
+   goal segment, quick-log + workout forms, history charts, device states.
+   Palette-token only; harmonises with .nft* glass/aurora language.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* header sync button (uses core .btn) sits beside the privacy chip */
+.vitals-who{white-space:nowrap}
+
+/* ── goal segment (3-up, reuses .vitals-seg) ─────────────────────────────── */
+.vitals-seg--goal{display:flex;width:100%}
+.vitals-seg--goal button{flex:1}
+.vitals-seg--goal button[data-goal="cut"].active{color:var(--accent2);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent2) 32%,transparent)}
+.vitals-seg--goal button[data-goal="gain"].active{color:var(--warn);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 32%,transparent)}
+
+/* ── TODAY HUD ───────────────────────────────────────────────────────────── */
+.vitals-hud-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:18px;align-items:stretch}
+@media (max-width:880px){.vitals-hud-grid{grid-template-columns:1fr}}
+
+.vitals-hud-budget{display:flex;align-items:center;gap:18px;min-width:0;
+  background:linear-gradient(140deg,color-mix(in srgb,var(--accent1) 9%,var(--bg2)),var(--bg2));
+  border:1px solid var(--border-hi);border-radius:var(--radius-sm);padding:16px 18px}
+.vitals-hud-rings{flex:none}
+.vitals-ring--sm{width:150px;height:150px;margin:0}
+.vitals-ring--sm svg{width:150px;height:150px}
+.vitals-hud-budget-main{min-width:0;flex:1}
+.vitals-hud-budget-v{font-family:var(--font-display);font-size:40px;font-weight:600;letter-spacing:-1px;line-height:1;color:var(--accent1);font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;margin:4px 0 9px}
+.vitals-hud-budget-v small{font-family:var(--font-mono);font-size:10px;letter-spacing:1px;color:var(--text-muted);font-weight:400}
+
+.vitals-budget-bd{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.vitals-bd-pill{font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--text);background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:3px 8px;white-space:nowrap}
+.vitals-bd-pill.is-cut{color:var(--accent2);border-color:color-mix(in srgb,var(--accent2) 35%,transparent)}
+.vitals-bd-pill.is-gain{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.vitals-bd-pill.is-move{color:var(--success);border-color:color-mix(in srgb,var(--success) 35%,transparent)}
+.vitals-bd-op{font-family:var(--font-mono);font-size:12px;color:var(--text-faint)}
+.vitals-hud-tip{font-size:11.5px;line-height:1.5;color:var(--text-muted);margin-top:11px}
+.vitals-hud-tip b{color:var(--text)}
+
+.vitals-hud-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;align-content:start}
+.vitals-tile{display:flex;flex-direction:column;gap:3px;padding:13px 14px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border);transition:border-color .16s var(--ease)}
+.vitals-tile:hover{border-color:var(--border-hi)}
+.vitals-tile b{font-family:var(--font-display);font-size:23px;font-weight:600;letter-spacing:-.5px;color:var(--text);font-variant-numeric:tabular-nums;line-height:1}
+.vitals-tile span{font-family:var(--font-mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-faint)}
+.vitals-tile--ok b{color:var(--success)}
+.vitals-tile--ok{border-color:color-mix(in srgb,var(--success) 30%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--success) 8%,var(--bg2)),var(--bg2))}
+.vitals-hud-foot{font-size:11.5px;line-height:1.5;margin-top:13px}
+.vitals-hud-foot a{color:var(--accent1);text-decoration:none}
+.vitals-hud-foot a:hover{text-decoration:underline}
+
+/* offline/info banner */
+.vitals-banner{margin-bottom:var(--gap);padding:11px 14px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border);font-size:12.5px;color:var(--text-muted)}
+
+/* ── QUICK LOG + WORKOUT FORM ────────────────────────────────────────────── */
+.vitals-quick{display:flex;flex-direction:column;gap:10px}
+.vitals-quick-row{display:flex;align-items:center;gap:9px}
+.vitals-quick-row .vitals-field-in{flex:1}
+.vitals-quick-row .btn{flex:none}
+.vitals-hr{border:0;height:1px;background:var(--border);margin:15px 0}
+
+.vitals-wk-form{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.vitals-wk-form .nft-in{height:38px}
+.vitals-wk-form .vitals-field-in input{font-size:14px;padding:8px 0}
+.vitals-wk-note{grid-column:1/-1}
+.vitals-wk-add{grid-column:1/-1;justify-content:center}
+@media (max-width:560px){.vitals-wk-form{grid-template-columns:1fr}}
+
+/* ── RECENT WORKOUTS LIST ────────────────────────────────────────────────── */
+#vit-wk-list{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto;padding-right:2px}
+.vitals-wk-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border);transition:border-color .16s var(--ease),transform .16s var(--ease)}
+.vitals-wk-item:hover{transform:translateX(2px);border-color:var(--border-hi)}
+.vitals-wk-ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:var(--panel);border:1px solid var(--border);flex:none}
+.vitals-wk-main{flex:1;min-width:0}
+.vitals-wk-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vitals-wk-sub{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);margin-top:2px;font-variant-numeric:tabular-nums}
+
+/* ── HISTORY CHARTS ──────────────────────────────────────────────────────── */
+.vitals-chart{min-height:150px}
+.vitals-chart .chart{width:100%;height:150px}
+.vitals-legend{display:flex;gap:14px;margin-top:8px;padding-left:2px}
+
+/* ── DEVICE STATE (reuses .vitals-dev*) ──────────────────────────────────── */
+.vitals-dev-state{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--success)}
+.vitals-dev-state.muted{color:var(--text-muted);font-weight:400}
+.vitals-dev-state code{font-family:var(--font-mono);font-size:10.5px;color:var(--text);background:var(--panel);padding:1px 5px;border-radius:5px}
+.vitals-dev-note a{color:var(--accent1);text-decoration:none}
+.vitals-dev-note a:hover{text-decoration:underline}

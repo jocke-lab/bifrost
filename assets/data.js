@@ -27,6 +27,30 @@
   const hub = make(projects.hub) || (C.supabaseUrl ? SB.createClient(C.supabaseUrl, C.supabaseAnonKey) : null);
   const nft = make(projects.nft);
 
+  // Keyless company books + vitals: the hub edge function `company`
+  // (hub-JWT allowlist auth + auto service-role). Mirrors the nft `admin` fn.
+  const COMPANY_FN = ((projects.hub && projects.hub.url) || C.supabaseUrl || 'https://zgvqnaorhtafqffzagll.supabase.co') + '/functions/v1/company';
+  const HUB_KEY = (projects.hub && projects.hub.anonKey) || C.supabaseAnonKey || 'sb_publishable_lgI1O2aderasrvjazJZSPw_Oul6pHvx';
+  async function companyToken() { try { const s = hub ? (await hub.auth.getSession()).data.session : null; return s && s.access_token; } catch (e) { return null; } }
+  async function company(path, opts = {}) {
+    const token = await companyToken();
+    const headers = { apikey: HUB_KEY, 'content-type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    let r;
+    try { r = await fetch(COMPANY_FN + '/' + path, { method: opts.method || 'GET', headers, body: opts.body ? JSON.stringify(opts.body) : undefined }); }
+    catch (e) { return { ok: false, _offline: true, error: e.message }; }
+    if (opts.raw) return r;
+    const t = await r.text(); let json; try { json = JSON.parse(t); } catch (e) { json = { ok: false, error: t || ('HTTP ' + r.status) }; }
+    return json;
+  }
+  async function companyDownload(path, filename) {
+    const r = await company(path, { raw: true });
+    if (!r.ok) { const t = await r.text(); throw new Error(t || ('HTTP ' + r.status)); }
+    const blob = await r.blob();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename || 'export.csv';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  }
+
   // Generic read helper: read(client, 'table', { select, eq, order:{col,asc}, limit, count })
   async function read(client, table, opts = {}) {
     if (!client) return { data: [], error: 'no client', count: 0 };
@@ -57,6 +81,9 @@
     // NFT platform convenience wrappers
     nft_read: (table, opts) => read(nft, table, opts),
     nft_count: (table, eq) => count(nft, table, eq),
+
+    // Company books + vitals (keyless edge function)
+    company, companyDownload,
 
     // Auth (against the hub project) — used by the admin login gate.
     auth: {

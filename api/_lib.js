@@ -65,6 +65,30 @@ async function requireAdmin(req) {
   return user;
 }
 
+// ── Signed-in user gate (no admin allowlist) ────────────────────────────────
+// Verifies the caller's bifrost-hub session JWT via /auth/v1/user (same as
+// requireAdmin) but accepts ANY valid hub user. Returns {uid,email,user} so
+// per-employee endpoints (wearables) know which person is acting. Does NOT
+// touch requireAdmin / ADMIN_EMAILS — the admin gate is unchanged.
+async function requireUser(req) {
+  const h = req.headers || {};
+  const token = String(h.authorization || h.Authorization || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) { const e = new Error('sign in required'); e.code = 'UNAUTHORIZED'; throw e; }
+  let user;
+  try {
+    const r = await fetch(PROJECTS.hub.url + '/auth/v1/user', { headers: { apikey: HUB_ANON, Authorization: 'Bearer ' + token } });
+    if (!r.ok) { const e = new Error('sign in required'); e.code = 'UNAUTHORIZED'; throw e; }
+    user = await r.json();
+  } catch (e) { if (e.code) throw e; const er = new Error('auth check failed'); er.code = 'UNAUTHORIZED'; throw er; }
+  if (!user || !user.id) { const e = new Error('sign in required'); e.code = 'UNAUTHORIZED'; throw e; }
+  return { uid: user.id, email: user.email || null, token, user };
+}
+
+// Single stable origin used IDENTICALLY in OAuth start + callback so the
+// redirect_uri matches the provider-console allowlist exactly. Override per
+// environment with PUBLIC_ORIGIN (no trailing slash).
+const PUBLIC_ORIGIN = (process.env.PUBLIC_ORIGIN || 'https://bifrostlkl.com').replace(/\/+$/, '');
+
 // Uniform failure response. "Not configured" returns 200 + configured:false so
 // the frontend can render a clean "add this key" state instead of an error.
 function fail(res, e) {
@@ -76,4 +100,4 @@ function fail(res, e) {
   return json(res, (e && e.status) || 500, { ok: false, error: (e && e.message) || 'error', detail: e && e.data });
 }
 
-module.exports = { PROJECTS, key, json, readBody, supa, fail, requireAdmin };
+module.exports = { PROJECTS, key, json, readBody, supa, fail, requireAdmin, requireUser, PUBLIC_ORIGIN, HUB_ANON };

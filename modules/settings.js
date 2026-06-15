@@ -21,6 +21,7 @@
 
       const SECTIONS = [
         { id: 'profile', ico: '🧑', label: 'Profile', sub: 'Name, email & body metrics' },
+        { id: 'workspace', ico: '🧩', label: 'Workspace', sub: 'Show or hide sections' },
         { id: 'appearance', ico: '🎨', label: 'Appearance', sub: 'Accent theme' }
       ];
 
@@ -204,7 +205,38 @@
         return wrap;
       }
 
-      const BUILDERS = { profile: buildProfile, appearance: buildAppearance };
+      /* ── WORKSPACE — show/hide deck sections ── */
+      function toggleRow(label, sub, on, cb) {
+        const node = H.el(`
+          <div class="settings-toggle-row">
+            <div class="settings-toggle-body"><div class="settings-field-label">${esc(label)}</div><div class="kpi-sub">${esc(sub)}</div></div>
+            <button class="settings-toggle${on ? ' on' : ''}" role="switch" aria-checked="${on}" aria-label="${esc(label)}"><span class="settings-knob"></span></button>
+          </div>`);
+        node.querySelector('.settings-toggle').addEventListener('click', (e) => {
+          const t = e.currentTarget; const now = t.classList.toggle('on'); t.setAttribute('aria-checked', now ? 'true' : 'false'); if (cb) cb(now);
+        });
+        return node;
+      }
+      function buildWorkspace() {
+        const wrap = H.el(`<div class="settings-panel"></div>`);
+        const card = H.el(`
+          <div class="card">
+            ${panel('🧩', 'Deck sections', 'SHOW / HIDE')}
+            <p class="kpi-sub" style="margin-bottom:13px">Turn sections on or off. Hidden sections leave the sidebar immediately.</p>
+            <div class="settings-toggle-list" id="ws-toggles"></div>
+          </div>`);
+        const list = card.querySelector('#ws-toggles');
+        let vitalsOn = true; try { vitalsOn = localStorage.getItem('helm.show.vitals') !== '0'; } catch (e) {}
+        list.appendChild(toggleRow('Vitals', 'Per-employee health tracker', vitalsOn, (on) => {
+          try { localStorage.setItem('helm.show.vitals', on ? '1' : '0'); } catch (e) {}
+          if (H.rebuildNav) H.rebuildNav();
+          H.toast('Vitals ' + (on ? 'shown' : 'hidden'), on ? 'success' : 'info');
+        }));
+        wrap.appendChild(card);
+        return wrap;
+      }
+
+      const BUILDERS = { profile: buildProfile, workspace: buildWorkspace, appearance: buildAppearance };
       const cache = {};
       let activeSec = null;
       function showSection(id) {

@@ -33,12 +33,19 @@
   const SECTIONS = [
     { id: 'home',     label: 'Dashboard',   icon: '🛰️', zone: 'HOME',         children: ['command'] },
     { id: 'vitals',   label: 'Vitals',      icon: '❤️', zone: 'HOME',         children: ['vitals'] },
+    { id: 'finance',  label: 'Accounting',  icon: '📒', zone: 'FINANCE',      children: ['accounting'] },
     { id: 'nftsite',  label: 'NFT Site',    icon: '🪙', zone: 'NFT PLATFORM', children: ['nft-site'] },
     { id: 'connect',  label: 'Connections', icon: '🔌', zone: 'TOOLS',        children: ['connect'] },
     { id: 'tools',    label: 'Tools',       icon: '🛠️', zone: 'TOOLS',        children: ['sign', 'settings'] }
   ];
   // zones rendered in this order, with the human label shown above each group
-  const ZONES = ['HOME', 'NFT PLATFORM', 'TOOLS'];
+  const ZONES = ['HOME', 'FINANCE', 'NFT PLATFORM', 'TOOLS'];
+
+  // user-toggleable sections (Settings → Workspace). Vitals can be hidden.
+  function sectionEnabled(id) {
+    if (id === 'vitals') { try { return localStorage.getItem('helm.show.vitals') !== '0'; } catch (e) { return true; } }
+    return true;
+  }
 
   /* ── tiny DOM utils ─────────────────────────────────────────────────── */
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -811,7 +818,7 @@
 
     const nav = el('<div class="nav-groups"></div>');
     ZONES.forEach(zone => {
-      const inZone = SECTIONS.filter(s => s.zone === zone);
+      const inZone = SECTIONS.filter(s => s.zone === zone && sectionEnabled(s.id));
       if (!inZone.length) return;
       const group = el(`<div class="nav-group" data-zone="${esc(zone)}"></div>`);
       group.appendChild(el(`<div class="nav-zone">${esc(zone)}</div>`));
@@ -981,7 +988,7 @@
     q = q.trim().toLowerCase();
     const mods = modules.filter(m => !q || m.label.toLowerCase().includes(q) || m.id.includes(q))
       .map(m => ({ kind: 'nav', title: m.label, sub: 'Go to module', hint: '↵', ico: m.icon, id: m.id }));
-    const secs = SECTIONS.filter(s => !q || s.label.toLowerCase().includes(q) || s.id.includes(q))
+    const secs = SECTIONS.filter(s => sectionEnabled(s.id) && (!q || s.label.toLowerCase().includes(q) || s.id.includes(q)))
       .map(s => ({ kind: 'section', title: s.label, sub: s.zone + ' · section', hint: '↵', ico: s.icon, id: s.id }));
     const acts = QUICK_ACTIONS.filter(a => !q || a.title.toLowerCase().includes(q) || a.sub.toLowerCase().includes(q))
       .map(a => Object.assign({ kind: 'action' }, a));
@@ -1372,6 +1379,13 @@
     it && it.scrollIntoView({ block: 'nearest' });
   }
 
+  /* rebuild the sidebar after a section is toggled on/off in Settings */
+  function rebuildNav() {
+    buildDock();
+    if (currentSection && !sectionEnabled(currentSection)) { showSection('home'); return; }
+    $$('.nav-section').forEach(b => b.classList.toggle('active', b.dataset.section === currentSection));
+  }
+
   /* boot orchestration */
   function boot() {
     let savedTheme = 'aurora';
@@ -1396,7 +1410,7 @@
 
   /* ── expose the single global ───────────────────────────────────────── */
   window.HELM = {
-    register, show, showSection, boot, rerender,
+    register, show, showSection, boot, rerender, rebuildNav, sectionEnabled,
     el, count, countAll, toast,
     fmt, charts, data,
     setTheme, setWeather, openCmdk,

@@ -72,6 +72,10 @@
 
   function loadVitals(root) {
     const host = root.querySelector('#dash-vitals'); if (!host) return;
+    const vitalsOff = (H.sectionEnabled && !H.sectionEnabled('vitals'));
+    const panel = host.closest('.nft-panel');
+    if (vitalsOff) { if (panel) panel.style.display = 'none'; return; }
+    if (panel) panel.style.display = '';
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem('helm.body')) || {}; } catch (e) {}
     const u = (H.session && H.session.user) || {};
