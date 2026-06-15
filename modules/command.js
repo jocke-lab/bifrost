@@ -229,6 +229,35 @@
         } catch (e) { row.innerHTML = '<span class="muted">' + (e.message || 'could not load') + '</span>'; }
       })();
 
+      /* NEEDS YOUR ATTENTION — live operator queue from the NFT platform */
+      {
+        const escA = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const attn = H.el(`
+          <div class="card" style="margin-bottom:var(--gap)">
+            <div class="card-head"><h3><span class="hico">🔔</span> Needs your attention</h3><span class="ch-meta" id="cmd-attn-meta"></span></div>
+            <div id="cmd-attn"><span class="muted">Checking the platform…</span></div>
+          </div>`);
+        root.appendChild(attn);
+        (async () => {
+          const host = attn.querySelector('#cmd-attn');
+          try {
+            if (!(window.DB && window.DB.nft)) { host.innerHTML = '<span class="muted">Data layer offline.</span>'; return; }
+            const [dealers, colls] = await Promise.all([
+              window.DB.nft_read('dealers', { select: 'name,status', eq: { status: 'pending' }, limit: 50 }),
+              window.DB.nft_read('collections', { select: 'name,approved', eq: { approved: false }, limit: 50 })
+            ]);
+            const pd = (dealers.data || []), pc = (colls.data || []);
+            const meta = attn.querySelector('#cmd-attn-meta');
+            if (!pd.length && !pc.length) { host.innerHTML = '<span class="muted">✓ All clear — no pending dealers or collection requests.</span>'; if (meta) meta.textContent = 'all clear'; return; }
+            const item = (ico, txt, hint) => `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span>${ico}</span><span style="flex:1">${txt}</span><span class="muted" style="font-size:11px">${hint}</span></div>`;
+            host.innerHTML =
+              pd.map(d => item('🏷️', '<b>Dealer application</b> — ' + escA(d.name || 'unnamed'), 'approve in NFT Site → Admin')).join('') +
+              pc.map(c => item('🗂️', '<b>Collection request</b> — ' + escA(c.name || 'unnamed'), 'approve in NFT Site → Admin')).join('');
+            if (meta) meta.textContent = (pd.length + pc.length) + ' pending';
+          } catch (e) { host.innerHTML = '<span class="muted">' + escA(e.message || 'could not load') + '</span>'; }
+        })();
+      }
+
       /* MAIN GRID: revenue area (span 2) + cash/burn bars */
       const main = H.el(`<div class="grid cols-3" style="margin-bottom:var(--gap)"></div>`);
 
