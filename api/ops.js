@@ -1,11 +1,12 @@
 // /api/ops — operator Support & dispute control queue for the NFT platform.
 // GET: aggregated queue (disputes, order issues, counterfeit reports, withdrawals, conversations)
 // POST {action}: resolve_issue | resolve_counterfeit | process_withdrawal | order_status | reply | messages
-const { json, readBody, supa, fail } = require('./_lib');
+const { json, readBody, supa, fail, requireAdmin } = require('./_lib');
 const ORDER_STATUS = ['awaiting_shipment', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded', 'disputed'];
 
 module.exports = async (req, res) => {
   try {
+    await requireAdmin(req);
     if (req.method === 'GET') {
       const [issues, counterfeit, withdrawals, disputes, conversations] = await Promise.all([
         supa('nft', 'order_issues?select=id,order_id,reporter,reason,status,created_at&status=neq.resolved&order=created_at.desc&limit=100'),

@@ -1,5 +1,5 @@
 // /api/dealers — GET list · POST create · PATCH update/approve  (NFT platform)
-const { json, readBody, supa, fail } = require('./_lib');
+const { json, readBody, supa, fail, requireAdmin } = require('./_lib');
 const STATUS = ['pending', 'approved', 'suspended'];
 // DB enforces slug ~ ^[a-z0-9-]{2,60}$
 const slugify = s => { const v = String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60); return v.length >= 2 ? v : ('d-' + Date.now().toString(36)); };
@@ -7,6 +7,7 @@ const clampRoy = n => Math.max(0, Math.min(2000, Number(n) || 0));
 
 module.exports = async (req, res) => {
   try {
+    await requireAdmin(req);
     if (req.method === 'GET') {
       const d = await supa('nft', 'dealers?select=id,name,slug,verified,status,default_royalty_bps,contact_email,website,created_at&order=created_at.desc');
       return json(res, 200, { ok: true, configured: true, dealers: d });

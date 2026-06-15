@@ -1,7 +1,8 @@
 // /api/accounting — NFT platform P&L (volume, platform fees=revenue, royalties, payouts). Service-role gated.
-const { json, supa, fail } = require('./_lib');
+const { json, supa, fail, requireAdmin } = require('./_lib');
 module.exports = async (req, res) => {
   try {
+    await requireAdmin(req);
     const [sales, withdrawals] = await Promise.all([
       supa('nft', 'sales?select=price_eur,platform_fee_eur,royalty_eur,rail,created_at&order=created_at.desc&limit=5000'),
       supa('nft', 'withdrawal_requests?select=amount_eur,status&limit=5000')

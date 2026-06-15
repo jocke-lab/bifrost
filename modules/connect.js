@@ -17,7 +17,7 @@
   let active = 'overview', rootEl = null, status = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function fmtDate(s) { if (!s) return ''; const d = new Date(isNaN(s) ? s : Number(s)); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
-  async function api(path, opts) { try { const r = await fetch(path, opts); const t = await r.text(); try { return JSON.parse(t); } catch (e) { return { ok: false, _offline: true }; } } catch (e) { return { ok: false, _offline: true, error: e.message }; } }
+  async function api(path, opts) { opts = opts || {}; try { let token = null; try { const s = window.DB && window.DB.auth ? await window.DB.auth.getSession() : null; token = s && s.access_token; } catch (e) {} const headers = Object.assign({}, opts.headers || {}); if (token) headers.Authorization = 'Bearer ' + token; const r = await fetch(path, Object.assign({}, opts, { headers })); const t = await r.text(); try { return JSON.parse(t); } catch (e) { return { ok: false, _offline: true }; } } catch (e) { return { ok: false, _offline: true, error: e.message }; } }
   const dot = on => `<span class="conn-dot ${on ? 'on' : 'off'}"></span>`;
   const needPanel = (title, html) => `<div class="conn-need-panel"><div class="conn-need-ico">🔌</div><h3>Connect ${esc(title)}</h3><p>${html}</p><p class="conn-muted">Add the env var(s) in Vercel → project <b>bifrost</b> → Settings → Environment Variables, then redeploy.</p></div>`;
   const section = (title, rows) => `<section class="conn-panel"><h3>${title}</h3><div class="conn-rows">${rows}</div></section>`;

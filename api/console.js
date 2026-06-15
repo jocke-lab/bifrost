@@ -1,10 +1,11 @@
 // /api/console — chain/gas, audit log, and card-production views for the control center.
 // GET ?view=chain|audit|cards ; POST {action: retry_chain | card_status}
-const { json, readBody, supa, fail } = require('./_lib');
+const { json, readBody, supa, fail, requireAdmin } = require('./_lib');
 const CARD_STATUS = ['requested', 'approved', 'shipped', 'delivered', 'rejected'];
 
 module.exports = async (req, res) => {
   try {
+    await requireAdmin(req);
     if (req.method === 'GET') {
       const u = new URL(req.url, 'http://x');
       const view = u.searchParams.get('view') || 'chain';

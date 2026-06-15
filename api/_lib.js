@@ -41,13 +41,39 @@ async function supa(project, path, opts) {
   return data;
 }
 
+// ── Admin auth gate ────────────────────────────────────────────────────────
+// Verifies the caller's bifrost-hub Supabase session JWT and checks it against
+// an email allowlist. Without this, the service-role endpoints would be
+// world-writable once the key is set. Hub publishable key is safe to embed.
+const HUB_ANON = 'sb_publishable_lgI1O2aderasrvjazJZSPw_Oul6pHvx';
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'arivd.arvidsson@gmail.com')
+  .toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+
+async function requireAdmin(req) {
+  const h = req.headers || {};
+  const token = String(h.authorization || h.Authorization || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) { const e = new Error('sign in required'); e.code = 'UNAUTHORIZED'; throw e; }
+  let user;
+  try {
+    const r = await fetch(PROJECTS.hub.url + '/auth/v1/user', { headers: { apikey: HUB_ANON, Authorization: 'Bearer ' + token } });
+    if (!r.ok) { const e = new Error('sign in required'); e.code = 'UNAUTHORIZED'; throw e; }
+    user = await r.json();
+  } catch (e) { if (e.code) throw e; const er = new Error('auth check failed'); er.code = 'UNAUTHORIZED'; throw er; }
+  if (!user || !user.email || !ADMIN_EMAILS.includes(String(user.email).toLowerCase())) {
+    const e = new Error('not an authorized admin'); e.code = 'FORBIDDEN'; throw e;
+  }
+  return user;
+}
+
 // Uniform failure response. "Not configured" returns 200 + configured:false so
 // the frontend can render a clean "add this key" state instead of an error.
 function fail(res, e) {
+  if (e && e.code === 'UNAUTHORIZED') return json(res, 401, { ok: false, unauthorized: true, error: 'sign in required' });
+  if (e && e.code === 'FORBIDDEN') return json(res, 403, { ok: false, forbidden: true, error: 'not an authorized admin' });
   if (e && e.code === 'NOT_CONFIGURED') {
     return json(res, 200, { ok: false, configured: false, need: e.env, project: e.project, message: 'Add ' + e.env + ' to Vercel env vars to enable this.' });
   }
   return json(res, (e && e.status) || 500, { ok: false, error: (e && e.message) || 'error', detail: e && e.data });
 }
 
-module.exports = { PROJECTS, key, json, readBody, supa, fail };
+module.exports = { PROJECTS, key, json, readBody, supa, fail, requireAdmin };

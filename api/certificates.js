@@ -1,7 +1,8 @@
 // /api/certificates — POST issue a certificate for a coin (optionally bind an NFC tag)
-const { json, readBody, supa, fail } = require('./_lib');
+const { json, readBody, supa, fail, requireAdmin } = require('./_lib');
 module.exports = async (req, res) => {
   try {
+    await requireAdmin(req);
     if (req.method === 'POST') {
       const b = await readBody(req);
       if (!b.coin_id) return json(res, 400, { ok: false, error: 'coin_id required' });

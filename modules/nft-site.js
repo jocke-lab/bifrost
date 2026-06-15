@@ -34,7 +34,46 @@
   const when = (iso) => { if (!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }); };
   const thumb = (url, alt) => url ? `<img class="nft-thumb" loading="lazy" src="${esc(url)}" alt="${esc(alt || '')}">` : `<div class="nft-thumb nft-noimg">◇</div>`;
   const DBok = () => !!(window.DB && window.DB.nft);
-  async function apiCall(path, opts) { try { const r = await fetch(path, opts); const t = await r.text(); try { return JSON.parse(t); } catch (e) { return { ok: false, _offline: true }; } } catch (e) { return { ok: false, _offline: true, error: e.message }; } }
+  async function apiCall(path, opts) {
+    opts = opts || {};
+    try {
+      let token = null;
+      try { const s = window.DB && window.DB.auth ? await window.DB.auth.getSession() : null; token = s && s.access_token; } catch (e) {}
+      const headers = Object.assign({}, opts.headers || {});
+      if (token) headers.Authorization = 'Bearer ' + token;
+      const r = await fetch(path, Object.assign({}, opts, { headers }));
+      const t = await r.text();
+      let data; try { data = JSON.parse(t); } catch (e) { return { ok: false, _offline: true }; }
+      if (r.status === 401 || r.status === 403 || data.unauthorized || data.forbidden) { data.unauthorized = true; openSignIn(); }
+      return data;
+    } catch (e) { return { ok: false, _offline: true, error: e.message }; }
+  }
+  function openSignIn() {
+    if (document.querySelector('.nft-signin')) return;
+    const ov = document.createElement('div'); ov.className = 'nft-modal nft-signin open';
+    ov.innerHTML = `<div class="nft-modal-box" style="max-width:380px"><div class="nft-modal-head"><b>🔐 Admin sign-in</b><button class="nft-modal-x" data-x>✕</button></div><div class="nft-modal-body" style="display:block"><p class="nft-muted" style="margin:0 0 12px">Sign in with your admin email to manage the platform.</p><input class="nft-in" id="si-email" type="email" placeholder="email" style="margin-bottom:8px"/><input class="nft-in" id="si-pass" type="password" placeholder="password" style="margin-bottom:8px"/><button class="nft-adm-btn" id="si-go" style="width:100%">Sign in</button><button class="nft-adm-mini" id="si-magic" style="width:100%;margin-top:8px">Email me a magic link instead</button><div class="nft-muted" id="si-msg" style="margin-top:10px"></div></div></div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector('[data-x]').addEventListener('click', close);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    const msg = ov.querySelector('#si-msg');
+    ov.querySelector('#si-go').addEventListener('click', async () => {
+      const email = ov.querySelector('#si-email').value.trim(), pass = ov.querySelector('#si-pass').value;
+      if (!email || !pass) { msg.textContent = 'Enter email + password.'; return; }
+      msg.textContent = 'Signing in…';
+      try { const r = await window.DB.auth.signInPassword(email, pass); if (r && r.error) { msg.textContent = r.error.message; return; } H.toast('Signed in ✓', 'success'); close(); updateAuthChip(); paint(); } catch (e) { msg.textContent = e.message; }
+    });
+    ov.querySelector('#si-magic').addEventListener('click', async () => {
+      const email = ov.querySelector('#si-email').value.trim(); if (!email) { msg.textContent = 'Enter your email first.'; return; }
+      try { const r = await window.DB.auth.signInMagicLink(email); msg.textContent = (r && r.error) ? r.error.message : 'Magic link sent — open it, then return here.'; } catch (e) { msg.textContent = e.message; }
+    });
+  }
+  async function updateAuthChip(root) {
+    const el = (root || document).querySelector('#nft-auth'); if (!el) return;
+    let u = null; try { u = window.DB && window.DB.auth ? await window.DB.auth.getUser() : null; } catch (e) {}
+    if (u && u.email) { el.textContent = '✓ ' + u.email.split('@')[0]; el.classList.remove('off'); el.onclick = async () => { try { await window.DB.auth.signOut(); } catch (e) {} H.toast('Signed out', 'info'); updateAuthChip(); paint(); }; }
+    else { el.textContent = '🔐 sign in'; el.classList.add('off'); el.onclick = () => openSignIn(); }
+  }
   let _collMap = null;
   async function collMap() { if (_collMap) return _collMap; const { data } = await window.DB.nft_read('collections', { select: 'id,name', limit: 200 }); _collMap = {}; (data || []).forEach(c => { _collMap[c.id] = c.name; }); return _collMap; }
 
@@ -77,7 +116,7 @@
       <div class="nftsite">
         <header class="nft-head">
           <div class="nft-headmain">
-            <h1 class="nft-title">NFT Site <span class="nft-live" id="nft-live">● live</span></h1>
+            <h1 class="nft-title">NFT Site <span class="nft-live" id="nft-live">● live</span> <span class="nft-live off" id="nft-auth" style="cursor:pointer">🔐 sign in</span></h1>
             <p class="nft-sub">Operator console · numismatic NFT trading platform · opulence-tech</p>
           </div>
           <div class="nft-kpis" id="nft-kpis">${'<div class="nft-kpi skel"></div>'.repeat(8)}</div>
@@ -98,6 +137,7 @@
       const live = root.querySelector('#nft-live');
       if (live) { live.textContent = '● offline'; live.classList.add('off'); }
     }
+    updateAuthChip(root);
     loadKpis();
     paint();
   }

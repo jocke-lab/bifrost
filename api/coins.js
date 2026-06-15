@@ -1,7 +1,8 @@
 // /api/coins — GET (?collection_id=) · POST create coin in a collection
-const { json, readBody, supa, fail } = require('./_lib');
+const { json, readBody, supa, fail, requireAdmin } = require('./_lib');
 module.exports = async (req, res) => {
   try {
+    await requireAdmin(req);
     if (req.method === 'GET') {
       const u = new URL(req.url, 'http://x'); const col = u.searchParams.get('collection_id');
       const q = 'coins?select=id,name,collection_id,edition_no,edition_total,metal,year,image_url,created_at'

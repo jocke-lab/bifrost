@@ -1,7 +1,8 @@
 // /api/nfc — GET tags · POST register a tag · POST {action:'link'} bind tag → coin
-const { json, readBody, supa, fail } = require('./_lib');
+const { json, readBody, supa, fail, requireAdmin } = require('./_lib');
 module.exports = async (req, res) => {
   try {
+    await requireAdmin(req);
     if (req.method === 'GET') {
       const d = await supa('nft', 'nfc_tags?select=id,uid,coin_id,dealer_id,status,tap_count,created_at&order=created_at.desc&limit=200');
       return json(res, 200, { ok: true, configured: true, tags: d });
