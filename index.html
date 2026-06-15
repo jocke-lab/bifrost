@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="modules/vitals.css?v=3" />
   <link rel="stylesheet" href="modules/accounting.css?v=1" />
   <link rel="stylesheet" href="modules/settings.css?v=2" />
+  <link rel="stylesheet" href="modules/team.css?v=1" />
   <link rel="stylesheet" href="modules/nft-site.css?v=14" />
   <link rel="stylesheet" href="modules/pdfsign.css?v=1" />
   <link rel="stylesheet" href="modules/connect.css?v=3" />
@@ -40,6 +41,9 @@
     <div class="boot-log"><b>›</b> initializing…</div>
     <button class="boot-skip">SKIP ⏎</button>
   </div>
+
+  <!-- ── LOGIN GATE (filled + shown by core.js when signed out) ────────── -->
+  <div id="login" hidden></div>
 
   <!-- ── APP SHELL ────────────────────────────────────────────────────── -->
   <div id="app">
@@ -95,6 +99,7 @@
       <section class="view" id="view-connect"></section>
       <section class="view" id="view-sign"></section>
       <section class="view" id="view-settings"></section>
+      <section class="view" id="view-team"></section>
     </main>
   </div>
 
@@ -123,10 +128,10 @@
   <!-- ── SCRIPTS: config + data first, then core, then real modules ────── -->
   <script src="assets/bifrost.config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/data.js"></script>
+  <script src="assets/data.js?v=2"></script>
 
   <script src="assets/faktura.js?v=1"></script>
-  <script src="assets/core.js?v=3"></script>
+  <script src="assets/core.js?v=4"></script>
   <script src="modules/command.js?v=4"></script>
   <script src="modules/vitals.js?v=3"></script>
   <script src="modules/accounting.js?v=1"></script>
@@ -134,6 +139,7 @@
   <script src="modules/connect.js?v=3"></script>
   <script src="modules/pdfsign.js?v=1"></script>
   <script src="modules/settings.js?v=3"></script>
+  <script src="modules/team.js?v=1"></script>
 
   <script>HELM.boot();</script>
 </body>

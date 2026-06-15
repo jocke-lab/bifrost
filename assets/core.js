@@ -36,15 +36,27 @@
     { id: 'finance',  label: 'Accounting',  icon: '📒', zone: 'FINANCE',      children: ['accounting'] },
     { id: 'nftsite',  label: 'NFT Site',    icon: '🪙', zone: 'NFT PLATFORM', children: ['nft-site'] },
     { id: 'connect',  label: 'Connections', icon: '🔌', zone: 'TOOLS',        children: ['connect'] },
-    { id: 'tools',    label: 'Tools',       icon: '🛠️', zone: 'TOOLS',        children: ['sign', 'settings'] }
+    { id: 'tools',    label: 'Tools',       icon: '🛠️', zone: 'TOOLS',        children: ['sign', 'settings'] },
+    { id: 'access',   label: 'Access',      icon: '🔐', zone: 'TOOLS',        children: ['team'] }
   ];
   // zones rendered in this order, with the human label shown above each group
   const ZONES = ['HOME', 'FINANCE', 'NFT PLATFORM', 'TOOLS'];
 
-  // user-toggleable sections (Settings → Workspace). Vitals can be hidden.
+  // ── role-based access ─────────────────────────────────────────────────
+  // sections not listed are visible to everyone; listed ones restrict to roles.
+  const SECTION_ROLES = {
+    finance: ['owner', 'admin', 'finance'],
+    nftsite: ['owner', 'admin', 'finance', 'member'],
+    connect: ['owner', 'admin'],
+    access:  ['owner', 'admin']
+  };
+  let currentRole = 'owner';
+  function roleAllowed(id) { const a = SECTION_ROLES[id]; return !a || a.includes(currentRole); }
+
+  // section visibility = role gate + user toggles (Settings → Workspace).
   function sectionEnabled(id) {
-    if (id === 'vitals') { try { return localStorage.getItem('helm.show.vitals') !== '0'; } catch (e) { return true; } }
-    return true;
+    if (id === 'vitals') { let on = true; try { on = localStorage.getItem('helm.show.vitals') !== '0'; } catch (e) {} if (!on) return false; }
+    return roleAllowed(id);
   }
 
   /* ── tiny DOM utils ─────────────────────────────────────────────────── */
@@ -1085,6 +1097,7 @@
       </div>
       <div class="idmenu-foot">
         <button class="btn btn-ghost btn-sm id-profile">View my profile</button>
+        <button class="btn btn-ghost btn-sm id-signout">Sign out</button>
       </div>`;
 
     $$('.id-presence', box).forEach(b => b.addEventListener('click', () => {
@@ -1093,6 +1106,8 @@
     }));
     const prof = $('.id-profile', box);
     prof && prof.addEventListener('click', () => { closeIdMenu(); if (byId['settings']) show('settings'); });
+    const so = $('.id-signout', box);
+    so && so.addEventListener('click', () => { closeIdMenu(); signOut(); });
   }
 
   // keep the topbar chip in sync with the acting user + presence
@@ -1386,6 +1401,135 @@
     $$('.nav-section').forEach(b => b.classList.toggle('active', b.dataset.section === currentSection));
   }
 
+  /* ====================================================================== */
+  /* LOGIN GATE + ROLE SESSION                                             */
+  /* ====================================================================== */
+  const MARK_SVG = '<svg viewBox="0 0 120 110" width="58" height="54" aria-hidden="true"><defs><linearGradient id="bfrLogin" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7C5CFF"/><stop offset=".5" stop-color="#19D3FF"/><stop offset="1" stop-color="#46E6A6"/></linearGradient></defs><path d="M14 94 A46 60 0 0 1 106 94" fill="none" stroke="url(#bfrLogin)" stroke-width="12" stroke-linecap="round"/><circle cx="14" cy="94" r="9" fill="#7C5CFF"/><circle cx="106" cy="94" r="9" fill="#46E6A6"/></svg>';
+  const ROLE_TITLE = { owner: 'Owner', admin: 'Administrator', finance: 'Finance', member: 'Team member', viewer: 'Viewer' };
+
+  function applyMe(me) {
+    currentRole = me.role || 'member';
+    const nm = me.full_name || me.email || 'You';
+    session.user = Object.assign({}, session.user, {
+      id: me.id, name: nm, email: me.email, role: me.role || 'member',
+      title: me.title || ROLE_TITLE[me.role] || 'Team member', avatar: data.initials(nm)
+    });
+  }
+
+  async function ensureAuthed() {
+    let s = null; try { s = await window.DB.auth.getSession(); } catch (e) {}
+    if (!s) { showLogin(); return false; }
+    let me = null; try { const r = await window.DB.access('me', { method: 'GET' }); if (r && r.ok) me = r.me; } catch (e) {}
+    if (!me) { try { await window.DB.auth.signOut(); } catch (e) {} showLogin(); return false; }
+    if (me.status === 'suspended') { try { await window.DB.auth.signOut(); } catch (e) {} showLogin({ msg: 'Your access has been revoked. Contact your administrator.' }); return false; }
+    if (me.status === 'invited') { showLogin({ email: me.email, mode: 'create', msg: 'Welcome — create a password to finish setting up your account.' }); return false; }
+    applyMe(me);
+    return true;
+  }
+
+  function showLogin(opts) {
+    opts = opts || {};
+    const app = document.getElementById('app'); if (app) app.style.display = 'none';
+    const boot = document.getElementById('boot'); if (boot) boot.classList.add('gone');
+    const host = document.getElementById('login'); if (!host) return;
+    host.hidden = false;
+    renderLogin(host, opts);
+  }
+
+  function renderLogin(host, opts) {
+    host.innerHTML = `
+      <div class="login-wrap">
+        <div class="login-card">
+          <div class="login-mark">${MARK_SVG}</div>
+          <h1 class="login-brand">bifrost</h1>
+          <p class="login-tag">Your company command deck</p>
+          <div class="login-note" id="login-note">${opts.msg ? esc(opts.msg) : ''}</div>
+          <div class="login-step" data-step="email">
+            <label class="login-lbl">Email</label>
+            <input class="login-in" id="li-email" type="email" autocomplete="username" placeholder="you@company.com" value="${esc(opts.email || '')}">
+            <button class="login-go" id="li-continue">Continue</button>
+          </div>
+          <div class="login-step" data-step="password" hidden>
+            <div class="login-aswho" id="li-who"></div>
+            <label class="login-lbl" id="li-pw-lbl">Password</label>
+            <input class="login-in" id="li-pw" type="password" autocomplete="current-password" placeholder="••••••••">
+            <input class="login-in" id="li-pw2" type="password" autocomplete="new-password" placeholder="Confirm password" hidden>
+            <button class="login-go" id="li-submit">Sign in</button>
+            <div class="login-alt">
+              <button class="login-textbtn" id="li-back">← different email</button>
+              <button class="login-textbtn" id="li-magic">Email me a link</button>
+            </div>
+          </div>
+        </div>
+        <div class="login-foot">bifrost · the bridge</div>
+      </div>`;
+    const note = host.querySelector('#login-note');
+    const setNote = (m, cls) => { note.textContent = m || ''; note.className = 'login-note' + (cls ? ' ' + cls : ''); };
+    const stepEmail = host.querySelector('[data-step="email"]'), stepPw = host.querySelector('[data-step="password"]');
+    const emailIn = host.querySelector('#li-email'), pwIn = host.querySelector('#li-pw'), pw2In = host.querySelector('#li-pw2');
+    const submit = host.querySelector('#li-submit'), pwLbl = host.querySelector('#li-pw-lbl'), who = host.querySelector('#li-who');
+    let mode = 'signin', email = (opts.email || '').toLowerCase();
+
+    function toPassword(m, addr) {
+      mode = m; email = addr; stepEmail.hidden = true; stepPw.hidden = false; who.textContent = addr;
+      if (m === 'create') { pwLbl.textContent = 'Create a password'; pw2In.hidden = false; pwIn.placeholder = 'At least 8 characters'; submit.textContent = 'Create & sign in'; }
+      else { pwLbl.textContent = 'Password'; pw2In.hidden = true; pwIn.placeholder = '••••••••'; submit.textContent = 'Sign in'; }
+      setTimeout(() => pwIn.focus(), 50);
+    }
+    async function doContinue() {
+      email = (emailIn.value || '').trim().toLowerCase();
+      if (!email || email.indexOf('@') < 0) { setNote('Enter a valid email.', 'warn'); return; }
+      setNote('Checking…');
+      const r = await window.DB.access('check', { body: { email } });
+      if (r._offline) { setNote('Can’t reach the server — try again.', 'warn'); return; }
+      if (r.suspended) { setNote('This account’s access has been revoked.', 'warn'); return; }
+      if (!r.exists) { setNote('No access for this email. Ask your admin to add you.', 'warn'); return; }
+      setNote(''); toPassword(r.needs_password ? 'create' : 'signin', email);
+    }
+    async function doSubmit() {
+      const pw = pwIn.value || '';
+      if (mode === 'create') {
+        if (pw.length < 8) { setNote('Password must be at least 8 characters.', 'warn'); return; }
+        if (pw !== (pw2In.value || '')) { setNote('Passwords don’t match.', 'warn'); return; }
+        setNote('Creating your account…');
+        const c = await window.DB.access('claim', { body: { email, password: pw } });
+        if (!c.ok) { setNote(c.error === 'already_active' ? 'Account already set up — just enter your password.' : ('Could not set password: ' + (c.error || 'error')), 'warn'); return; }
+      }
+      setNote('Signing in…');
+      const { error } = await window.DB.auth.signInPassword(email, pw);
+      if (error) { setNote(mode === 'create' ? ('Created — sign-in failed: ' + error.message) : 'Wrong password. Try again or use a sign-in link.', 'warn'); return; }
+      location.reload();
+    }
+    host.querySelector('#li-continue').addEventListener('click', doContinue);
+    emailIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doContinue(); } });
+    submit.addEventListener('click', doSubmit);
+    pwIn.addEventListener('keydown', e => { if (e.key === 'Enter' && pw2In.hidden) { e.preventDefault(); doSubmit(); } });
+    pw2In.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSubmit(); } });
+    host.querySelector('#li-back').addEventListener('click', () => { stepPw.hidden = true; stepEmail.hidden = false; setNote(''); emailIn.focus(); });
+    host.querySelector('#li-magic').addEventListener('click', async () => {
+      if (!email) { setNote('Enter your email first.', 'warn'); return; }
+      setNote('Sending a sign-in link…');
+      const { error } = await window.DB.auth.signInMagicLink(email);
+      setNote(error ? ('Could not send link: ' + error.message) : 'Check your email for a sign-in link.', error ? 'warn' : 'ok');
+    });
+    if (opts.mode === 'create') toPassword('create', (opts.email || '').toLowerCase());
+  }
+
+  async function signOut() { try { await window.DB.auth.signOut(); } catch (e) {} location.reload(); }
+
+  function startApp() {
+    wireShell();
+    refreshProfileChip();
+    const app = document.getElementById('app');
+    if (app) { app.style.display = ''; app.classList.add('ready'); }
+    const hash = location.hash.slice(1);
+    const sec = hash && (sectionOfModule[hash] || hash);
+    const ok = hash && byId[hash] && sectionEnabled(sec);
+    show(ok ? hash : 'command');
+    setWeather(86);
+    setTimeout(() => toast('Welcome, ' + String(session.user.name || '').split(' ')[0], 'success'), 500);
+  }
+
   /* boot orchestration */
   function boot() {
     let savedTheme = 'aurora';
@@ -1393,18 +1537,10 @@
     setTheme(THEMES[savedTheme] ? savedTheme : 'aurora');
     startCanvas();
     setInterval(tickClock, 1000); tickClock();
-    runBoot(() => {
-      wireShell();
-      const app = document.getElementById('app');
-      app && app.classList.add('ready');
-      // initial route: hash if valid+registered, else 'my-day' (the morning page), else 'command'
-      const hash = location.hash.slice(1);
-      const first = (hash && byId[hash]) ? hash
-        : (byId['command'] ? 'command' : (modules[0] && modules[0].id));
-      if (first) show(first);
-      // health weather after the deck is live
-      setWeather(86);
-      setTimeout(() => toast('Deck online — all systems nominal', 'success'), 600);
+    runBoot(async () => {
+      const authed = await ensureAuthed();
+      if (!authed) return;          // login screen is showing
+      startApp();
     });
   }
 

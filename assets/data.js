@@ -43,6 +43,18 @@
     const t = await r.text(); let json; try { json = JSON.parse(t); } catch (e) { json = { ok: false, error: t || ('HTTP ' + r.status) }; }
     return json;
   }
+  // Auth/onboarding + team management: the hub edge function `access`.
+  const ACCESS_FN = ((projects.hub && projects.hub.url) || C.supabaseUrl || 'https://zgvqnaorhtafqffzagll.supabase.co') + '/functions/v1/access';
+  async function access(path, opts = {}) {
+    const token = await companyToken();
+    const headers = { apikey: HUB_KEY, 'content-type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    let r;
+    try { r = await fetch(ACCESS_FN + '/' + path, { method: opts.method || 'POST', headers, body: opts.body ? JSON.stringify(opts.body) : undefined }); }
+    catch (e) { return { ok: false, _offline: true, error: e.message }; }
+    const t = await r.text(); let json; try { json = JSON.parse(t); } catch (e) { json = { ok: false, error: t || ('HTTP ' + r.status) }; }
+    return json;
+  }
   async function companyDownload(path, filename) {
     const r = await company(path, { raw: true });
     if (!r.ok) { const t = await r.text(); throw new Error(t || ('HTTP ' + r.status)); }
@@ -84,6 +96,8 @@
 
     // Company books + vitals (keyless edge function)
     company, companyDownload,
+    // Auth/onboarding + team management
+    access,
 
     // Auth (against the hub project) — used by the admin login gate.
     auth: {
