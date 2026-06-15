@@ -41,6 +41,7 @@
     { id: 'comms',     label: 'Comms',      icon: '💬', zone: 'COMPANY', children: ['comms', 'inbox', 'calendar'] },
     { id: 'growth',    label: 'Growth',     icon: '📈', zone: 'COMPANY', children: ['signal', 'analytics'] },
     { id: 'platform',  label: 'Platform',   icon: '🖥️', zone: 'SYSTEM',  children: ['automations', 'integrations', 'devlog', 'infra'] },
+    { id: 'connect',   label: 'Connections',icon: '🔌', zone: 'SYSTEM',  children: ['connect'] },
     { id: 'workspace', label: 'Workspace',  icon: '🗄️', zone: 'SYSTEM',  children: ['vault', 'sign', 'audit', 'settings'] }
   ];
   // zones rendered in this order, with the human label shown above each group

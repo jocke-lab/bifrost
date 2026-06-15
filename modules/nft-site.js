@@ -15,7 +15,8 @@
     { id: 'collections', label: 'Collections', icon: '🗂️' },
     { id: 'drops',       label: 'Drops',       icon: '🚀' },
     { id: 'dealers',     label: 'Dealers',     icon: '🏷️' },
-    { id: 'sales',       label: 'Sales',       icon: '💶' }
+    { id: 'sales',       label: 'Sales',       icon: '💶' },
+    { id: 'admin',       label: 'Admin',       icon: '⚙️' }
   ];
 
   let active = 'overview';
@@ -26,6 +27,7 @@
   const when = (iso) => { if (!iso) return '—'; const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }); };
   const thumb = (url, alt) => url ? `<img class="nft-thumb" loading="lazy" src="${esc(url)}" alt="${esc(alt || '')}">` : `<div class="nft-thumb nft-noimg">◇</div>`;
   const DBok = () => !!(window.DB && window.DB.nft);
+  async function apiCall(path, opts) { try { const r = await fetch(path, opts); const t = await r.text(); try { return JSON.parse(t); } catch (e) { return { ok: false, _offline: true }; } } catch (e) { return { ok: false, _offline: true, error: e.message }; } }
 
   function render(root) {
     rootEl = root;
@@ -80,6 +82,7 @@
       if (active === 'drops')       return void await paintDrops(body);
       if (active === 'dealers')     return void await paintDealers(body);
       if (active === 'sales')       return void await paintSales(body);
+      if (active === 'admin')       return void await paintAdmin(body);
     } catch (e) { body.innerHTML = `<div class="nft-warn">Failed to load: ${esc(e.message)}</div>`; }
   }
 
@@ -164,6 +167,71 @@
     const { data } = await window.DB.nft_read('sales', { select: '*', order: { col: 'created_at', asc: false }, limit: 60 });
     const rows = (data || []).map(s => `<tr><td>${when(s.created_at)}</td><td class="num">${eur(s.price_eur)}</td><td><span class="nft-chip">${esc(s.rail || '—')}</span></td><td class="num">${eur(s.royalty_eur)}</td><td class="num">${eur(s.platform_fee_eur)}</td><td class="nft-mono">${s.tx_hash ? esc(String(s.tx_hash).slice(0, 10)) + '…' : '—'}</td></tr>`).join('') || `<tr><td colspan="6" class="nft-muted">No sales.</td></tr>`;
     body.innerHTML = `<section class="nft-panel"><h3>Sales ledger</h3><table class="nft-table"><thead><tr><th>Date</th><th class="num">Price</th><th>Rail</th><th class="num">Royalty</th><th class="num">Platform fee</th><th>Tx</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  }
+
+  // ── Admin tab: the full operator "circle" (writes via the serverless API) ──
+  async function paintAdmin(body) {
+    const st = await apiCall('/api/status');
+    const configured = !!(st && st.integrations && st.integrations.nft_admin);
+    const banner = configured
+      ? `<div class="nft-adm-ok">● Admin connected — these actions write live to the platform.</div>`
+      : `<div class="nft-adm-warn">🔒 Admin writes need <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel (project <b>bifrost</b> → Settings → Environment Variables). Every form below works the instant it's added.${st && st._offline ? ' Note: the API only runs on the live site (bifrostlkl.com), not this local preview.' : ''}</div>`;
+    body.innerHTML = `${banner}<div class="nft-adm-grid" id="nft-adm"><div class="nft-loading"><span class="nft-spin"></span> Loading…</div></div>`;
+    const host = body.querySelector('#nft-adm');
+    const [dz, cz] = await Promise.all([apiCall('/api/dealers'), apiCall('/api/collections')]);
+    const dealers = (dz && dz.dealers) || [], collections = (cz && cz.collections) || [];
+    const dealerOpts = dealers.map(d => `<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('');
+    const collOpts = collections.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    const card = (title, inner) => `<div class="nft-adm-card"><h4>${title}</h4>${inner}</div>`;
+    host.innerHTML = [
+      card('➕ New dealer', `
+        <input class="nft-in" data-f="d_name" placeholder="Dealer name"/>
+        <input class="nft-in" data-f="d_email" placeholder="Contact email (optional)"/>
+        <input class="nft-in" data-f="d_roy" type="number" placeholder="Royalty bps (default 500)"/>
+        <button class="nft-adm-btn" data-act="dealer-create">Create dealer</button>`),
+      card('✓ Dealers — approve', `<div class="nft-adm-list">${dealers.length ? dealers.map(d => `<div class="nft-adm-row"><span>${esc(d.name)} <span class="nft-chip ${d.status === 'approved' ? 'ok' : ''}">${esc(d.status)}</span></span>${d.status !== 'approved' ? `<button class="nft-adm-mini" data-approve-dealer="${esc(d.id)}">Approve</button>` : '<span class="nft-muted">✓</span>'}</div>`).join('') : '<div class="nft-muted">No dealers yet.</div>'}</div>`),
+      card('➕ New collection', `
+        <select class="nft-in" data-f="c_dealer"><option value="">Select dealer…</option>${dealerOpts}</select>
+        <input class="nft-in" data-f="c_name" placeholder="Collection name"/>
+        <input class="nft-in" data-f="c_roy" type="number" placeholder="Royalty bps (default 500)"/>
+        <button class="nft-adm-btn" data-act="coll-create">Create collection</button>`),
+      card('✓ Collection requests — approve', `<div class="nft-adm-list">${collections.length ? collections.map(c => `<div class="nft-adm-row"><span>${esc(c.name)} <span class="nft-chip ${c.approved ? 'ok' : ''}">${c.approved ? 'approved' : 'pending'}</span></span>${!c.approved ? `<button class="nft-adm-mini" data-approve-coll="${esc(c.id)}">Approve</button>` : '<span class="nft-muted">✓</span>'}</div>`).join('') : '<div class="nft-muted">No collections.</div>'}</div>`),
+      card('➕ New coin', `
+        <select class="nft-in" data-f="coin_coll"><option value="">Select collection…</option>${collOpts}</select>
+        <input class="nft-in" data-f="coin_name" placeholder="Coin name"/>
+        <input class="nft-in" data-f="coin_metal" placeholder="Metal (optional)"/>
+        <button class="nft-adm-btn" data-act="coin-create">Create coin</button>`),
+      card('🎫 Issue certificate (+ NFC)', `
+        <input class="nft-in" data-f="cert_coin" placeholder="Coin ID"/>
+        <input class="nft-in" data-f="cert_tag" placeholder="NFC tag ID (optional)"/>
+        <button class="nft-adm-btn" data-act="cert-create">Issue certificate</button>`),
+      card('🏷️ NFC tags', `
+        <input class="nft-in" data-f="nfc_uid" placeholder="New tag UID"/>
+        <button class="nft-adm-btn" data-act="nfc-register">Register tag</button>
+        <div class="nft-adm-sep"></div>
+        <input class="nft-in" data-f="nfc_tag" placeholder="Tag ID"/>
+        <input class="nft-in" data-f="nfc_coin" placeholder="Coin ID"/>
+        <button class="nft-adm-btn" data-act="nfc-link">Link tag → coin</button>`)
+    ].join('');
+
+    const val = f => { const el = host.querySelector(`[data-f="${f}"]`); return el ? el.value.trim() : ''; };
+    async function post(path, bodyObj, okMsg, method) {
+      const r = await apiCall(path, { method: method || 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(bodyObj) });
+      if (r.ok) { H.toast(okMsg, 'success'); paintAdmin(body); }
+      else if (r.configured === false) { H.toast('Add OPULENCE_TECH_SERVICE_ROLE in Vercel to enable this', 'warn'); }
+      else H.toast('Failed: ' + (r.error || (r._offline ? 'API runs on the live site only' : 'error')), 'danger');
+    }
+    host.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
+      const a = b.dataset.act;
+      if (a === 'dealer-create') { if (!val('d_name')) return H.toast('Name required', 'warn'); post('/api/dealers', { name: val('d_name'), contact_email: val('d_email') || undefined, royalty_bps: val('d_roy') || undefined }, 'Dealer created'); }
+      if (a === 'coll-create') { if (!val('c_dealer') || !val('c_name')) return H.toast('Dealer + name required', 'warn'); post('/api/collections', { dealer_id: val('c_dealer'), name: val('c_name'), royalty_bps: val('c_roy') || undefined }, 'Collection created'); }
+      if (a === 'coin-create') { if (!val('coin_coll') || !val('coin_name')) return H.toast('Collection + name required', 'warn'); post('/api/coins', { collection_id: val('coin_coll'), name: val('coin_name'), metal: val('coin_metal') || undefined }, 'Coin created'); }
+      if (a === 'cert-create') { if (!val('cert_coin')) return H.toast('Coin ID required', 'warn'); post('/api/certificates', { coin_id: val('cert_coin'), tag_id: val('cert_tag') || undefined }, 'Certificate issued'); }
+      if (a === 'nfc-register') { if (!val('nfc_uid')) return H.toast('UID required', 'warn'); post('/api/nfc', { uid: val('nfc_uid') }, 'Tag registered'); }
+      if (a === 'nfc-link') { if (!val('nfc_tag') || !val('nfc_coin')) return H.toast('Tag + coin required', 'warn'); post('/api/nfc', { action: 'link', tag_id: val('nfc_tag'), coin_id: val('nfc_coin') }, 'Tag linked'); }
+    }));
+    host.querySelectorAll('[data-approve-dealer]').forEach(b => b.addEventListener('click', () => post('/api/dealers', { id: b.dataset.approveDealer, action: 'approve' }, 'Dealer approved', 'PATCH')));
+    host.querySelectorAll('[data-approve-coll]').forEach(b => b.addEventListener('click', () => post('/api/collections', { id: b.dataset.approveColl, action: 'approve' }, 'Collection approved')));
   }
 
   H.register({ id: 'nft-site', label: 'NFT Site', icon: '🪙', scope: 'company', render });

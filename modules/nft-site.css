@@ -60,3 +60,19 @@
 .nft-priv .pv-l { font-weight: 600; font-size: 13px; color: var(--text, #eaf2f8); }
 .nft-priv .pv-lock { font-size: 11px; color: var(--warn, #F5A524); }
 .nft-priv .pv-n { font-size: 11px; color: var(--muted, #8aa4bc); }
+
+/* Admin tab — operator circle forms */
+.nft-adm-ok { color: #46E6A6; background: rgba(70, 230, 166, .1); border: 1px solid rgba(70, 230, 166, .25); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+.nft-adm-warn { color: var(--warn, #F5A524); background: rgba(245, 165, 36, .1); border: 1px solid rgba(245, 165, 36, .25); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+.nft-adm-warn code { background: rgba(255, 255, 255, .1); padding: 1px 6px; border-radius: 5px; font-family: var(--font-mono, monospace); font-size: 11px; }
+.nft-adm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.nft-adm-card { background: rgba(255, 255, 255, .025); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.nft-adm-card h4 { margin: 0 0 4px; font-size: 13px; color: var(--text, #eaf2f8); }
+.nft-in { font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, .04); border: 1px solid var(--border, rgba(255, 255, 255, .12)); color: var(--text, #eaf2f8); width: 100%; }
+.nft-adm-btn { font: inherit; font-size: 13px; padding: 8px 12px; border-radius: 8px; cursor: pointer; background: linear-gradient(120deg, var(--accent3, #7C5CFF), var(--accent1, #19D3FF)); border: none; color: #07111a; font-weight: 600; }
+.nft-adm-btn:hover { filter: brightness(1.08); }
+.nft-adm-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
+.nft-adm-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text, #eaf2f8); padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, .04); }
+.nft-adm-mini { font: inherit; font-size: 11px; padding: 4px 10px; border-radius: 7px; cursor: pointer; background: rgba(255, 255, 255, .07); border: 1px solid var(--border, rgba(255, 255, 255, .14)); color: var(--text, #eaf2f8); }
+.nft-adm-mini:hover { background: rgba(25, 211, 255, .15); }
+.nft-adm-sep { height: 1px; background: var(--border, rgba(255, 255, 255, .08)); margin: 4px 0; }
