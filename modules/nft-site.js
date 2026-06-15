@@ -28,6 +28,8 @@
   const thumb = (url, alt) => url ? `<img class="nft-thumb" loading="lazy" src="${esc(url)}" alt="${esc(alt || '')}">` : `<div class="nft-thumb nft-noimg">◇</div>`;
   const DBok = () => !!(window.DB && window.DB.nft);
   async function apiCall(path, opts) { try { const r = await fetch(path, opts); const t = await r.text(); try { return JSON.parse(t); } catch (e) { return { ok: false, _offline: true }; } } catch (e) { return { ok: false, _offline: true, error: e.message }; } }
+  let _collMap = null;
+  async function collMap() { if (_collMap) return _collMap; const { data } = await window.DB.nft_read('collections', { select: 'id,name', limit: 200 }); _collMap = {}; (data || []).forEach(c => { _collMap[c.id] = c.name; }); return _collMap; }
 
   function render(root) {
     rootEl = root;
@@ -125,12 +127,16 @@
   }
 
   async function paintCatalog(body) {
-    const { data } = await window.DB.nft_read('coins', { select: 'id,name,metal,year,edition_no,edition_total,image_url,created_at', order: { col: 'created_at', asc: false }, limit: 60 });
-    const cards = (data || []).map(c => `
+    const [res, cm] = await Promise.all([
+      window.DB.nft_read('coins', { select: 'id,name,metal,year,edition_no,edition_total,image_url,collection_id,created_at', order: { col: 'created_at', asc: false }, limit: 60 }),
+      collMap()
+    ]);
+    const cards = (res.data || []).map(c => `
       <div class="nft-card">
         <div class="nft-cardimg">${thumb(c.image_url, c.name)}</div>
         <div class="nft-cardmeta">
           <b>${esc(c.name || 'Untitled')}</b>
+          <span class="nft-muted">${esc(cm[c.collection_id] || 'No collection')}</span>
           <span class="nft-muted">${esc(c.metal || '—')}${c.year ? ' · ' + esc(c.year) : ''}${c.edition_no ? ` · #${esc(c.edition_no)}/${esc(c.edition_total || '?')}` : ''}</span>
         </div>
       </div>`).join('') || `<div class="nft-muted">No coins.</div>`;
@@ -140,15 +146,35 @@
   async function paintCollections(body) {
     const { data } = await window.DB.nft_read('collections', { select: 'id,name,slug,cover_url,royalty_bps,published,verified,featured,chain,contract_address', order: { col: 'created_at', asc: false }, limit: 60 });
     const cards = (data || []).map(c => `
-      <div class="nft-card">
+      <button class="nft-card nft-card-btn" data-coll="${esc(c.id)}" data-name="${esc(c.name)}">
         <div class="nft-cardimg">${thumb(c.cover_url, c.name)}</div>
         <div class="nft-cardmeta">
           <b>${esc(c.name)} ${c.verified ? '<span class="nft-chip ok">✓</span>' : ''}${c.featured ? '<span class="nft-chip">★</span>' : ''}</b>
           <span class="nft-muted">${esc(c.slug || '')} · ${(c.royalty_bps || 0) / 100}% · ${c.published ? 'published' : 'draft'}</span>
-          ${c.contract_address ? `<span class="nft-mono">${esc(String(c.contract_address).slice(0, 10))}…</span>` : ''}
         </div>
-      </div>`).join('') || `<div class="nft-muted">No collections.</div>`;
-    body.innerHTML = `<section class="nft-panel"><h3>Collections</h3><div class="nft-cards">${cards}</div></section>`;
+      </button>`).join('') || `<div class="nft-muted">No collections.</div>`;
+    body.innerHTML = `<section class="nft-panel"><h3>Collections <span class="nft-muted">— click one to view its coins</span></h3><div class="nft-cards">${cards}</div></section>`;
+    body.querySelectorAll('[data-coll]').forEach(b => b.addEventListener('click', () => paintCollectionDetail(body, b.dataset.coll, b.dataset.name)));
+  }
+
+  async function paintCollectionDetail(body, collId, name) {
+    body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading ${esc(name)}…</div>`;
+    const { data } = await window.DB.nft_read('coins', { select: 'id,name,metal,year,edition_no,edition_total,image_url', eq: { collection_id: collId }, order: { col: 'created_at', asc: false }, limit: 200 });
+    const cards = (data || []).map(c => `
+      <div class="nft-card">
+        <div class="nft-cardimg">${thumb(c.image_url, c.name)}</div>
+        <div class="nft-cardmeta">
+          <b>${esc(c.name || 'Untitled')}</b>
+          <span class="nft-muted">${esc(c.metal || '—')}${c.edition_no ? ` · #${esc(c.edition_no)}/${esc(c.edition_total || '?')}` : ''}</span>
+        </div>
+      </div>`).join('') || `<div class="nft-muted">No coins in this collection yet.</div>`;
+    body.innerHTML = `
+      <div class="nft-detail-head">
+        <button class="nft-back" data-back>← Collections</button>
+        <h3>${esc(name)} <span class="nft-muted">${(data || []).length} coins</span></h3>
+      </div>
+      <div class="nft-cards">${cards}</div>`;
+    body.querySelector('[data-back]').addEventListener('click', () => paintCollections(body));
   }
 
   async function paintDrops(body) {
