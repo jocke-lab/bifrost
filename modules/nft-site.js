@@ -31,6 +31,39 @@
   let _collMap = null;
   async function collMap() { if (_collMap) return _collMap; const { data } = await window.DB.nft_read('collections', { select: 'id,name', limit: 200 }); _collMap = {}; (data || []).forEach(c => { _collMap[c.id] = c.name; }); return _collMap; }
 
+  // a clickable coin card (opens its certificate detail)
+  function coinCardHTML(c, cm) {
+    const collLine = cm ? `<span class="nft-muted">${esc(cm[c.collection_id] || 'No collection')}</span>` : '';
+    return `<button class="nft-card nft-card-btn" data-coin-id="${esc(c.id)}" data-coin-name="${esc(c.name || 'Untitled')}">
+      <div class="nft-cardimg">${thumb(c.image_url, c.name)}</div>
+      <div class="nft-cardmeta">
+        <b>${esc(c.name || 'Untitled')}</b>
+        ${collLine}
+        <span class="nft-muted">${esc(c.metal || '—')}${c.year ? ' · ' + esc(c.year) : ''}${c.edition_no ? ` · #${esc(c.edition_no)}/${esc(c.edition_total || '?')}` : ''}</span>
+      </div>
+    </button>`;
+  }
+  function wireCoins(container) {
+    container.querySelectorAll('[data-coin-id]').forEach(b => b.addEventListener('click', () => openCoinModal(b.dataset.coinId, b.dataset.coinName)));
+  }
+  async function openCoinModal(coinId, name) {
+    let ov = document.querySelector('.nft-modal');
+    if (!ov) { ov = document.createElement('div'); ov.className = 'nft-modal'; document.body.appendChild(ov); }
+    ov.innerHTML = `<div class="nft-modal-box"><div class="nft-modal-head"><b>${esc(name)}</b><button class="nft-modal-x" data-x>✕</button></div><div class="nft-modal-body"><div class="nft-loading"><span class="nft-spin"></span> Loading certificate…</div></div></div>`;
+    ov.classList.add('open');
+    ov.querySelector('[data-x]').addEventListener('click', () => ov.classList.remove('open'));
+    ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
+    const mb = ov.querySelector('.nft-modal-body');
+    try {
+      const { data } = await window.DB.nft_read('certificates', { select: 'id,serial,minted,minted_at,token_id,onchain_owner,tag_id,created_at', eq: { coin_id: coinId }, order: { col: 'created_at', asc: false }, limit: 20 });
+      const certs = (data || []).map(ct => `<div class="nft-cert">
+        <div class="nft-cert-top"><span class="nft-mono">${esc(ct.serial)}</span>${ct.minted ? '<span class="nft-chip ok">minted</span>' : '<span class="nft-chip">unminted</span>'}${ct.tag_id ? '<span class="nft-chip ok">🔗 NFC chip</span>' : '<span class="nft-chip">no chip</span>'}</div>
+        <div class="nft-muted">${ct.token_id ? 'Token #' + esc(ct.token_id) + ' · ' : ''}${ct.onchain_owner ? 'owner ' + esc(String(ct.onchain_owner).slice(0, 12)) + '…' : 'off-chain'}</div>
+      </div>`).join('') || '<div class="nft-muted">No certificate issued for this coin yet — issue one from the Admin tab.</div>';
+      mb.innerHTML = `<div class="nft-cert-list">${certs}</div>`;
+    } catch (e) { mb.innerHTML = `<div class="nft-warn">${esc(e.message)}</div>`; }
+  }
+
   function render(root) {
     rootEl = root;
     root.innerHTML = `
@@ -131,16 +164,9 @@
       window.DB.nft_read('coins', { select: 'id,name,metal,year,edition_no,edition_total,image_url,collection_id,created_at', order: { col: 'created_at', asc: false }, limit: 60 }),
       collMap()
     ]);
-    const cards = (res.data || []).map(c => `
-      <div class="nft-card">
-        <div class="nft-cardimg">${thumb(c.image_url, c.name)}</div>
-        <div class="nft-cardmeta">
-          <b>${esc(c.name || 'Untitled')}</b>
-          <span class="nft-muted">${esc(cm[c.collection_id] || 'No collection')}</span>
-          <span class="nft-muted">${esc(c.metal || '—')}${c.year ? ' · ' + esc(c.year) : ''}${c.edition_no ? ` · #${esc(c.edition_no)}/${esc(c.edition_total || '?')}` : ''}</span>
-        </div>
-      </div>`).join('') || `<div class="nft-muted">No coins.</div>`;
-    body.innerHTML = `<section class="nft-panel"><h3>Catalog <span class="nft-muted">— newest 60 coins</span></h3><div class="nft-cards">${cards}</div></section>`;
+    const cards = (res.data || []).map(c => coinCardHTML(c, cm)).join('') || `<div class="nft-muted">No coins.</div>`;
+    body.innerHTML = `<section class="nft-panel"><h3>Catalog <span class="nft-muted">— newest 60 coins · click a coin for its certificate</span></h3><div class="nft-cards">${cards}</div></section>`;
+    wireCoins(body);
   }
 
   async function paintCollections(body) {
@@ -160,21 +186,15 @@
   async function paintCollectionDetail(body, collId, name) {
     body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading ${esc(name)}…</div>`;
     const { data } = await window.DB.nft_read('coins', { select: 'id,name,metal,year,edition_no,edition_total,image_url', eq: { collection_id: collId }, order: { col: 'created_at', asc: false }, limit: 200 });
-    const cards = (data || []).map(c => `
-      <div class="nft-card">
-        <div class="nft-cardimg">${thumb(c.image_url, c.name)}</div>
-        <div class="nft-cardmeta">
-          <b>${esc(c.name || 'Untitled')}</b>
-          <span class="nft-muted">${esc(c.metal || '—')}${c.edition_no ? ` · #${esc(c.edition_no)}/${esc(c.edition_total || '?')}` : ''}</span>
-        </div>
-      </div>`).join('') || `<div class="nft-muted">No coins in this collection yet.</div>`;
+    const cards = (data || []).map(c => coinCardHTML(c)).join('') || `<div class="nft-muted">No coins in this collection yet.</div>`;
     body.innerHTML = `
       <div class="nft-detail-head">
         <button class="nft-back" data-back>← Collections</button>
-        <h3>${esc(name)} <span class="nft-muted">${(data || []).length} coins</span></h3>
+        <h3>${esc(name)} <span class="nft-muted">${(data || []).length} coins · click a coin for its certificate</span></h3>
       </div>
       <div class="nft-cards">${cards}</div>`;
     body.querySelector('[data-back]').addEventListener('click', () => paintCollections(body));
+    wireCoins(body);
   }
 
   async function paintDrops(body) {

@@ -83,3 +83,13 @@
 .nft-detail-head h3 { margin: 0; font-size: 16px; color: var(--text, #eaf2f8); }
 .nft-back { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer; background: rgba(255, 255, 255, .05); border: 1px solid var(--border, rgba(255, 255, 255, .12)); color: var(--text, #eaf2f8); }
 .nft-back:hover { background: rgba(255, 255, 255, .1); }
+
+/* coin → certificate modal */
+.nft-modal { position: fixed; inset: 0; z-index: 600; background: rgba(4, 8, 14, .66); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; padding: 20px; }
+.nft-modal.open { display: flex; }
+.nft-modal-box { width: min(520px, 96vw); background: var(--panel, #0c1422); border: 1px solid var(--border, rgba(255, 255, 255, .12)); border-radius: 18px; padding: 18px; box-shadow: 0 24px 80px rgba(0, 0, 0, .6); }
+.nft-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; color: var(--text, #eaf2f8); font-size: 16px; }
+.nft-modal-x { background: none; border: none; color: var(--muted, #8aa4bc); font-size: 16px; cursor: pointer; }
+.nft-cert-list { display: flex; flex-direction: column; gap: 10px; }
+.nft-cert { background: rgba(255, 255, 255, .03); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.nft-cert-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
