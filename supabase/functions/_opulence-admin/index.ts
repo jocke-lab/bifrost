@@ -40,19 +40,38 @@ Deno.serve(async (req) => {
   } catch (e) { return j(500, { ok: false, error: String((e && e.message) || e) }); }
 });
 
+async function sha256hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+function randHex(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map((x) => x.toString(16).padStart(2, '0')).join('').toUpperCase(); }
+function fmtCode(h) { return h.slice(0, 4) + '-' + h.slice(4, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16); }
+
 async function route(resource, sb, req, b, url) {
   const m = req.method;
   const ok = (o) => ({ status: 200, body: Object.assign({ ok: true, configured: true }, o) });
   const bad = (e, s) => ({ status: s || 400, body: { ok: false, error: e } });
 
   if (resource === 'dealers') {
-    if (m === 'GET') { const { data, error } = await sb.from('dealers').select('id,name,slug,verified,status,default_royalty_bps,contact_email,website,created_at').order('created_at', { ascending: false }); if (error) throw error; return ok({ dealers: data }); }
+    if (m === 'GET') { const { data, error } = await sb.from('dealers').select('id,owner_id,name,slug,bio,logo_url,verified,status,default_royalty_bps,contact_email,contact_phone,website,custom_domain,custom_domain_verified,ship_name,ship_line1,ship_postcode,ship_city,ship_country,ai_credit_cents,created_at').order('created_at', { ascending: false }); if (error) throw error; return ok({ dealers: data }); }
     if (m === 'POST') { if (!b.name) return bad('name required'); const row = { name: b.name, slug: slugify(b.slug || b.name), default_royalty_bps: b.royalty_bps != null ? clampRoy(b.royalty_bps) : 500, contact_email: b.contact_email || null, website: b.website || null, bio: b.bio || null }; if (b.status && DEALER_ST.includes(b.status)) row.status = b.status; if (b.verified != null) row.verified = !!b.verified; const { data, error } = await sb.from('dealers').insert(row).select().single(); if (error) throw error; return ok({ dealer: data }); }
-    if (m === 'PATCH') { if (!b.id) return bad('id required'); const patch = {}; if (b.action === 'approve') { patch.status = 'approved'; patch.verified = true; } if (b.status && DEALER_ST.includes(b.status)) patch.status = b.status; ['verified', 'default_royalty_bps', 'name', 'contact_email', 'website', 'bio'].forEach((k) => { if (b[k] !== undefined) patch[k] = b[k]; }); const { data, error } = await sb.from('dealers').update(patch).eq('id', b.id).select().single(); if (error) throw error; return ok({ dealer: data }); }
+    if (m === 'PATCH') {
+      if (!b.id) return bad('id required');
+      if (b.action === 'domain_verified') { const { data, error } = await sb.from('dealers').update({ custom_domain_verified: !!b.verified }).eq('id', b.id).select().single(); if (error) throw error; return ok({ dealer: data }); }
+      const patch = {};
+      if (b.action === 'approve') { patch.status = 'approved'; patch.verified = true; }
+      if (b.action === 'set_status' && b.status && DEALER_ST.includes(b.status)) patch.status = b.status;
+      if (b.status && DEALER_ST.includes(b.status) && patch.status === undefined) patch.status = b.status;
+      ['verified', 'default_royalty_bps', 'name', 'contact_email', 'website', 'bio'].forEach((k) => { if (b[k] !== undefined && patch[k] === undefined) patch[k] = b[k]; });
+      const { data, error } = await sb.from('dealers').update(patch).eq('id', b.id).select().single(); if (error) throw error;
+      // approval flips the owner's profile to 'creator' so they can enter the studio
+      if (patch.status === 'approved' && data && data.owner_id) { await sb.from('profiles').update({ role: 'creator' }).eq('id', data.owner_id).eq('role', 'collector'); }
+      return ok({ dealer: data });
+    }
   }
   if (resource === 'collections') {
     if (m === 'GET') { const { data, error } = await sb.from('collections').select('id,name,slug,dealer_id,published,approved,verified,featured,royalty_bps,chain,created_at').order('created_at', { ascending: false }); if (error) throw error; return ok({ collections: data }); }
-    if (m === 'POST') { if (b.action === 'approve') { if (!b.id) return bad('id required'); const patch = { approved: true }; if (b.publish !== false) patch.published = true; if (b.verified !== undefined) patch.verified = !!b.verified; const { data, error } = await sb.from('collections').update(patch).eq('id', b.id).select().single(); if (error) throw error; return ok({ collection: data }); } if (!b.name || !b.dealer_id) return bad('name and dealer_id required'); const row = { name: b.name, slug: slugify(b.slug || b.name), dealer_id: b.dealer_id, description: b.description || null, royalty_bps: b.royalty_bps != null ? clampRoy(b.royalty_bps) : 500, chain: b.chain || 'base', approved: !!b.approved, published: !!b.published, verified: !!b.verified }; const { data, error } = await sb.from('collections').insert(row).select().single(); if (error) throw error; return ok({ collection: data }); }
+    if (m === 'POST') { if (b.action === 'feature') { if (!b.id) return bad('id required'); const { data, error } = await sb.from('collections').update({ featured: !!b.featured }).eq('id', b.id).select().single(); if (error) throw error; return ok({ collection: data }); } if (b.action === 'approve') { if (!b.id) return bad('id required'); const patch = { approved: true }; if (b.publish !== false) patch.published = true; if (b.verified !== undefined) patch.verified = !!b.verified; const { data, error } = await sb.from('collections').update(patch).eq('id', b.id).select().single(); if (error) throw error; return ok({ collection: data }); } if (!b.name || !b.dealer_id) return bad('name and dealer_id required'); const row = { name: b.name, slug: slugify(b.slug || b.name), dealer_id: b.dealer_id, description: b.description || null, royalty_bps: b.royalty_bps != null ? clampRoy(b.royalty_bps) : 500, chain: b.chain || 'base', approved: !!b.approved, published: !!b.published, verified: !!b.verified }; const { data, error } = await sb.from('collections').insert(row).select().single(); if (error) throw error; return ok({ collection: data }); }
   }
   if (resource === 'coins') {
     if (m === 'GET') { const col = url.searchParams.get('collection_id'); let q = sb.from('coins').select('id,name,collection_id,edition_no,edition_total,metal,year,image_url,created_at').order('created_at', { ascending: false }).limit(200); if (col) q = q.eq('collection_id', col); const { data, error } = await q; if (error) throw error; return ok({ coins: data }); }
@@ -76,6 +95,7 @@ async function route(resource, sb, req, b, url) {
     if (m === 'POST') {
       if (b.action === 'resolve_issue') { const { data } = await sb.from('order_issues').update({ status: b.status || 'resolved' }).eq('id', b.id).select().single(); return ok({ row: data }); }
       if (b.action === 'resolve_counterfeit') { const { data } = await sb.from('counterfeit_reports').update({ status: b.status || 'resolved' }).eq('id', b.id).select().single(); return ok({ row: data }); }
+      if (b.action === 'report_status') { const valid = ['open', 'reviewing', 'resolved', 'dismissed']; const st = valid.includes(b.status) ? b.status : 'reviewing'; const { data } = await sb.from('counterfeit_reports').update({ status: st }).eq('id', b.id).select().single(); return ok({ row: data }); }
       if (b.action === 'process_withdrawal') { const st = b.status === 'rejected' ? 'rejected' : 'paid'; const { data } = await sb.from('withdrawal_requests').update({ status: st, note: b.note || null, processed_at: new Date().toISOString() }).eq('id', b.id).select().single(); return ok({ row: data }); }
       if (b.action === 'order_status') { if (!ORDER_ST.includes(b.status)) return bad('bad status'); const patch = { status: b.status }; if (b.status === 'cancelled') patch.cancelled_at = new Date().toISOString(); if (b.status === 'completed') patch.completed_at = new Date().toISOString(); const { data } = await sb.from('orders').update(patch).eq('id', b.id).select().single(); return ok({ row: data }); }
       if (b.action === 'messages') { if (!b.conversation_id) return bad('conversation_id required'); const { data } = await sb.from('messages').select('id,sender_id,kind,body,created_at').eq('conversation_id', b.conversation_id).order('created_at', { ascending: true }).limit(200); return ok({ messages: data || [] }); }
@@ -104,10 +124,81 @@ async function route(resource, sb, req, b, url) {
     if (m === 'GET') { const view = url.searchParams.get('view') || 'chain';
       if (view === 'chain') { const [jobs, snaps] = await Promise.all([ sb.from('chain_jobs').select('id,type,status,certificate_id,to_address,attempts,last_error,tx_hash,created_at,updated_at').order('created_at', { ascending: false }).limit(100), sb.from('wallet_snapshots').select('balance_wei,created_at').order('created_at', { ascending: false }).limit(1) ]); const counts = {}; (jobs.data || []).forEach((jb) => { counts[jb.status] = (counts[jb.status] || 0) + 1; }); const wei = snaps.data && snaps.data[0] ? Number(snaps.data[0].balance_wei || 0) : null; return ok({ jobs: jobs.data || [], counts, balance_eth: wei != null ? wei / 1e18 : null }); }
       if (view === 'audit') { const q = url.searchParams.get('q'); let qq = sb.from('audit_log').select('id,actor_id,action,target,meta,created_at').order('created_at', { ascending: false }).limit(200); if (q) qq = qq.ilike('action', '%' + q + '%'); const { data } = await qq; return ok({ rows: data || [] }); }
-      if (view === 'cards') { const { data } = await sb.from('card_orders').select('id,dealer_id,quantity,status,notes,amount_eur,created_at').order('created_at', { ascending: false }).limit(100); return ok({ rows: data || [] }); }
+      if (view === 'cards') { const [co, dl] = await Promise.all([ sb.from('card_orders').select('id,dealer_id,quantity,status,notes,amount_eur,design_url,conversation_id,created_at').order('created_at', { ascending: false }).limit(100), sb.from('dealers').select('id,name') ]); const dmap = {}; (dl.data || []).forEach((d) => dmap[d.id] = d.name); const rows = (co.data || []).map((r) => ({ ...r, dealer_name: dmap[r.dealer_id] || null })); return ok({ rows }); }
       return bad('bad view');
     }
-    if (m === 'POST') { if (b.action === 'retry_chain') { const { data } = await sb.from('chain_jobs').update({ status: 'queued', last_error: null }).eq('id', b.id).select().single(); return ok({ row: data }); } if (b.action === 'card_status') { if (!CARD_ST.includes(b.status)) return bad('valid status required'); const { data } = await sb.from('card_orders').update({ status: b.status }).eq('id', b.id).select().single(); return ok({ row: data }); } return bad('unknown action'); }
+    if (m === 'POST') { if (b.action === 'retry_chain') { const { data } = await sb.from('chain_jobs').update({ status: 'queued', last_error: null }).eq('id', b.id).select().single(); return ok({ row: data }); } if (b.action === 'mark_chain_job') { const patch = { status: b.failed ? 'failed' : 'done' }; if (b.tx) patch.tx_hash = b.tx; const { data } = await sb.from('chain_jobs').update(patch).eq('id', b.id).select().single(); return ok({ row: data }); } if (b.action === 'card_status') { if (!CARD_ST.includes(b.status)) return bad('valid status required'); const { data } = await sb.from('card_orders').update({ status: b.status }).eq('id', b.id).select().single(); return ok({ row: data }); } return bad('unknown action'); }
   }
+
+  // ── PROVISIONING: issue claim-coded cards per collection (replicates admin_provision_collection) ──
+  if (resource === 'provision') {
+    if (m === 'GET') {
+      const [cols, dls, coins, tags] = await Promise.all([
+        sb.from('collections').select('id,name,slug,dealer_id,published,approved,verified,featured,royalty_bps,created_at').order('created_at', { ascending: false }),
+        sb.from('dealers').select('id,name,custom_domain,custom_domain_verified'),
+        sb.from('coins').select('id,collection_id'),
+        sb.from('nfc_tags').select('coin_id').not('coin_id', 'is', null),
+      ]);
+      const dmap = {}; (dls.data || []).forEach((d) => dmap[d.id] = d);
+      const total = {}, carded = new Set((tags.data || []).map((t) => t.coin_id));
+      const cardedCnt = {};
+      (coins.data || []).forEach((c) => { if (!c.collection_id) return; total[c.collection_id] = (total[c.collection_id] || 0) + 1; if (carded.has(c.id)) cardedCnt[c.collection_id] = (cardedCnt[c.collection_id] || 0) + 1; });
+      const rows = (cols.data || []).map((c) => ({ ...c, dealer: dmap[c.dealer_id] || null, coins: total[c.id] || 0, cards_issued: cardedCnt[c.id] || 0 }));
+      return ok({ rows });
+    }
+    if (m === 'POST') {
+      if (!b.collection_id) return bad('collection_id required');
+      const { data: col } = await sb.from('collections').select('dealer_id').eq('id', b.collection_id).maybeSingle();
+      if (!col) return bad('collection not found', 404);
+      const { data: coins } = await sb.from('coins').select('id,name,edition_no').eq('collection_id', b.collection_id).order('name');
+      const { data: tagged } = await sb.from('nfc_tags').select('coin_id').not('coin_id', 'is', null);
+      const has = new Set((tagged || []).map((t) => t.coin_id));
+      const cards = [];
+      for (const c of (coins || [])) {
+        if (has.has(c.id)) continue;
+        const uid = 'OPT-' + randHex(7), code = randHex(8), hash = await sha256hex(code);
+        const { error } = await sb.from('nfc_tags').insert({ uid, dealer_id: col.dealer_id, coin_id: c.id, status: 'assigned', claim_code_hash: hash });
+        if (error) { if (error.code === '23505') continue; throw error; }
+        cards.push({ coin_name: c.name, edition_no: c.edition_no, uid, claim_code: fmtCode(code) });
+      }
+      return ok({ cards });
+    }
+  }
+
+  // ── BULK TAG ISSUANCE (replicates admin_issue_tags) ──
+  if (resource === 'tags') {
+    if (m === 'POST') {
+      if (!b.dealer_id) return bad('dealer_id required');
+      const count = Math.max(1, Math.min(1000, Number(b.count) || 0));
+      const out = [];
+      for (let i = 0; i < count; i++) {
+        const uid = 'OPT-' + randHex(7), code = randHex(8), hash = await sha256hex(code);
+        const { error } = await sb.from('nfc_tags').insert({ uid, dealer_id: b.dealer_id, status: 'unassigned', claim_code_hash: hash });
+        if (error) throw error;
+        out.push({ uid, claim_code: fmtCode(code) });
+      }
+      return ok({ tags: out });
+    }
+  }
+
+  // ── ORDERS & ESCROW ──
+  if (resource === 'orders') {
+    if (m === 'GET') {
+      const { data } = await sb.from('orders').select('id,label_code,status,item_price_eur,total_eur,buyer_id,seller_id,dealer_id,coin_id,dispute_reason,created_at').order('created_at', { ascending: false }).limit(100);
+      const rows = data || [];
+      const coinIds = [...new Set(rows.map((o) => o.coin_id).filter(Boolean))];
+      const { data: coins } = coinIds.length ? await sb.from('coins').select('id,name').in('id', coinIds) : { data: [] };
+      const cmap = {}; (coins || []).forEach((c) => cmap[c.id] = c.name);
+      const ESCROW = ['awaiting_shipment', 'shipped', 'delivered', 'disputed'];
+      let open = 0, flight = 0, disputes = 0;
+      rows.forEach((o) => { if (ESCROW.includes(o.status)) open += Number(o.total_eur || 0); if (['awaiting_shipment', 'shipped', 'delivered'].includes(o.status)) flight++; if (o.status === 'disputed') disputes++; o.coin_name = cmap[o.coin_id] || null; });
+      return ok({ rows, totals: { open_escrow: Math.round(open * 100) / 100, in_flight: flight, disputes } });
+    }
+    if (m === 'POST') {
+      if (b.action === 'order_status') { if (!ORDER_ST.includes(b.status)) return bad('bad status'); const patch = { status: b.status }; if (b.status === 'cancelled') patch.cancelled_at = new Date().toISOString(); if (b.status === 'completed') patch.completed_at = new Date().toISOString(); const { data } = await sb.from('orders').update(patch).eq('id', b.id).select().single(); return ok({ row: data }); }
+      return bad('unknown action');
+    }
+  }
+
   return bad('unknown resource', 404);
 }
