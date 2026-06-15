@@ -96,3 +96,9 @@
 .nft-modal-body { max-height: 52vh; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
 .nft-chatbox { display: flex; gap: 8px; margin-top: 12px; }
 .nft-chatbox .nft-in { flex: 1; }
+
+/* atlas / constellation map */
+.nft-map { width: 100%; overflow: hidden; }
+.nft-map svg { width: 100%; height: auto; display: block; }
+.nft-mapnode { cursor: pointer; transition: opacity .15s; }
+.nft-mapnode:hover circle { opacity: 1; filter: drop-shadow(0 0 6px rgba(25, 211, 255, .5)); }

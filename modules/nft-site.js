@@ -11,6 +11,7 @@
 
   const TABS = [
     { id: 'overview',    label: 'Overview',    icon: '🛰️' },
+    { id: 'map',         label: 'Atlas',       icon: '🗺️' },
     { id: 'catalog',     label: 'Catalog',     icon: '🪙' },
     { id: 'collections', label: 'Collections', icon: '🗂️' },
     { id: 'drops',       label: 'Drops',       icon: '🚀' },
@@ -118,6 +119,7 @@
     body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading live data…</div>`;
     try {
       if (active === 'overview')    return void await paintOverview(body);
+      if (active === 'map')         return void await paintMap(body);
       if (active === 'catalog')     return void await paintCatalog(body);
       if (active === 'collections') return void await paintCollections(body);
       if (active === 'drops')       return void await paintDrops(body);
@@ -169,6 +171,46 @@
           ${privTile('Counterfeit reports', 'triage flagged certificates')}
         </div>
       </section>`;
+  }
+
+  // ── Atlas: constellation map of collections (Nexus-style magnitude + golden spiral) ──
+  async function paintMap(body) {
+    body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Building the atlas…</div>`;
+    if (!(window.DB && window.DB.nft)) { body.innerHTML = `<div class="nft-warn">Data layer offline.</div>`; return; }
+    const [colls, coins] = await Promise.all([
+      window.DB.nft_read('collections', { select: 'id,name,published,verified,featured', order: { col: 'created_at', asc: false }, limit: 200 }),
+      window.DB.nft_read('coins', { select: 'collection_id', limit: 2000 })
+    ]);
+    const cnt = {}; (coins.data || []).forEach(c => { if (c.collection_id) cnt[c.collection_id] = (cnt[c.collection_id] || 0) + 1; });
+    const list = (colls.data || []).map(c => ({ ...c, coins: cnt[c.id] || 0 }));
+    if (!list.length) { body.innerHTML = `<section class="nft-panel"><div class="nft-muted">No collections to map yet.</div></section>`; return; }
+    const maxC = Math.max(1, ...list.map(c => c.coins));
+    const W = 900, Hh = 560, cx = W / 2, cy = Hh / 2, GOLD = Math.PI * (3 - Math.sqrt(5));
+    let nodes = '', conns = '';
+    list.forEach((c, i) => {
+      const ang = i * GOLD, r = 64 + 30 * Math.sqrt(i);
+      const x = cx + r * Math.cos(ang), y = cy + r * Math.sin(ang);
+      const rad = 9 + Math.round(16 * Math.sqrt(c.coins / maxC));
+      const col = c.verified ? '#46E6A6' : (c.published ? 'var(--accent1, #19D3FF)' : '#5a6b82');
+      conns += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,.08)" stroke-width="1"/>`;
+      nodes += `<g class="nft-mapnode" data-id="${esc(c.id)}" data-name="${esc(c.name)}">
+        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad}" fill="${col}" opacity="0.85"/>
+        ${c.featured ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad + 4}" fill="none" stroke="#F5A524" stroke-width="1.5"/>` : ''}
+        ${c.coins >= Math.max(2, maxC * 0.25) ? `<text x="${x.toFixed(1)}" y="${(y + rad + 12).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted, #8aa4bc)">${esc(c.name).slice(0, 18)}</text>` : ''}
+        <title>${esc(c.name)} · ${c.coins} coins${c.verified ? ' · verified' : ''}</title>
+      </g>`;
+    });
+    body.innerHTML = `
+      <section class="nft-panel">
+        <h3>Platform atlas <span class="nft-muted">— ${list.length} collections sized by coins · 🟢 verified · 🔵 published · ⚪ draft · click to open</span></h3>
+        <div class="nft-map"><svg viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="xMidYMid meet">
+          ${conns}
+          <circle cx="${cx}" cy="${cy}" r="26" fill="var(--accent3, #7C5CFF)"/>
+          <text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="11" font-weight="600" fill="#07111a">OPV</text>
+          ${nodes}
+        </svg></div>
+      </section>`;
+    body.querySelectorAll('.nft-mapnode').forEach(n => n.addEventListener('click', () => paintCollectionDetail(body, n.dataset.id, n.dataset.name)));
   }
 
   async function paintCatalog(body) {
