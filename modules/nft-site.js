@@ -16,6 +16,7 @@
     { id: 'drops',       label: 'Drops',       icon: '🚀' },
     { id: 'dealers',     label: 'Dealers',     icon: '🏷️' },
     { id: 'sales',       label: 'Sales',       icon: '💶' },
+    { id: 'support',     label: 'Support',     icon: '🛟' },
     { id: 'admin',       label: 'Admin',       icon: '⚙️' }
   ];
 
@@ -117,6 +118,7 @@
       if (active === 'drops')       return void await paintDrops(body);
       if (active === 'dealers')     return void await paintDealers(body);
       if (active === 'sales')       return void await paintSales(body);
+      if (active === 'support')     return void await paintSupport(body);
       if (active === 'admin')       return void await paintAdmin(body);
     } catch (e) { body.innerHTML = `<div class="nft-warn">Failed to load: ${esc(e.message)}</div>`; }
   }
@@ -213,6 +215,54 @@
     const { data } = await window.DB.nft_read('sales', { select: '*', order: { col: 'created_at', asc: false }, limit: 60 });
     const rows = (data || []).map(s => `<tr><td>${when(s.created_at)}</td><td class="num">${eur(s.price_eur)}</td><td><span class="nft-chip">${esc(s.rail || '—')}</span></td><td class="num">${eur(s.royalty_eur)}</td><td class="num">${eur(s.platform_fee_eur)}</td><td class="nft-mono">${s.tx_hash ? esc(String(s.tx_hash).slice(0, 10)) + '…' : '—'}</td></tr>`).join('') || `<tr><td colspan="6" class="nft-muted">No sales.</td></tr>`;
     body.innerHTML = `<section class="nft-panel"><h3>Sales ledger</h3><table class="nft-table"><thead><tr><th>Date</th><th class="num">Price</th><th>Rail</th><th class="num">Royalty</th><th class="num">Platform fee</th><th>Tx</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  }
+
+  // ── Support tab: handle any trade dispute, issue, chat, counterfeit, withdrawal ──
+  async function paintSupport(body) {
+    const st = await apiCall('/api/status');
+    const configured = !!(st && st.integrations && st.integrations.nft_admin);
+    if (!configured) { body.innerHTML = `<div class="nft-adm-warn">🛟 Support &amp; dispute tools need <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel.${st && st._offline ? ' The API runs on the live site (bifrostlkl.com), not this local preview.' : ''}</div>`; return; }
+    body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading support queue…</div>`;
+    const ops = await apiCall('/api/ops');
+    if (!ops.ok) { body.innerHTML = `<div class="nft-warn">${esc(ops.error || 'could not load')}</div>`; return; }
+    const rows = (arr, fn, empty) => (arr && arr.length) ? arr.map(fn).join('') : `<div class="nft-muted">${empty}</div>`;
+    const total = (ops.issues || []).length + (ops.counterfeit || []).length + (ops.withdrawals || []).length + (ops.disputes || []).length;
+    body.innerHTML = `
+      <div class="${total ? 'nft-adm-warn' : 'nft-adm-ok'}">🛟 ${total ? total + ' item(s) need your attention' : 'All clear — no open disputes, issues, counterfeit reports or withdrawals.'}</div>
+      <section class="nft-panel"><h3>Disputed trades</h3>${rows(ops.disputes, d => `<div class="nft-adm-row"><span><span class="nft-mono">${esc(String(d.id).slice(0, 8))}</span> · €${esc(d.total_eur)} · ${esc(d.dispute_reason || 'disputed')}</span><span><button class="nft-adm-mini" data-op="order_status" data-id="${esc(d.id)}" data-status="refunded">Refund buyer</button> <button class="nft-adm-mini" data-op="order_status" data-id="${esc(d.id)}" data-status="completed">Release to seller</button></span></div>`, 'No disputed trades ✓')}</section>
+      <section class="nft-panel"><h3>Order issues</h3>${rows(ops.issues, i => `<div class="nft-adm-row"><span><span class="nft-mono">${esc(String(i.order_id).slice(0, 8))}</span> · ${esc(i.reason)} <span class="nft-chip">${esc(i.status)}</span></span><button class="nft-adm-mini" data-op="resolve_issue" data-id="${esc(i.id)}">Resolve</button></div>`, 'No open issues ✓')}</section>
+      <section class="nft-panel"><h3>Counterfeit reports</h3>${rows(ops.counterfeit, c => `<div class="nft-adm-row"><span>${esc(c.reason)}${c.tag_uid ? ' · tag ' + esc(c.tag_uid) : ''} <span class="nft-chip">${esc(c.status)}</span></span><span><button class="nft-adm-mini" data-op="resolve_counterfeit" data-id="${esc(c.id)}" data-status="dismissed">Dismiss</button> <button class="nft-adm-mini" data-op="resolve_counterfeit" data-id="${esc(c.id)}" data-status="confirmed">Confirm</button></span></div>`, 'No counterfeit reports ✓')}</section>
+      <section class="nft-panel"><h3>Withdrawal requests</h3>${rows(ops.withdrawals, w => `<div class="nft-adm-row"><span>€${esc(w.amount_eur)} · ${esc(w.method)} <span class="nft-chip">${esc(w.status)}</span></span><span><button class="nft-adm-mini" data-op="process_withdrawal" data-id="${esc(w.id)}" data-status="paid">Mark paid</button> <button class="nft-adm-mini" data-op="process_withdrawal" data-id="${esc(w.id)}" data-status="rejected">Reject</button></span></div>`, 'No pending withdrawals ✓')}</section>
+      <section class="nft-panel"><h3>Conversations</h3>${rows(ops.conversations, c => `<div class="nft-adm-row"><span>${esc(c.kind)}${c.order_id ? ' · order ' + esc(String(c.order_id).slice(0, 8)) : ''} <span class="nft-muted">${esc(when(c.last_message_at))}</span></span><button class="nft-adm-mini" data-conv="${esc(c.id)}">Open chat</button></div>`, 'No conversations.')}</section>`;
+    body.querySelectorAll('[data-op]').forEach(b => b.addEventListener('click', async () => {
+      const payload = { action: b.dataset.op, id: b.dataset.id };
+      if (b.dataset.status) payload.status = b.dataset.status;
+      const r = await apiCall('/api/ops', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      if (r.ok) { H.toast('Done ✓', 'success'); paintSupport(body); }
+      else H.toast('Failed: ' + (r.error || 'error'), 'danger');
+    }));
+    body.querySelectorAll('[data-conv]').forEach(b => b.addEventListener('click', () => openChat(b.dataset.conv)));
+  }
+
+  async function openChat(convId) {
+    let ov = document.querySelector('.nft-modal');
+    if (!ov) { ov = document.createElement('div'); ov.className = 'nft-modal'; document.body.appendChild(ov); }
+    ov.innerHTML = `<div class="nft-modal-box"><div class="nft-modal-head"><b>Conversation</b><button class="nft-modal-x" data-x>✕</button></div><div class="nft-modal-body"><div class="nft-loading"><span class="nft-spin"></span> Loading…</div></div><div class="nft-chatbox"><input class="nft-in" id="nft-chat-in" placeholder="Reply as operator…"/><button class="nft-adm-btn" id="nft-chat-send">Send</button></div></div>`;
+    ov.classList.add('open');
+    ov.querySelector('[data-x]').addEventListener('click', () => ov.classList.remove('open'));
+    ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
+    const mb = ov.querySelector('.nft-modal-body');
+    async function load() {
+      const r = await apiCall('/api/ops', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'messages', conversation_id: convId }) });
+      mb.innerHTML = (r.messages || []).map(m => `<div class="nft-cert"><div class="nft-muted">${esc(when(m.created_at))}</div><div>${esc(m.body || '')}</div></div>`).join('') || '<div class="nft-muted">No messages.</div>';
+      mb.scrollTop = mb.scrollHeight;
+    }
+    load();
+    ov.querySelector('#nft-chat-send').addEventListener('click', async () => {
+      const inp = ov.querySelector('#nft-chat-in'); const t = inp.value.trim(); if (!t) return; inp.value = '';
+      const r = await apiCall('/api/ops', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'reply', conversation_id: convId, body: t }) });
+      if (r.ok) load(); else H.toast('Send failed: ' + (r.error || ''), 'danger');
+    });
   }
 
   // ── Admin tab: the full operator "circle" (writes via the serverless API) ──

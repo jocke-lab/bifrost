@@ -93,3 +93,6 @@
 .nft-cert-list { display: flex; flex-direction: column; gap: 10px; }
 .nft-cert { background: rgba(255, 255, 255, .03); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 .nft-cert-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.nft-modal-body { max-height: 52vh; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.nft-chatbox { display: flex; gap: 8px; margin-top: 12px; }
+.nft-chatbox .nft-in { flex: 1; }
