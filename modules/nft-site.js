@@ -16,6 +16,7 @@
     { id: 'drops',       label: 'Drops',       icon: '🚀' },
     { id: 'dealers',     label: 'Dealers',     icon: '🏷️' },
     { id: 'sales',       label: 'Sales',       icon: '💶' },
+    { id: 'accounting',  label: 'Accounting',  icon: '📊' },
     { id: 'nfc',         label: 'NFC Cards',   icon: '🏷️' },
     { id: 'support',     label: 'Support',     icon: '🛟' },
     { id: 'admin',       label: 'Admin',       icon: '⚙️' }
@@ -119,6 +120,7 @@
       if (active === 'drops')       return void await paintDrops(body);
       if (active === 'dealers')     return void await paintDealers(body);
       if (active === 'sales')       return void await paintSales(body);
+      if (active === 'accounting')  return void await paintAccounting(body);
       if (active === 'nfc')         return void await paintNfc(body);
       if (active === 'support')     return void await paintSupport(body);
       if (active === 'admin')       return void await paintAdmin(body);
@@ -217,6 +219,22 @@
     const { data } = await window.DB.nft_read('sales', { select: '*', order: { col: 'created_at', asc: false }, limit: 60 });
     const rows = (data || []).map(s => `<tr><td>${when(s.created_at)}</td><td class="num">${eur(s.price_eur)}</td><td><span class="nft-chip">${esc(s.rail || '—')}</span></td><td class="num">${eur(s.royalty_eur)}</td><td class="num">${eur(s.platform_fee_eur)}</td><td class="nft-mono">${s.tx_hash ? esc(String(s.tx_hash).slice(0, 10)) + '…' : '—'}</td></tr>`).join('') || `<tr><td colspan="6" class="nft-muted">No sales.</td></tr>`;
     body.innerHTML = `<section class="nft-panel"><h3>Sales ledger</h3><table class="nft-table"><thead><tr><th>Date</th><th class="num">Price</th><th>Rail</th><th class="num">Royalty</th><th class="num">Platform fee</th><th>Tx</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  }
+
+  // ── Accounting tab: live P&L (volume, platform revenue, royalties, payouts) ──
+  async function paintAccounting(body) {
+    const st = await apiCall('/api/status');
+    if (!(st && st.integrations && st.integrations.nft_admin)) { body.innerHTML = `<div class="nft-adm-warn">📊 Accounting needs <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel.${st && st._offline ? ' The API runs on the live site only.' : ''}</div>`; return; }
+    body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading P&amp;L…</div>`;
+    const r = await apiCall('/api/accounting');
+    if (!r.ok) { body.innerHTML = `<div class="nft-warn">${esc(r.error || 'could not load')}</div>`; return; }
+    const t = r.totals || {};
+    const kpi = (v, l) => `<div class="nft-kpi"><span class="k">${v}</span><span class="l">${l}</span></div>`;
+    const rows = (r.monthly || []).map(m => `<tr><td>${esc(m.month)}</td><td class="num">${eur(m.volume)}</td><td class="num">${eur(m.fees)}</td><td class="num">${eur(m.royalties)}</td><td class="num">${m.count}</td></tr>`).join('') || `<tr><td colspan="5" class="nft-muted">No sales yet.</td></tr>`;
+    body.innerHTML = `
+      <div class="nft-kpis" style="margin-bottom:16px">${kpi(eur(t.volume), 'Volume')}${kpi(eur(t.fees), 'Platform revenue')}${kpi(eur(t.royalties), 'Royalties paid')}${kpi(eur(t.payouts), 'Payouts')}${kpi(t.sales || 0, 'Sales')}</div>
+      <section class="nft-panel"><h3>Monthly P&amp;L <span class="nft-muted">— last 12 months</span></h3>
+        <table class="nft-table"><thead><tr><th>Month</th><th class="num">Volume</th><th class="num">Platform rev</th><th class="num">Royalties</th><th class="num">Sales</th></tr></thead><tbody>${rows}</tbody></table></section>`;
   }
 
   // ── NFC Cards tab: manage every chip — register, link, unlink, deactivate ──
