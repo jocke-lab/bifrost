@@ -13,6 +13,16 @@ module.exports = async (req, res) => {
         const d = await supa('nft', 'nfc_tags?id=eq.' + encodeURIComponent(b.tag_id), { method: 'PATCH', body: { coin_id: b.coin_id, status: 'assigned' } });
         return json(res, 200, { ok: true, configured: true, tag: Array.isArray(d) ? d[0] : d });
       }
+      if (b.action === 'unlink') {
+        if (!b.tag_id) return json(res, 400, { ok: false, error: 'tag_id required' });
+        const d = await supa('nft', 'nfc_tags?id=eq.' + encodeURIComponent(b.tag_id), { method: 'PATCH', body: { coin_id: null, status: 'unassigned' } });
+        return json(res, 200, { ok: true, configured: true, tag: Array.isArray(d) ? d[0] : d });
+      }
+      if (b.action === 'deactivate') {
+        if (!b.tag_id) return json(res, 400, { ok: false, error: 'tag_id required' });
+        const d = await supa('nft', 'nfc_tags?id=eq.' + encodeURIComponent(b.tag_id), { method: 'PATCH', body: { status: 'revoked' } });
+        return json(res, 200, { ok: true, configured: true, tag: Array.isArray(d) ? d[0] : d });
+      }
       if (!b.uid) return json(res, 400, { ok: false, error: 'uid required' });
       const row = { uid: b.uid };
       if (b.dealer_id) row.dealer_id = b.dealer_id;

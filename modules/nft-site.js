@@ -16,6 +16,7 @@
     { id: 'drops',       label: 'Drops',       icon: '🚀' },
     { id: 'dealers',     label: 'Dealers',     icon: '🏷️' },
     { id: 'sales',       label: 'Sales',       icon: '💶' },
+    { id: 'nfc',         label: 'NFC Cards',   icon: '🏷️' },
     { id: 'support',     label: 'Support',     icon: '🛟' },
     { id: 'admin',       label: 'Admin',       icon: '⚙️' }
   ];
@@ -118,6 +119,7 @@
       if (active === 'drops')       return void await paintDrops(body);
       if (active === 'dealers')     return void await paintDealers(body);
       if (active === 'sales')       return void await paintSales(body);
+      if (active === 'nfc')         return void await paintNfc(body);
       if (active === 'support')     return void await paintSupport(body);
       if (active === 'admin')       return void await paintAdmin(body);
     } catch (e) { body.innerHTML = `<div class="nft-warn">Failed to load: ${esc(e.message)}</div>`; }
@@ -215,6 +217,47 @@
     const { data } = await window.DB.nft_read('sales', { select: '*', order: { col: 'created_at', asc: false }, limit: 60 });
     const rows = (data || []).map(s => `<tr><td>${when(s.created_at)}</td><td class="num">${eur(s.price_eur)}</td><td><span class="nft-chip">${esc(s.rail || '—')}</span></td><td class="num">${eur(s.royalty_eur)}</td><td class="num">${eur(s.platform_fee_eur)}</td><td class="nft-mono">${s.tx_hash ? esc(String(s.tx_hash).slice(0, 10)) + '…' : '—'}</td></tr>`).join('') || `<tr><td colspan="6" class="nft-muted">No sales.</td></tr>`;
     body.innerHTML = `<section class="nft-panel"><h3>Sales ledger</h3><table class="nft-table"><thead><tr><th>Date</th><th class="num">Price</th><th>Rail</th><th class="num">Royalty</th><th class="num">Platform fee</th><th>Tx</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  }
+
+  // ── NFC Cards tab: manage every chip — register, link, unlink, deactivate ──
+  async function paintNfc(body) {
+    const st = await apiCall('/api/status');
+    const configured = !!(st && st.integrations && st.integrations.nft_admin);
+    if (!configured) { body.innerHTML = `<div class="nft-adm-warn">🏷️ NFC card management needs <code>OPULENCE_TECH_SERVICE_ROLE</code> in Vercel.${st && st._offline ? ' The API runs on the live site only.' : ''}</div>`; return; }
+    body.innerHTML = `<div class="nft-loading"><span class="nft-spin"></span> Loading NFC cards…</div>`;
+    const r = await apiCall('/api/nfc');
+    if (!r.ok) { body.innerHTML = `<div class="nft-warn">${esc(r.error || 'could not load')}</div>`; return; }
+    const tags = r.tags || [];
+    const STAT = ['unassigned', 'assigned', 'claimed', 'revoked'];
+    const byStatus = {}; tags.forEach(t => { byStatus[t.status] = (byStatus[t.status] || 0) + 1; });
+    const chipCls = s => (s === 'assigned' || s === 'claimed') ? 'ok' : '';
+    const rowsFor = f => {
+      const list = f === 'all' ? tags : tags.filter(t => t.status === f);
+      return list.map(t => `<tr>
+        <td class="nft-mono">${esc(t.uid)}</td>
+        <td><span class="nft-chip ${chipCls(t.status)}">${esc(t.status)}</span></td>
+        <td class="nft-mono">${t.coin_id ? esc(String(t.coin_id).slice(0, 8)) : '—'}</td>
+        <td class="num">${t.tap_count ?? 0}</td>
+        <td>${t.coin_id ? `<button class="nft-adm-mini" data-nfc="unlink" data-id="${esc(t.id)}">Unlink</button>` : `<button class="nft-adm-mini" data-nfc="link" data-id="${esc(t.id)}">Link…</button>`} ${t.status !== 'revoked' ? `<button class="nft-adm-mini" data-nfc="deactivate" data-id="${esc(t.id)}">Deactivate</button>` : ''}</td>
+      </tr>`).join('') || `<tr><td colspan="5" class="nft-muted">No cards.</td></tr>`;
+    };
+    body.innerHTML = `
+      <div class="nft-kpis" style="margin-bottom:16px">${STAT.map(s => `<div class="nft-kpi"><span class="k">${byStatus[s] || 0}</span><span class="l">${s}</span></div>`).join('')}</div>
+      <section class="nft-panel"><h3>Register a new card</h3><div style="display:flex;gap:8px;max-width:480px"><input class="nft-in" id="nfc-uid" placeholder="New tag UID (from your NFC reader)"/><button class="nft-adm-btn" id="nfc-reg">Register</button></div></section>
+      <section class="nft-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px"><h3 style="margin:0">Cards <span class="nft-muted">${tags.length}</span></h3>
+          <div class="nft-tabs" style="border:0;margin:0">${['all', ...STAT].map(f => `<button class="nft-tab${f === 'all' ? ' active' : ''}" data-filter="${f}">${f}</button>`).join('')}</div></div>
+        <table class="nft-table"><thead><tr><th>UID</th><th>Status</th><th>Coin</th><th class="num">Taps</th><th></th></tr></thead><tbody id="nfc-rows">${rowsFor('all')}</tbody></table>
+      </section>`;
+    const wire = () => body.querySelectorAll('[data-nfc]').forEach(b => b.addEventListener('click', async () => {
+      const act = b.dataset.nfc, id = b.dataset.id;
+      if (act === 'link') { const coin = prompt('Coin ID to link this card to:'); if (!coin) return; const rr = await apiCall('/api/nfc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'link', tag_id: id, coin_id: coin.trim() }) }); if (rr.ok) { H.toast('Linked ✓', 'success'); paintNfc(body); } else H.toast('Failed: ' + (rr.error || ''), 'danger'); return; }
+      const rr = await apiCall('/api/nfc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: act, tag_id: id }) });
+      if (rr.ok) { H.toast(act + ' ✓', 'success'); paintNfc(body); } else H.toast('Failed: ' + (rr.error || ''), 'danger');
+    }));
+    body.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => { body.querySelectorAll('[data-filter]').forEach(x => x.classList.toggle('active', x === b)); body.querySelector('#nfc-rows').innerHTML = rowsFor(b.dataset.filter); wire(); }));
+    body.querySelector('#nfc-reg').addEventListener('click', async () => { const uid = body.querySelector('#nfc-uid').value.trim(); if (!uid) return H.toast('UID required', 'warn'); const rr = await apiCall('/api/nfc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ uid }) }); if (rr.ok) { H.toast('Card registered ✓', 'success'); paintNfc(body); } else H.toast('Failed: ' + (rr.error || ''), 'danger'); });
+    wire();
   }
 
   // ── Support tab: handle any trade dispute, issue, chat, counterfeit, withdrawal ──
