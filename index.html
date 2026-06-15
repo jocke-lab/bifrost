@@ -41,6 +41,7 @@
   <link rel="stylesheet" href="modules/settings.css" />
   <link rel="stylesheet" href="modules/my-day.css" />
   <link rel="stylesheet" href="modules/vitals.css" />
+  <link rel="stylesheet" href="modules/nft-site.css?v=3" />
 </head>
 <body>
 
@@ -141,6 +142,7 @@
       <section class="view" id="view-settings"></section>
       <section class="view" id="view-my-day"></section>
       <section class="view" id="view-vitals"></section>
+      <section class="view" id="view-nft-site"></section>
     </main>
 
     <!-- RIGHT RAIL: copilot + flight log -->
@@ -214,6 +216,11 @@
   </div>
 
   <!-- ── SCRIPTS: core FIRST, then every module, then boot ────────────── -->
+  <!-- Config + live data layer (Supabase) — MUST load before core.js -->
+  <script src="assets/bifrost.config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/data.js"></script>
+
   <script src="assets/core.js"></script>
   <script src="modules/command.js"></script>
   <script src="modules/ledger.js"></script>
@@ -242,6 +249,7 @@
   <script src="modules/settings.js"></script>
   <script src="modules/my-day.js"></script>
   <script src="modules/vitals.js"></script>
+  <script src="modules/nft-site.js?v=3"></script>
 
   <script>HELM.boot();</script>
 </body>

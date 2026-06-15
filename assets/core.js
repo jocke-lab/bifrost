@@ -32,6 +32,7 @@
      are kept: byId (modules) and sectionById (sections). ─────────────────── */
   const SECTIONS = [
     { id: 'me',        label: 'My Day',     icon: '☀️', zone: 'YOU',     children: ['my-day', 'vitals'] },
+    { id: 'nftsite',   label: 'NFT Site',   icon: '🪙', zone: 'NFT PLATFORM', children: ['nft-site'] },
     { id: 'overview',  label: 'Overview',   icon: '🛰️', zone: 'COMPANY', children: ['command'] },
     { id: 'finance',   label: 'Finance',    icon: '💰', zone: 'COMPANY', children: ['ledger', 'revenue', 'billing'] },
     { id: 'customers', label: 'Customers',  icon: '🤝', zone: 'COMPANY', children: ['customers', 'pipeline', 'partners', 'portal'] },
@@ -43,7 +44,7 @@
     { id: 'workspace', label: 'Workspace',  icon: '🗄️', zone: 'SYSTEM',  children: ['vault', 'audit', 'settings'] }
   ];
   // zones rendered in this order, with the human label shown above each group
-  const ZONES = ['YOU', 'COMPANY', 'SYSTEM'];
+  const ZONES = ['YOU', 'NFT PLATFORM', 'COMPANY', 'SYSTEM'];
 
   /* ── tiny DOM utils ─────────────────────────────────────────────────── */
   const $ = (sel, root) => (root || document).querySelector(sel);
