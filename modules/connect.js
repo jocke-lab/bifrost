@@ -11,7 +11,8 @@
     { id: 'slack', label: 'Slack', icon: '💬' },
     { id: 'calendar', label: 'Calendar', icon: '📅' },
     { id: 'gmail', label: 'Gmail', icon: '✉️' },
-    { id: 'drive', label: 'Drive', icon: '📁' }
+    { id: 'drive', label: 'Drive', icon: '📁' },
+    { id: 'wearables', label: 'Wearables', icon: '⌚' }
   ];
   let active = 'overview', rootEl = null, status = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -43,6 +44,7 @@
     status = await api('/api/status');
     if (active === 'overview') return paintOverview(body);
     if (active === 'slack') return paintSlack(body);
+    if (active === 'wearables') return paintWearables(body);
     return paintGoogle(body, active);
   }
 
@@ -66,6 +68,11 @@
           <div class="conn-card-h">${dot(i.google)}<b>Google Workspace</b></div>
           <p>Calendar, Gmail and Drive, unified.</p>
           <div class="conn-status">${i.google ? '<a class="conn-btn primary" href="/api/google-start">🔗 Connect Google</a>' : '<span class="conn-need">needs <code>GOOGLE_CLIENT_ID</code> + <code>SECRET</code></span>'}</div>
+        </div>
+        <div class="conn-card">
+          <div class="conn-card-h">${dot(i.whoop || i.oura)}<b>Wearables</b></div>
+          <p>Whoop &amp; Oura recovery, sleep and strain.</p>
+          <div class="conn-status"><button class="conn-btn" data-go="wearables">Open Wearables →</button></div>
         </div>
       </div>
       <div class="conn-help">
@@ -131,6 +138,33 @@
     if (which === 'calendar') body.innerHTML = section('📅 Upcoming · ' + esc(hud.email || ''), (hud.calendar || []).map(e => `<div class="conn-row"><b>${esc(e.summary || '(no title)')}</b><span class="conn-muted">${esc(fmtDate(e.start))}${e.location ? ' · ' + esc(e.location) : ''}</span></div>`).join('') || emptyRow('No upcoming events'));
     if (which === 'gmail') body.innerHTML = section('✉️ Inbox · ' + esc(hud.email || ''), (hud.gmail || []).map(m => `<div class="conn-row"><b>${esc(m.subject || '(no subject)')}</b><span class="conn-muted">${esc(m.from || '')}</span><span class="conn-snip">${esc(m.snippet || '')}</span></div>`).join('') || emptyRow('Inbox empty'));
     if (which === 'drive') body.innerHTML = section('📁 Recent files · ' + esc(hud.email || ''), (hud.drive || []).map(f => `<div class="conn-row"><b><a href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener">${esc(f.name)}</a></b><span class="conn-muted">${esc(fmtDate(f.modifiedTime))}</span></div>`).join('') || emptyRow('No files'));
+  }
+
+  async function paintWearables(body) {
+    body.innerHTML = `<div class="conn-loading"><span class="conn-spin"></span> Loading wearables…</div>`;
+    const hud = await api('/api/wearables-hud');
+    const cfg = (hud && hud.configured) || {};
+    function card(name, key, data, env) {
+      const connected = data && data.connected;
+      let inner;
+      if (!cfg[key]) inner = `<p class="conn-need">needs <code>${env}</code> + secret in Vercel</p>`;
+      else if (connected) {
+        inner = key === 'whoop'
+          ? `<div class="conn-metrics"><div><b>${data.recovery ?? '—'}%</b><span>Recovery</span></div><div><b>${data.hrv ? Math.round(data.hrv) : '—'}</b><span>HRV ms</span></div><div><b>${data.resting_hr ?? '—'}</b><span>RHR</span></div><div><b>${data.sleep_performance ?? '—'}%</b><span>Sleep</span></div></div>`
+          : `<div class="conn-metrics"><div><b>${data.readiness ?? '—'}</b><span>Readiness</span></div><div><b>${data.sleep_score ?? '—'}</b><span>Sleep</span></div></div>`;
+      } else inner = `<a class="conn-btn primary" href="/api/${key}-start">🔗 Connect ${name}</a>`;
+      return `<div class="conn-card"><div class="conn-card-h">${dot(connected)}<b>${name}</b></div>${inner}</div>`;
+    }
+    body.innerHTML = `
+      ${hud && hud._offline ? `<div class="conn-note">⚠ Live on bifrostlkl.com — the API isn't reachable in this local preview.</div>` : ''}
+      <div class="conn-cards">
+        ${card('Whoop', 'whoop', hud && hud.whoop, 'WHOOP_CLIENT_ID')}
+        ${card('Oura Ring', 'oura', hud && hud.oura, 'OURA_CLIENT_ID')}
+      </div>
+      <div class="conn-help"><h3>Enable wearables</h3><ul>
+        <li><b>Whoop</b> — developer.whoop.com → create app, redirect <code>https://bifrostlkl.com/api/whoop-callback</code> → <code>WHOOP_CLIENT_ID</code> + <code>WHOOP_CLIENT_SECRET</code>.</li>
+        <li><b>Oura</b> — cloud.ouraring.com → OAuth app, redirect <code>https://bifrostlkl.com/api/oura-callback</code> → <code>OURA_CLIENT_ID</code> + <code>OURA_CLIENT_SECRET</code>.</li>
+      </ul></div>`;
   }
 
   H.register({ id: 'connect', label: 'Connections', icon: '🔌', scope: 'company', render });

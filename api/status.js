@@ -8,7 +8,9 @@ module.exports = (req, res) => {
       nft_admin: has('OPULENCE_TECH_SERVICE_ROLE'),
       hub_admin: has('BIFROST_SERVICE_ROLE'),
       slack: has('SLACK_BOT_TOKEN'),
-      google: has('GOOGLE_CLIENT_ID') && has('GOOGLE_CLIENT_SECRET')
+      google: has('GOOGLE_CLIENT_ID') && has('GOOGLE_CLIENT_SECRET'),
+      whoop: has('WHOOP_CLIENT_ID') && has('WHOOP_CLIENT_SECRET'),
+      oura: has('OURA_CLIENT_ID') && has('OURA_CLIENT_SECRET')
     }
   });
 };
