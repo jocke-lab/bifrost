@@ -203,6 +203,32 @@
       });
       root.appendChild(vrow);
 
+      /* LIVE NFT PLATFORM PULSE — real data from the trading platform (no mock) */
+      const nftPulse = H.el(`
+        <div class="card" style="margin-bottom:var(--gap)">
+          <div class="card-head">
+            <h3><span class="hico">🪙</span> NFT Platform · <span style="color:#46E6A6">live</span></h3>
+            <span class="ch-meta" id="cmd-nft-when">loading…</span>
+          </div>
+          <div id="cmd-nft-row" style="display:flex;flex-wrap:wrap;gap:22px;padding:4px 2px">
+            <span class="muted">Connecting to the trading platform…</span>
+          </div>
+        </div>`);
+      root.appendChild(nftPulse);
+      (async () => {
+        const row = nftPulse.querySelector('#cmd-nft-row');
+        try {
+          if (!(window.DB && window.DB.nft)) { row.innerHTML = '<span class="muted">Data layer offline.</span>'; return; }
+          const defs = [['coins', 'Coins'], ['collections', 'Collections'], ['listings', 'Listings'], ['sales', 'Sales'], ['dealers', 'Dealers'], ['certificates', 'Certs']];
+          const counts = await Promise.all(defs.map(([t]) => window.DB.nft_count(t)));
+          const sales = await window.DB.nft_read('sales', { select: 'price_eur,created_at', order: { col: 'created_at', asc: false }, limit: 1 });
+          const last = (sales.data && sales.data[0]) || null;
+          const kpi = (v, l) => `<div style="display:flex;flex-direction:column;gap:2px"><b style="font-size:22px;font-family:var(--font-display, sans-serif)">${v}</b><span style="font-size:10px;color:var(--muted, #8aa4bc);text-transform:uppercase;letter-spacing:.06em">${l}</span></div>`;
+          row.innerHTML = defs.map(([t, l], i) => kpi(Number(counts[i] || 0).toLocaleString('en-US'), l)).join('') + (last ? kpi('€' + Number(last.price_eur || 0).toLocaleString('en-US'), 'Last sale') : '');
+          const w = nftPulse.querySelector('#cmd-nft-when'); if (w) w.textContent = 'live · opulence-tech';
+        } catch (e) { row.innerHTML = '<span class="muted">' + (e.message || 'could not load') + '</span>'; }
+      })();
+
       /* MAIN GRID: revenue area (span 2) + cash/burn bars */
       const main = H.el(`<div class="grid cols-3" style="margin-bottom:var(--gap)"></div>`);
 
