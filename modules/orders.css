@@ -1,0 +1,78 @@
+/* ============================================================================
+   orders.css — tweaks specific to the Orders module ONLY.
+   No fonts/colors/global styles here (core.css owns all tokens). Every class is
+   prefixed .orders-* and leans on documented components + palette tokens.
+   ========================================================================== */
+
+/* KPI tile: tag chip on the trend row + spark hugging the bottom */
+.orders-kpi .orders-kpi-tag{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--text-faint)}
+.orders-kpi .spark{margin-top:10px}
+
+/* ── fulfillment funnel: stage strip under the bars ──────────────────────── */
+.orders-funnel-strip{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.orders-stage{
+  display:flex;align-items:center;gap:9px;padding:10px 11px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm)}
+.orders-stage .os-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.orders-stage .os-body{flex:1;min-width:0}
+.orders-stage .os-name{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--text-faint)}
+.orders-stage .os-num{
+  font-family:var(--font-display);font-size:18px;font-weight:600;
+  letter-spacing:-.3px;font-variant-numeric:tabular-nums;margin-top:1px}
+.orders-stage .os-meta{text-align:right;flex:none}
+.orders-stage .os-conv{
+  display:block;font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--accent1)}
+.orders-stage .os-drop{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:.5px;color:var(--danger)}
+.orders-stage .os-drop.ok{color:var(--text-faint)}
+
+/* ── returns gauge with centered overlay ─────────────────────────────────── */
+.orders-gauge-card{display:flex;flex-direction:column}
+.orders-gauge{position:relative;display:grid;place-items:center;flex:1;min-height:170px}
+.orders-gauge .chart{width:100%;max-width:210px}
+.orders-gauge-core{position:absolute;top:54%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.orders-gauge-core .ogc-num{
+  font-family:var(--font-display);font-size:40px;font-weight:600;
+  letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums;color:var(--success)}
+.orders-gauge-core .ogc-lbl{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:3px;
+  text-transform:uppercase;color:var(--text-faint);margin-top:5px}
+
+/* ── order book: filters, scroll wrap, customer cell ─────────────────────── */
+.orders-book-filters{display:flex;gap:6px;align-items:center}
+.orders-chip{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:1px;cursor:pointer;
+  padding:3px 8px;border-radius:20px;border:1px solid var(--border);
+  color:var(--text-faint);background:var(--panel);transition:.15s var(--ease)}
+.orders-chip:hover{border-color:var(--border-hi);color:var(--text-muted)}
+.orders-chip.active{
+  color:var(--accent1);border-color:var(--border-hi);background:var(--accent-soft)}
+.orders-table-wrap{max-height:340px;overflow-y:auto;margin-top:4px}
+.orders-table-wrap .table thead th{
+  position:sticky;top:0;z-index:1;background:var(--panel-hi);
+  backdrop-filter:blur(4px)}
+.orders-book .table tbody tr{cursor:pointer}
+.orders-cust{display:flex;align-items:center;gap:8px}
+
+/* ── carrier donut legend ────────────────────────────────────────────────── */
+.orders-donut{display:grid;place-items:center}
+.orders-donut .chart{max-width:180px}
+.orders-legend{margin-top:10px}
+.orders-legend .sr-label{display:flex;align-items:center;gap:8px}
+.orders-swatch{width:9px;height:9px;border-radius:3px;display:inline-block;flex:none}
+
+/* ── region breakdown rows ───────────────────────────────────────────────── */
+.orders-regions{display:flex;flex-direction:column;gap:14px;margin-top:4px}
+.orders-region .or-name{font-size:13px;font-weight:600;color:var(--text)}
+.orders-region .or-val{
+  font-family:var(--font-mono);font-size:12px;color:var(--text-muted);font-variant-numeric:tabular-nums}
+
+/* funnel strip reflows to 2-up on narrow decks */
+@media (max-width:560px){
+  .orders-funnel-strip{grid-template-columns:repeat(2,1fr)}
+}

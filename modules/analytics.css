@@ -1,0 +1,109 @@
+/* ============================================================================
+   analytics.css — tweaks specific to the Analytics module ONLY.
+   No fonts/colors/global styles here (core.css owns all tokens).
+   Every class is prefixed .analytics-* and uses ONLY palette tokens via var().
+   Built on top of the documented .card/.kpi/.grid/.table/.attn classes.
+   ========================================================================== */
+
+/* ── HERO metric explorer ────────────────────────────────────────────────── */
+.analytics-hero{overflow:hidden}
+.analytics-hero-top{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;margin-bottom:14px}
+
+/* segmented tab control (Revenue / Users / Orders / Sessions) */
+.analytics-tabs{
+  display:inline-flex;gap:2px;padding:3px;border-radius:11px;
+  background:var(--bg2);border:1px solid var(--border);flex-wrap:wrap}
+.analytics-tab{
+  font-family:var(--font-display);font-size:12.5px;font-weight:600;
+  letter-spacing:.2px;color:var(--text-muted);
+  padding:7px 16px;border-radius:8px;border:1px solid transparent;
+  transition:all .16s var(--ease);white-space:nowrap}
+.analytics-tab:hover{color:var(--text);background:var(--panel)}
+.analytics-tab.on{
+  color:var(--bg);background:var(--accent-grad);border-color:transparent;
+  box-shadow:0 0 16px var(--glow)}
+
+/* headline figure block on the right of the tabs */
+.analytics-hero-figure{text-align:right;min-width:0}
+.analytics-hero-val{display:flex;align-items:baseline;gap:8px;justify-content:flex-end}
+.analytics-hero-unit{
+  font-family:var(--font-mono);font-size:11px;letter-spacing:2px;
+  color:var(--text-faint);text-transform:uppercase}
+.analytics-hero-val .kpi-value{font-size:34px;line-height:1}
+.analytics-hero-meta{
+  display:flex;align-items:center;justify-content:flex-end;gap:14px;margin-top:6px;flex-wrap:wrap}
+.analytics-legend{
+  display:inline-flex;gap:13px;font-family:var(--font-mono);
+  font-size:9px;letter-spacing:1.3px;color:var(--text-faint);text-transform:uppercase}
+.analytics-legend .al{display:inline-flex;align-items:center;gap:5px}
+.analytics-legend .al i{width:14px;height:2px;border-radius:2px;display:inline-block}
+.analytics-legend .al.cur i{background:var(--accent1);box-shadow:0 0 6px var(--accent1)}
+.analytics-legend .al.prev i{background:var(--accent3)}
+
+.analytics-hero-chart{transition:opacity .25s var(--ease)}
+
+/* ── KPI tiles ───────────────────────────────────────────────────────────── */
+.analytics-kpi{display:flex;flex-direction:column;gap:6px}
+.analytics-kpi .kpi-value.sm{font-size:24px;margin-top:2px}
+.analytics-kpi .spark{margin-top:auto;padding-top:8px}
+
+/* ── TRAFFIC donut + legend ──────────────────────────────────────────────── */
+.analytics-donut-wrap{display:flex;flex-direction:column;gap:14px}
+.analytics-donut{max-width:200px;margin:2px auto 0}
+.analytics-legend-list{display:flex;flex-direction:column;gap:2px}
+.analytics-src{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:7px 9px;border-radius:8px;border:1px solid transparent;
+  background:transparent;transition:all .14s var(--ease);text-align:left}
+.analytics-src:hover{background:var(--panel);border-color:var(--border)}
+.analytics-src .as-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.analytics-src .as-name{flex:1;font-size:12.5px;color:var(--text);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.analytics-src .as-val{
+  font-family:var(--font-mono);font-size:12px;font-weight:600;
+  color:var(--text-muted);font-variant-numeric:tabular-nums}
+
+/* ── RETENTION cohort heatmap ────────────────────────────────────────────── */
+.analytics-cohort-scroll{overflow-x:auto;margin:0 -4px}
+.analytics-cohort-table{min-width:560px}
+.analytics-cohort-table thead th{padding:7px 9px}
+.analytics-cohort-table tbody td{padding:7px 9px;border-bottom:1px solid var(--border)}
+.analytics-cohort-table td:first-child{font-weight:600;color:var(--text)}
+/* heat cells: tight, centered, pill-ish */
+.analytics-heat{
+  text-align:center !important;font-size:12px;font-weight:600;
+  border-radius:5px;transition:transform .12s var(--ease);
+  border-bottom:2px solid var(--bg) !important}
+.analytics-heat:hover{transform:scale(1.06);position:relative;z-index:2}
+
+.analytics-heat-key{
+  display:flex;align-items:center;gap:9px;margin-top:12px;
+  font-family:var(--font-mono);font-size:9px;letter-spacing:2px;
+  color:var(--text-faint);text-transform:uppercase}
+.analytics-heat-key .ahk-bar{
+  flex:1;height:7px;border-radius:5px;
+  background:linear-gradient(90deg,
+    color-mix(in srgb, var(--accent3) 25%, transparent),
+    color-mix(in srgb, var(--accent2) 32%, transparent),
+    color-mix(in srgb, var(--accent1) 50%, transparent));
+  border:1px solid var(--border)}
+
+/* ── INSIGHTS feed ───────────────────────────────────────────────────────── */
+.analytics-insight-stack{display:flex;flex-direction:column;gap:10px}
+.analytics-insight{cursor:pointer;transition:border-color .16s var(--ease),transform .16s var(--ease)}
+.analytics-insight:hover{transform:translateX(2px);border-color:var(--border-hi)}
+.analytics-insight .tag{flex:none;align-self:flex-start;margin-top:1px}
+
+/* ── responsive ──────────────────────────────────────────────────────────── */
+@media (max-width:820px){
+  .analytics-hero-top{flex-direction:column;align-items:stretch}
+  .analytics-hero-figure{text-align:left}
+  .analytics-hero-val,.analytics-hero-meta{justify-content:flex-start}
+  .analytics-tabs{justify-content:center}
+}
+@media (max-width:560px){
+  .analytics-tab{flex:1;text-align:center;padding:7px 8px}
+  .analytics-hero-val .kpi-value{font-size:28px}
+}

@@ -1,0 +1,55 @@
+/* ============================================================================
+   billing.css — tweaks specific to the Billing module ONLY.
+   No fonts/colors/global styles (core.css owns all tokens). Every class is
+   namespaced .billing-* and leans on palette tokens via var(--…).
+   ========================================================================== */
+
+/* KPI tile: spark hugs the bottom */
+.billing-kpi .spark{margin-top:10px}
+
+/* collections gauge: ring + legend side by side, reflow on narrow */
+.billing-gauge{display:grid;grid-template-columns:minmax(150px,1fr) 1fr;gap:18px;align-items:center}
+@media (max-width:520px){.billing-gauge{grid-template-columns:1fr}}
+.billing-gauge-ring{position:relative;display:grid;place-items:center;aspect-ratio:1;max-width:200px;width:100%;margin:0 auto}
+.billing-gauge-ring .chart{position:absolute;inset:0}
+.billing-gauge-core{position:relative;text-align:center;z-index:2}
+.billing-gauge-core .bg-num{font-family:var(--font-display);font-size:42px;font-weight:600;letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums}
+.billing-gauge-core .bg-lbl{font-family:var(--font-mono);font-size:8px;letter-spacing:2.5px;color:var(--text-faint);text-transform:uppercase;margin-top:5px}
+.billing-gauge-legend{display:flex;flex-direction:column}
+.billing-gauge-legend .stat-row{padding:7px 0}
+
+/* sync status rows */
+.billing-sync{display:flex;flex-direction:column;gap:9px}
+.billing-sync-row{display:flex;align-items:center;gap:11px;padding:10px 11px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);transition:border-color .18s var(--ease)}
+.billing-sync-row:hover{border-color:var(--border-hi)}
+.billing-sync-row .bsr-ico{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:15px;background:var(--panel);border:1px solid var(--border);flex:none}
+.billing-sync-row .bsr-body{flex:1;min-width:0}
+.billing-sync-row .bsr-name{font-size:13px;font-weight:600}
+.billing-sync-row .bsr-sub{font-size:11px;color:var(--text-muted);margin-top:1px}
+.billing-sync-row .bsr-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.billing-sync-row .bsr-meta{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;color:var(--text-faint)}
+
+/* invoices table: scroll horizontally on small screens, keep card flush */
+.billing-table-card{display:flex;flex-direction:column}
+.billing-table-scroll{overflow-x:auto;margin-top:6px}
+.billing-table-scroll .table{min-width:520px}
+.billing-cust{display:flex;align-items:center;gap:9px;font-weight:600;white-space:nowrap}
+
+/* chase queue stack */
+.billing-chase{display:flex;flex-direction:column;gap:10px}
+
+/* billed-vs-collected trend legend (mirrors command's wave legend) */
+.billing-trend-card{position:relative}
+.billing-trend-legend{position:absolute;top:14px;right:16px;display:flex;gap:14px;font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;color:var(--text-faint);z-index:2}
+.billing-trend-legend .btl{display:flex;align-items:center;gap:5px}
+.billing-trend-legend .btl i{width:14px;height:2px;border-radius:2px;display:inline-block}
+.billing-trend-legend .btl.billed i{background:var(--accent1)}
+.billing-trend-legend .btl.collected i{background:var(--accent3)}
+
+/* trend summary strip under the chart: billed/collected/rate/avg */
+.billing-trend-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:14px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.billing-trend-stats .bts{display:flex;flex-direction:column;gap:4px;padding:11px 13px;background:var(--bg2)}
+.billing-trend-stats .bts-k{font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-faint)}
+.billing-trend-stats .bts-v{font-family:var(--font-display);font-size:18px;font-weight:600;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+.billing-trend-stats .bts-v.ok{color:var(--success)}
+@media (max-width:680px){.billing-trend-stats{grid-template-columns:repeat(2,1fr)}}

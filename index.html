@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bifrost — the bridge for your whole company</title>
+  <meta name="description" content="bifrost — a calm, premium command deck for the whole company. One glowing health number answers: is my company okay?" />
+
+  <!-- Fonts preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Core stylesheet FIRST -->
+  <link rel="stylesheet" href="assets/core.css" />
+
+  <!-- Per-module stylesheets (every module id, in bible order). Missing files are harmless. -->
+  <link rel="stylesheet" href="modules/command.css" />
+  <link rel="stylesheet" href="modules/ledger.css" />
+  <link rel="stylesheet" href="modules/revenue.css" />
+  <link rel="stylesheet" href="modules/billing.css" />
+  <link rel="stylesheet" href="modules/customers.css" />
+  <link rel="stylesheet" href="modules/pipeline.css" />
+  <link rel="stylesheet" href="modules/partners.css" />
+  <link rel="stylesheet" href="modules/portal.css" />
+  <link rel="stylesheet" href="modules/inventory.css" />
+  <link rel="stylesheet" href="modules/orders.css" />
+  <link rel="stylesheet" href="modules/projects.css" />
+  <link rel="stylesheet" href="modules/crew.css" />
+  <link rel="stylesheet" href="modules/meetings.css" />
+  <link rel="stylesheet" href="modules/signal.css" />
+  <link rel="stylesheet" href="modules/analytics.css" />
+  <link rel="stylesheet" href="modules/calendar.css" />
+  <link rel="stylesheet" href="modules/inbox.css" />
+  <link rel="stylesheet" href="modules/comms.css" />
+  <link rel="stylesheet" href="modules/automations.css" />
+  <link rel="stylesheet" href="modules/integrations.css" />
+  <link rel="stylesheet" href="modules/devlog.css" />
+  <link rel="stylesheet" href="modules/infra.css" />
+  <link rel="stylesheet" href="modules/vault.css" />
+  <link rel="stylesheet" href="modules/audit.css" />
+  <link rel="stylesheet" href="modules/settings.css" />
+  <link rel="stylesheet" href="modules/my-day.css" />
+  <link rel="stylesheet" href="modules/vitals.css" />
+</head>
+<body>
+
+  <!-- ── BACKGROUND ───────────────────────────────────────────────────── -->
+  <canvas id="bg-canvas"></canvas>
+  <div class="bg-grid"></div>
+  <div class="bg-glows"></div>
+
+  <!-- ── BOOT / SPLASH ────────────────────────────────────────────────── -->
+  <div id="boot">
+    <div class="boot-mark"><svg viewBox="0 0 120 110" width="100%" height="100%" aria-hidden="true"><defs><linearGradient id="bfrMarkBoot" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7C5CFF"/><stop offset=".5" stop-color="#19D3FF"/><stop offset="1" stop-color="#46E6A6"/></linearGradient></defs><path d="M14 94 A46 60 0 0 1 106 94" fill="none" stroke="url(#bfrMarkBoot)" stroke-width="12" stroke-linecap="round"/><circle cx="14" cy="94" r="9" fill="#7C5CFF"/><circle cx="106" cy="94" r="9" fill="#46E6A6"/></svg></div>
+    <div class="boot-title">bifrost</div>
+    <div class="boot-sub">bridging your company · powering up</div>
+    <div class="boot-bar"><div class="fill"></div></div>
+    <div class="boot-log"><b>›</b> initializing…</div>
+    <button class="boot-skip">SKIP ⏎</button>
+  </div>
+
+  <!-- ── APP SHELL ────────────────────────────────────────────────────── -->
+  <div id="app">
+
+    <!-- DOCK / SIDEBAR — grouped two-level nav (sections injected by core.js) -->
+    <nav class="dock" aria-label="Sections">
+      <div class="helm-mark" title="bifrost"><svg viewBox="0 0 120 110" width="100%" height="100%" aria-hidden="true"><defs><linearGradient id="bfrMark" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7C5CFF"/><stop offset=".5" stop-color="#19D3FF"/><stop offset="1" stop-color="#46E6A6"/></linearGradient></defs><path d="M14 94 A46 60 0 0 1 106 94" fill="none" stroke="url(#bfrMark)" stroke-width="12" stroke-linecap="round"/><circle cx="14" cy="94" r="9" fill="#7C5CFF"/><circle cx="106" cy="94" r="9" fill="#46E6A6"/></svg></div>
+    </nav>
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="brand-lockup">
+        <b>bifrost</b><span class="tag">THE BRIDGE</span>
+      </div>
+      <div class="master-caution" data-state="ok">
+        <span class="led"></span><span class="mc-text">ALL SYSTEMS NOMINAL</span>
+      </div>
+
+      <div class="topbar-search" role="button" tabindex="0" aria-label="Open command palette">
+        <span>⌕</span>
+        <input type="text" placeholder="Search or command…  try “pay invoice 2294”" readonly />
+        <span class="kbd">⌘K</span>
+      </div>
+
+      <div class="topbar-spacer"></div>
+
+      <div class="t-clock">00:00:00 · T+ 00:00:00</div>
+      <div class="live-pip"><span class="led"></span>LIVE</div>
+
+      <div class="theme-swatches" title="Accent">
+        <button class="swatch on" data-theme="aurora" style="background:linear-gradient(120deg,#7C5CFF,#4D8DFF 40%,#19D3FF 72%,#46E6A6)"></button>
+        <button class="swatch" data-theme="violet" style="background:linear-gradient(120deg,#7C6CFF,#34C3FF)"></button>
+        <button class="swatch" data-theme="amber" style="background:linear-gradient(120deg,#F5A524,#FF7A59)"></button>
+        <button class="swatch" data-theme="rose" style="background:linear-gradient(120deg,#FF4D6D,#7C6CFF)"></button>
+      </div>
+
+      <button class="icon-btn" data-act="bell" aria-label="Notifications">🔔<span class="badge-dot"></span></button>
+      <button class="icon-btn" data-act="rail" aria-label="Toggle flight log">▥</button>
+
+      <button class="profile-chip" aria-haspopup="dialog" aria-label="Identity & presence">
+        <span class="av"><span class="pc-dot pdot available"></span>AA</span>
+        <span class="pc-name">Arvid</span>
+        <span class="pc-caret">▾</span>
+      </button>
+    </header>
+
+    <!-- TAPE TICKER -->
+    <div class="tape" aria-label="Live company tape">
+      <div class="tape-track"></div>
+    </div>
+
+    <!-- SUB-TAB BAR — secondary nav for the active section (built by core.js) -->
+    <nav class="subtabs" aria-label="Section pages"></nav>
+
+    <!-- STAGE: one <section> per module (modules fill these) -->
+    <main class="stage" id="stage">
+      <section class="view" id="view-command"></section>
+      <section class="view" id="view-ledger"></section>
+      <section class="view" id="view-revenue"></section>
+      <section class="view" id="view-billing"></section>
+      <section class="view" id="view-customers"></section>
+      <section class="view" id="view-pipeline"></section>
+      <section class="view" id="view-partners"></section>
+      <section class="view" id="view-portal"></section>
+      <section class="view" id="view-inventory"></section>
+      <section class="view" id="view-orders"></section>
+      <section class="view" id="view-projects"></section>
+      <section class="view" id="view-crew"></section>
+      <section class="view" id="view-meetings"></section>
+      <section class="view" id="view-signal"></section>
+      <section class="view" id="view-analytics"></section>
+      <section class="view" id="view-calendar"></section>
+      <section class="view" id="view-inbox"></section>
+      <section class="view" id="view-comms"></section>
+      <section class="view" id="view-automations"></section>
+      <section class="view" id="view-integrations"></section>
+      <section class="view" id="view-devlog"></section>
+      <section class="view" id="view-infra"></section>
+      <section class="view" id="view-vault"></section>
+      <section class="view" id="view-audit"></section>
+      <section class="view" id="view-settings"></section>
+      <section class="view" id="view-my-day"></section>
+      <section class="view" id="view-vitals"></section>
+    </main>
+
+    <!-- RIGHT RAIL: copilot + flight log -->
+    <aside class="rail">
+      <div class="copilot">
+        <div class="rail-head"><span>◆ COPILOT</span><span class="rh-led"></span></div>
+        <div class="copilot-card" style="margin-top:10px">
+          <div class="co-top">
+            <div class="co-av">✦</div>
+            <div class="co-name">bifrost Copilot<small>OPUS · STANDING BY</small></div>
+          </div>
+          <p>Good morning, Commander. Cash is healthy and the deck is nominal, but <b>runway dipped under 15 months</b> and 6 invoices are overdue. Want me to draft the chase emails?</p>
+          <div class="copilot-input">
+            <input type="text" placeholder="Ask the deck anything…" />
+            <button aria-label="Send">➤</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="rail-sec fill">
+        <div class="rail-head"><span>▣ FLIGHT LOG</span><span class="rh-led"></span></div>
+        <div class="flightlog"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ── COMMAND PALETTE OVERLAY (hidden by default) ──────────────────── -->
+  <div class="cmdk" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="cmdk-scrim"></div>
+    <div class="cmdk-box">
+      <div class="cmdk-input">
+        <span class="pfx">›</span>
+        <input type="text" placeholder="Type a command or jump to a module…" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="cmdk-list"></div>
+      <div class="cmdk-foot">
+        <span><b>↑↓</b> navigate</span><span><b>↵</b> run</span><span><b>esc</b> close</span>
+        <span style="margin-left:auto"><b>⌘K</b> command surface</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── IDENTITY POPOVER (person switcher — filled by core.js) ────────── -->
+  <div class="idmenu" role="dialog" aria-modal="true" aria-label="Identity & presence">
+    <div class="idmenu-scrim"></div>
+    <div class="idmenu-box"></div>
+  </div>
+
+  <!-- ── NOTIFICATION CENTER (drawer — filled by core.js) ──────────────── -->
+  <div class="notif" role="dialog" aria-modal="true" aria-label="Notifications">
+    <div class="notif-scrim"></div>
+    <div class="notif-box">
+      <div class="notif-head">
+        <span class="nh-title">◆ NOTIFICATIONS</span>
+        <button class="notif-close icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="notif-list"></div>
+    </div>
+  </div>
+
+  <!-- ── COMPANY OVERVIEW OVERLAY HOST (filled by command module later) ── -->
+  <div class="overview" role="dialog" aria-modal="true" aria-label="Company overview">
+    <div class="overview-scrim"></div>
+    <div class="overview-box">
+      <div class="overview-head">
+        <span class="ov-title">⤢ COMPANY OVERVIEW</span>
+        <button class="overview-close icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="overview-body"></div>
+    </div>
+  </div>
+
+  <!-- ── SCRIPTS: core FIRST, then every module, then boot ────────────── -->
+  <script src="assets/core.js"></script>
+  <script src="modules/command.js"></script>
+  <script src="modules/ledger.js"></script>
+  <script src="modules/revenue.js"></script>
+  <script src="modules/billing.js"></script>
+  <script src="modules/customers.js"></script>
+  <script src="modules/pipeline.js"></script>
+  <script src="modules/partners.js"></script>
+  <script src="modules/portal.js"></script>
+  <script src="modules/inventory.js"></script>
+  <script src="modules/orders.js"></script>
+  <script src="modules/projects.js"></script>
+  <script src="modules/crew.js"></script>
+  <script src="modules/meetings.js"></script>
+  <script src="modules/signal.js"></script>
+  <script src="modules/analytics.js"></script>
+  <script src="modules/calendar.js"></script>
+  <script src="modules/inbox.js"></script>
+  <script src="modules/comms.js"></script>
+  <script src="modules/automations.js"></script>
+  <script src="modules/integrations.js"></script>
+  <script src="modules/devlog.js"></script>
+  <script src="modules/infra.js"></script>
+  <script src="modules/vault.js"></script>
+  <script src="modules/audit.js"></script>
+  <script src="modules/settings.js"></script>
+  <script src="modules/my-day.js"></script>
+  <script src="modules/vitals.js"></script>
+
+  <script>HELM.boot();</script>
+</body>
+</html>

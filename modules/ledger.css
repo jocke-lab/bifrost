@@ -1,0 +1,211 @@
+/* ============================================================================
+   ledger.css — namespaced tweaks for the Ledger module ONLY.
+   Every selector is .ledger-* and uses palette tokens via var(--…).
+   No hardcoded hex, no font imports.
+   ========================================================================== */
+
+/* ── runway gauge ───────────────────────────────────────────────────────── */
+.ledger-runway{display:flex;flex-direction:column}
+.ledger-gaugewrap{position:relative;display:grid;place-items:center;margin:2px 0 4px}
+.ledger-gaugewrap .chart{max-width:240px;margin:0 auto}
+.ledger-gaugecore{position:absolute;top:54%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+.ledger-gaugenum{font-family:var(--font-display);font-weight:600;font-size:46px;line-height:1;letter-spacing:-1px;display:flex;align-items:baseline;justify-content:center;gap:4px;font-variant-numeric:tabular-nums}
+.ledger-gaugenum i{font-style:normal;font-size:16px;color:var(--text-muted);font-weight:500}
+.ledger-gaugesub{font-family:var(--font-mono);font-size:9px;letter-spacing:2.5px;color:var(--text-faint);margin-top:5px}
+.ledger-fuelmeta{display:flex;gap:10px;margin-top:6px}
+.ledger-fuelmeta>div{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px;display:flex;flex-direction:column;gap:3px}
+.ledger-fuelmeta .faint{font-size:11px}
+.ledger-fuelmeta b{font-family:var(--font-mono);font-size:14px;font-weight:600;letter-spacing:.3px}
+.ledger-dry{color:var(--warn)}
+
+/* ── KPI strip ──────────────────────────────────────────────────────────── */
+.ledger-kpis{height:100%}
+.ledger-kpi{justify-content:space-between}
+.ledger-kpi .kpi-value{margin-top:2px}
+
+/* ── cash-in vs burn legend swatch ──────────────────────────────────────── */
+.ledger-legend-burn{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--accent3)}
+.ledger-legend-burn i{width:9px;height:9px;border-radius:3px;background:var(--accent3);box-shadow:0 0 7px var(--accent3)}
+
+/* ── bank accounts ──────────────────────────────────────────────────────── */
+.ledger-banks .li-title{display:flex;align-items:center;gap:8px}
+.ledger-acctmeta .pill{font-size:8px;padding:2px 7px}
+.ledger-bal{font-size:13px;font-weight:600;color:var(--text)}
+
+/* ── expense donut ──────────────────────────────────────────────────────── */
+.ledger-donutwrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.ledger-donut{flex:none;width:188px;max-width:50%}
+.ledger-donut .chart{width:100%}
+.ledger-legend{flex:1;min-width:140px;display:flex;flex-direction:column;gap:2px}
+.ledger-legrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.ledger-legrow:last-child{border-bottom:none}
+.ledger-legdot{width:9px;height:9px;border-radius:3px;flex:none;box-shadow:0 0 6px currentColor}
+.ledger-leglab{flex:1;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ledger-legval{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--text)}
+.ledger-legpct{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);min-width:30px;text-align:right}
+
+/* ── P&L snapshot ───────────────────────────────────────────────────────── */
+.ledger-srstrong .sr-label{color:var(--text);font-weight:600}
+.ledger-srstrong{background:linear-gradient(90deg,var(--accent-soft),transparent);margin:0 -16px;padding-left:16px;padding-right:16px}
+.ledger-pos{color:var(--success)}
+.ledger-neg{color:var(--danger)}
+
+/* ── transactions table ─────────────────────────────────────────────────── */
+.ledger-txscroll{max-height:330px;overflow-y:auto;overflow-x:auto}
+.ledger-txtable{min-width:420px}
+.ledger-txtable thead th{position:sticky;top:0;background:var(--panel);z-index:1}
+.ledger-txtable td{padding-top:9px;padding-bottom:9px}
+.ledger-amt-in{color:var(--success)}
+.ledger-amt-out{color:var(--danger)}
+
+/* ── VAT / moms ─────────────────────────────────────────────────────────── */
+.ledger-vatbanner{margin-top:2px}
+.ledger-vat .panel .big-num{margin-top:4px}
+.ledger-vatnet{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--danger) 8%,transparent),transparent);
+  border-color:color-mix(in srgb,var(--danger) 28%,transparent)}
+.ledger-vatnet-sub{font-size:10.5px;margin-top:3px}
+
+/* ── monogram logo tile (shared by costs) ───────────────────────────────── */
+.ledger-mono{width:34px;height:34px;border-radius:9px;flex:none;display:grid;place-items:center;
+  font-family:var(--font-display);font-weight:700;font-size:12px;letter-spacing:.3px;
+  border:1px solid var(--border);box-shadow:0 0 12px -4px currentColor}
+.ledger-mono.lg{width:42px;height:42px;font-size:14px;border-radius:11px}
+
+/* ── add-cost form ──────────────────────────────────────────────────────── */
+.ledger-costform{display:flex;flex-direction:column}
+.ledger-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ledger-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ledger-field-full{grid-column:1/-1}
+.ledger-field label{font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-faint)}
+.ledger-field input,.ledger-field select{
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 10px;
+  font-size:13px;color:var(--text);outline:none;transition:border-color .15s var(--ease);width:100%;font-family:var(--font-body)}
+.ledger-field input:focus,.ledger-field select:focus{border-color:var(--border-hi)}
+.ledger-field input::placeholder{color:var(--text-faint)}
+.ledger-field select{appearance:none;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--text-faint) 50%),linear-gradient(135deg,var(--text-faint) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:28px}
+.ledger-toggle{display:flex;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:3px}
+.ledger-tg{flex:1;padding:8px 10px;border-radius:7px;font-size:12px;font-weight:600;color:var(--text-muted);
+  border:1px solid transparent;transition:.15s var(--ease)}
+.ledger-tg:hover{color:var(--text)}
+.ledger-tg.active{background:var(--panel-hi);color:var(--text);border-color:var(--border-hi);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent1) 22%,transparent)}
+.ledger-vatprev{justify-content:flex-end}
+.ledger-vatprev-val{font-family:var(--font-mono);font-size:14px;font-weight:600;color:var(--text);
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 10px;text-align:right}
+.ledger-formnote{font-size:11px;margin-top:8px;text-align:center}
+
+/* ── cost lists (fixed + variable) ──────────────────────────────────────── */
+.ledger-costcard{display:flex;flex-direction:column}
+.ledger-coststream{max-height:300px;overflow-y:auto;padding:6px 16px 10px}
+.ledger-costrow{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--border)}
+.ledger-costrow:last-child{border-bottom:none}
+.ledger-costbody{flex:1;min-width:0}
+.ledger-costtop{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ledger-costsrc{font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ledger-costnote{font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ledger-costamt{font-family:var(--font-mono);font-size:13px;font-weight:600;white-space:nowrap}
+@keyframes ledgerCostIn{from{background:var(--accent-soft)}to{background:transparent}}
+.ledger-costrow-new{animation:ledgerCostIn 1.6s var(--ease)}
+
+/* ── auto-accounting feed ───────────────────────────────────────────────── */
+.ledger-autosub{font-size:12px;color:var(--text-muted)}
+.ledger-autolive{font-size:8px;padding:2px 8px}
+.ledger-vouchers{max-height:520px;overflow-y:auto;padding:4px 16px 12px;display:flex;flex-direction:column;gap:10px}
+.ledger-voucher{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 13px;transition:border-color .2s var(--ease)}
+.ledger-voucher:hover{border-color:var(--border-hi)}
+.ledger-voucher-edited{border-color:color-mix(in srgb,var(--accent2) 40%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent2) 18%,transparent)}
+.ledger-voucher-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.ledger-vid{font-size:12px;font-weight:700;color:var(--accent1);letter-spacing:.5px}
+.ledger-vsrc{font-size:12.5px;font-weight:600;color:var(--text)}
+.ledger-vconf{font-size:8.5px;padding:2px 8px}
+.ledger-vamt{font-size:13px;font-weight:600;color:var(--text)}
+.ledger-entries{margin-top:9px;border-left:2px solid var(--border-hi);padding-left:11px;display:flex;flex-direction:column;gap:6px}
+.ledger-entry{display:flex;align-items:center;gap:9px;font-size:12px}
+.ledger-dc{font-family:var(--font-mono);font-size:8px;font-weight:700;letter-spacing:1px;padding:2px 6px;border-radius:5px;flex:none;width:48px;text-align:center}
+.ledger-dc-d{color:var(--accent2);background:color-mix(in srgb,var(--accent2) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent2) 25%,transparent)}
+.ledger-dc-c{color:var(--accent3);background:color-mix(in srgb,var(--accent3) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent3) 25%,transparent)}
+.ledger-acct{font-size:12px;font-weight:600;color:var(--text);flex:none;width:38px}
+.ledger-acctname{flex:1;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ledger-entry-amt{font-size:12px;color:var(--text);white-space:nowrap}
+.ledger-vwhy{margin-top:9px;font-size:11.5px;color:var(--text-muted);line-height:1.45;display:flex;gap:7px;align-items:flex-start}
+.ledger-vwhy-ico{flex:none}
+.ledger-vactions{display:flex;gap:7px;margin-top:10px}
+.ledger-autohealth{display:flex;flex-direction:column}
+.ledger-autohealth .ledger-gaugewrap .chart{max-width:200px}
+.ledger-autohealth .ledger-gaugenum{font-size:38px}
+
+/* ── EXPENSES OVERVIEW ───────────────────────────────────────────────────── */
+.ledger-expoview .card-head{flex-wrap:wrap;gap:10px}
+
+/* segmented toggle [ Monthly recurring | One-time | All ] */
+.ledger-seg{display:inline-flex;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:3px}
+.ledger-seg-btn{padding:7px 12px;border-radius:7px;font-size:11.5px;font-weight:600;letter-spacing:.2px;
+  color:var(--text-muted);border:1px solid transparent;background:transparent;cursor:pointer;
+  white-space:nowrap;transition:.15s var(--ease)}
+.ledger-seg-btn:hover{color:var(--text)}
+.ledger-seg-btn.active{background:var(--panel-hi);color:var(--text);border-color:var(--border-hi);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent1) 22%,transparent)}
+
+/* combined strip: recurring + one-time = this month, plus 6-mo bars */
+.ledger-expstrip{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px;align-items:stretch;
+  margin:4px 0 14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.ledger-expstrip-sums{display:flex;align-items:center;flex-wrap:wrap;gap:10px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px}
+.ledger-expsum{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ledger-expsum-k{font-family:var(--font-mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-faint)}
+.ledger-expsum-v{font-family:var(--font-mono);font-size:16px;font-weight:600;letter-spacing:.2px;white-space:nowrap}
+.ledger-expsum-op{font-family:var(--font-display);font-size:16px;color:var(--text-faint);flex:none}
+.ledger-expsum-total .ledger-expsum-v{color:var(--text);font-size:18px}
+.ledger-expbars{display:flex;flex-direction:column;min-width:0}
+.ledger-expbars .chart{width:100%}
+
+/* segmented body: hero headline + donut */
+.ledger-exphero{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px}
+.ledger-exphero-main{flex:1;min-width:200px;display:flex;flex-direction:column;gap:5px}
+.ledger-exphero-main .big-num{font-size:30px;line-height:1}
+.ledger-exphero-ann{font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px}
+.ledger-exphero-ann b{font-family:var(--font-mono);font-weight:600;color:var(--text)}
+.ledger-exphero-donut{flex:none;width:132px}
+.ledger-exphero-donut .chart{width:100%}
+
+/* expense list blocks (recurring / one-time / dual) */
+.ledger-expdual{gap:14px}
+.ledger-explist{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.ledger-explist-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:11px 14px;border-bottom:1px solid var(--border)}
+.ledger-explist-title{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:7px}
+.ledger-explist-rows{max-height:340px;overflow-y:auto;padding:2px 14px 6px}
+.ledger-exprow{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--border)}
+.ledger-exprow:last-child{border-bottom:none}
+.ledger-exprow-body{flex:1;min-width:0}
+.ledger-exprow-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ledger-exprow-name{font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ledger-exprow-sub{font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ledger-exprow-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}
+.ledger-exprow-amt{font-family:var(--font-mono);font-size:13px;font-weight:600;white-space:nowrap}
+.ledger-exprow-amt i{font-style:normal;font-size:10px;color:var(--text-faint);font-weight:500;margin-left:1px}
+.ledger-exprow-meta{display:flex;align-items:center;gap:7px}
+.ledger-exprow-when{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);white-space:nowrap}
+.ledger-exprow-iv{font-size:8px;padding:2px 7px}
+.ledger-exprow-empty{padding:18px 4px;text-align:center;font-size:12px}
+
+/* category tag with a leading colour dot (tokens only) */
+.ledger-tagdot{display:inline-flex;align-items:center;gap:5px}
+.ledger-tagdot i{width:7px;height:7px;border-radius:50%;flex:none;box-shadow:0 0 6px currentColor}
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+@media (max-width:820px){
+  .ledger-gaugenum{font-size:40px}
+  .ledger-donut{max-width:100%;margin:0 auto}
+  .ledger-form{grid-template-columns:1fr}
+  .ledger-vatnet{flex-direction:column;align-items:flex-start}
+  .ledger-seg{width:100%}
+  .ledger-seg-btn{flex:1;text-align:center;padding:8px 6px;font-size:11px}
+  .ledger-expstrip{grid-template-columns:1fr}
+  .ledger-expdual{grid-template-columns:1fr}
+  .ledger-exphero{gap:12px}
+  .ledger-exphero-donut{margin:0 auto}
+}

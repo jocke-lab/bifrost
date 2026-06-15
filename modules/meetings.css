@@ -1,0 +1,220 @@
+/* ============================================================================
+   meetings.css — namespaced tweaks for the Meetings module.
+   All selectors are prefixed .meetings-* and use ONLY core.css design tokens
+   (var(--…)). No hardcoded hex / fonts / global element styling.
+   ========================================================================== */
+
+/* ── KPI tile ──────────────────────────────────────────────────────────── */
+.meetings-kpi .spark { margin-top: 6px; }
+
+/* provider tag — keep the emoji + label tight on one line */
+.meetings-prov { white-space: nowrap; }
+
+/* avatar-stack: smaller, denser avatars in this module */
+.meetings-up .avatar,
+.meetings-card-meta .avatar,
+.meetings-act-av {
+  width: 24px; height: 24px; font-size: 10px;
+}
+.meetings-av-more {
+  background: var(--panel-hi);
+  color: var(--text-muted);
+  border: 2px solid var(--panel);
+}
+
+/* ── UPCOMING CALLS ────────────────────────────────────────────────────── */
+.meetings-up-list { display: flex; flex-direction: column; gap: 10px; }
+.meetings-up {
+  display: flex; align-items: stretch; gap: 14px;
+  padding: 13px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg2);
+  transition: border-color .16s var(--ease), transform .16s var(--ease);
+}
+.meetings-up:hover { border-color: var(--border-hi); transform: translateX(2px); }
+
+.meetings-up-when {
+  flex: none; width: 84px;
+  display: flex; flex-direction: column; justify-content: center;
+  padding-right: 13px; border-right: 1px solid var(--border);
+}
+.meetings-up-time {
+  font-family: var(--font-display); font-size: 18px; font-weight: 600;
+  letter-spacing: -.3px; color: var(--text);
+}
+.meetings-up-day {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--text-faint); margin-top: 2px;
+}
+
+.meetings-up-body { flex: 1; min-width: 0; }
+.meetings-up-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.meetings-up-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.meetings-up-foot { align-items: center; }
+.meetings-up-dur { font-size: 11px; color: var(--text-faint); letter-spacing: .5px; }
+
+.meetings-up-cta { flex: none; display: flex; align-items: center; }
+
+/* ── LIBRARY summary card ──────────────────────────────────────────────── */
+.meetings-lib-stats { display: flex; flex-direction: column; }
+.meetings-stat-pill { min-width: 26px; justify-content: center; }
+.meetings-stat-pill::before { display: none; }   /* drop the dot inside a count pill */
+
+/* ── RECORDINGS LIBRARY cards ──────────────────────────────────────────── */
+.meetings-lib { align-items: stretch; }
+.meetings-card {
+  display: flex; flex-direction: column; cursor: pointer;
+  transition: border-color .18s var(--ease), transform .18s var(--ease),
+              box-shadow .18s var(--ease);
+}
+.meetings-card:hover { transform: translateY(-2px); border-color: var(--border-hi); }
+.meetings-card.active {
+  border-color: var(--border-hi);
+  box-shadow: inset 0 0 0 1px var(--accent-soft), 0 0 22px var(--weather);
+}
+
+/* recording "thumbnail" — gradient panel with provider/duration overlay */
+.meetings-thumb {
+  position: relative; height: 116px; overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(120% 80% at 30% 0%, var(--panel-hi), var(--bg2) 70%);
+}
+.meetings-thumb-grad {
+  position: absolute; inset: 0;
+  background: var(--accent-grad); opacity: .10;
+  mask-image: radial-gradient(circle at 50% 45%, var(--text) 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle at 50% 45%, var(--text) 0%, transparent 72%);
+}
+.meetings-thumb-prov { position: absolute; top: 9px; left: 9px; z-index: 2; }
+.meetings-thumb-dur {
+  position: absolute; bottom: 9px; right: 10px; z-index: 2;
+  font-size: 10px; letter-spacing: 1px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 2px 7px;
+}
+.meetings-play {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 42px; height: 42px; border-radius: 50%; z-index: 3;
+  display: grid; place-items: center; font-size: 15px; padding-left: 3px;
+  color: var(--bg); background: var(--accent-grad);
+  box-shadow: 0 0 20px var(--glow);
+  transition: transform .16s var(--ease), filter .16s var(--ease);
+}
+.meetings-play:hover { transform: translate(-50%, -50%) scale(1.1); filter: brightness(1.1); }
+
+/* decorative waveform along the bottom of the thumbnail */
+.meetings-thumb-wave {
+  position: absolute; left: 12px; right: 12px; bottom: 26px; z-index: 1;
+  display: flex; align-items: flex-end; gap: 4px; height: 30px; opacity: .5;
+}
+.meetings-thumb-wave span {
+  flex: 1; border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent1), var(--accent2));
+}
+.meetings-thumb-wave span:nth-child(1) { height: 38%; }
+.meetings-thumb-wave span:nth-child(2) { height: 70%; }
+.meetings-thumb-wave span:nth-child(3) { height: 52%; }
+.meetings-thumb-wave span:nth-child(4) { height: 92%; }
+.meetings-thumb-wave span:nth-child(5) { height: 60%; }
+.meetings-thumb-wave span:nth-child(6) { height: 80%; }
+.meetings-thumb-wave span:nth-child(7) { height: 44%; }
+.meetings-thumb-wave span:nth-child(8) { height: 66%; }
+.meetings-thumb-wave span:nth-child(9) { height: 34%; }
+.meetings-thumb-wave span:nth-child(10) { height: 56%; }
+
+.meetings-card-body { padding: 13px; display: flex; flex-direction: column; flex: 1; }
+.meetings-card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.meetings-card-meta { margin-top: 6px; font-size: 12px; }
+.meetings-card-meta .muted { font-family: var(--font-mono); font-size: 10px; letter-spacing: .5px; }
+.meetings-pill { font-size: 9px; letter-spacing: .5px; padding: 2px 7px; }
+.meetings-pill::before { display: none; }
+.meetings-open { margin-top: auto; }
+
+/* ── DETAIL PANE ───────────────────────────────────────────────────────── */
+.meetings-detail-host { scroll-margin-top: var(--gap); }
+.meetings-detail { align-items: start; }
+
+/* transcript */
+.meetings-tc-meta { font-size: 12px; padding-bottom: 11px; border-bottom: 1px solid var(--border); }
+.meetings-tc-lines { display: flex; flex-direction: column; gap: 12px; margin-top: 13px; }
+.meetings-tc-line { display: flex; gap: 11px; }
+.meetings-tc-av { width: 28px; height: 28px; font-size: 11px; flex: none; }
+.meetings-tc-body { flex: 1; min-width: 0; }
+.meetings-tc-head { display: flex; align-items: baseline; gap: 9px; }
+.meetings-tc-name { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.meetings-tc-ts { font-size: 10px; letter-spacing: 1px; color: var(--text-faint); }
+.meetings-tc-text {
+  font-size: 13px; color: var(--text-muted); line-height: 1.55; margin-top: 2px;
+  padding: 7px 11px; border-radius: var(--radius-sm);
+  background: var(--bg2); border: 1px solid var(--border);
+  border-left: 2px solid var(--border-hi);
+}
+.meetings-tc-foot { font-size: 11px; }
+
+/* AI brief */
+.meetings-brief-body { display: flex; flex-direction: column; gap: 16px; }
+.meetings-brief-sec { display: flex; flex-direction: column; gap: 9px; }
+.meetings-brief-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--text-faint);
+  display: flex; align-items: center; gap: 8px;
+}
+.meetings-brief-summary {
+  font-size: 13px; color: var(--text); line-height: 1.65;
+  padding: 12px 14px; border-radius: var(--radius-sm);
+  background: var(--bg2); border: 1px solid var(--border);
+  border-left: 2px solid var(--accent1);
+}
+.meetings-brief-pill { font-size: 9px; }
+
+/* action items — reuse .check styling, just trim spacing for a button */
+.meetings-acts { display: flex; flex-direction: column; }
+.meetings-act { width: 100%; text-align: left; background: none; }
+.meetings-act .ck-body { display: flex; flex-direction: column; }
+.meetings-act-av { flex: none; }
+
+/* decisions */
+.meetings-decs { display: flex; flex-direction: column; gap: 7px; }
+.meetings-dec {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13px; color: var(--text);
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  background: var(--bg2); border: 1px solid var(--border);
+}
+.meetings-dec-ico { color: var(--accent3); font-size: 11px; margin-top: 2px; flex: none; }
+.meetings-dec-text { flex: 1; line-height: 1.45; }
+
+.meetings-brief-cta { border-top: 1px solid var(--border); padding-top: 13px; }
+
+/* brief-pending state */
+.meetings-brief-pending { text-align: center; padding: 22px 12px; }
+.meetings-brief-pending p { font-size: 13px; line-height: 1.6; max-width: 320px; margin: 10px auto 0; }
+.meetings-brief-spinner {
+  font-size: 30px; color: var(--accent1);
+  animation: meetingsSpin 2.4s var(--ease) infinite;
+  display: inline-block;
+}
+@keyframes meetingsSpin {
+  0%, 100% { opacity: .4; transform: scale(.9) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.06) rotate(180deg); }
+}
+
+/* ── RESPONSIVE ────────────────────────────────────────────────────────── */
+@media (max-width: 820px) {
+  .meetings-up { flex-wrap: wrap; }
+  .meetings-up-when {
+    width: auto; border-right: none; border-bottom: 1px solid var(--border);
+    padding-right: 0; padding-bottom: 8px; margin-bottom: 4px;
+    flex-direction: row; align-items: baseline; gap: 9px; width: 100%;
+  }
+  .meetings-up-cta { width: 100%; }
+  .meetings-up-cta .btn { width: 100%; }
+}
+@media (max-width: 560px) {
+  .meetings-detail { grid-template-columns: 1fr; }
+}
+
+/* reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .meetings-brief-spinner { animation: none; }
+}

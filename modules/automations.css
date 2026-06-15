@@ -1,0 +1,163 @@
+/* ============================================================================
+   automations.css — namespaced tweaks for the Automations module ONLY.
+   Every selector is prefixed .automations-* and uses palette tokens via var(--).
+   No hardcoded colors, no font imports. Builds on core.css component classes.
+   ========================================================================== */
+
+/* KPI tiles keep the spark pinned to the floor of the card */
+.automations-kpi { justify-content: space-between; min-height: 134px; }
+
+/* gauge card — center the dial */
+.automations-gauge-card .chart { display: grid; place-items: center; }
+
+/* ── RULES LIST ───────────────────────────────────────────────────────────── */
+.automations-rules { display: flex; flex-direction: column; }
+.automations-rule {
+  display: flex; align-items: center; gap: 13px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s var(--ease);
+}
+.automations-rule:last-child { border-bottom: none; }
+.automations-rule:hover { background: var(--panel); }
+.automations-rule.is-off { opacity: .62; }
+
+.automations-rule-body { flex: 1; min-width: 0; }
+.automations-rule-line {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; line-height: 1.5;
+}
+.automations-when, .automations-then {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 1.5px; padding: 2px 6px; border-radius: 5px;
+  background: var(--bg); border: 1px solid var(--border); flex: none;
+}
+.automations-when { color: var(--accent2); border-color: var(--accent2); }
+.automations-then { color: var(--accent1); border-color: var(--accent1); }
+.automations-trigger { color: var(--text); font-weight: 500; }
+.automations-action  { color: var(--text-muted); font-weight: 500; }
+.automations-arrow {
+  color: var(--accent3); font-weight: 700; font-size: 15px; flex: none;
+  text-shadow: 0 0 10px var(--accent3);
+}
+
+.automations-rule-meta {
+  display: flex; align-items: center; gap: 12px; margin-top: 6px; flex-wrap: wrap;
+}
+.automations-runs {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .8px;
+  color: var(--text-faint);
+}
+.automations-state {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 1.2px;
+}
+.automations-state.live   { color: var(--success); }
+.automations-state.paused { color: var(--text-faint); }
+
+.automations-rule-edit { width: 30px; height: 30px; padding: 0; flex: none; font-size: 16px; }
+
+/* ── TOGGLE SWITCH (namespaced, working) ──────────────────────────────────── */
+.automations-toggle {
+  position: relative; flex: none;
+  width: 42px; height: 24px; border-radius: 20px;
+  background: var(--bg); border: 1px solid var(--border);
+  transition: background .2s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.automations-toggle .ka-knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--text-faint);
+  transition: transform .22s var(--ease), background .22s var(--ease);
+}
+.automations-toggle.on {
+  background: var(--accent-grad); border-color: transparent;
+  box-shadow: 0 0 14px var(--glow);
+}
+.automations-toggle.on .ka-knob {
+  transform: translateX(18px);
+  background: var(--bg);
+}
+.automations-toggle:hover { border-color: var(--border-hi); }
+
+/* ── BUILD NEW (mock builder) ─────────────────────────────────────────────── */
+.automations-builder { display: flex; flex-direction: column; }
+.automations-bld-step { display: flex; flex-direction: column; gap: 7px; }
+.automations-bld-tag {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.automations-bld-tag.when { color: var(--accent2); }
+.automations-bld-tag.do   { color: var(--accent1); }
+.automations-bld-slot {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 13px 14px; border-radius: var(--radius-sm);
+  background: var(--bg2); border: 1px dashed var(--border-hi);
+  text-align: left; transition: all .16s var(--ease);
+}
+.automations-bld-slot:hover { border-color: var(--accent2); background: var(--panel); }
+.automations-bld-slot.filled {
+  border-style: solid; border-color: var(--accent1);
+  box-shadow: inset 0 0 0 1px var(--accent1);
+}
+.automations-bld-ico {
+  width: 30px; height: 30px; border-radius: 9px; flex: none;
+  display: grid; place-items: center; font-size: 15px;
+  background: var(--panel-hi); border: 1px solid var(--border);
+}
+.automations-bld-txt { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); }
+.automations-bld-chev { color: var(--text-faint); font-size: 16px; font-weight: 600; }
+
+.automations-bld-conn { display: grid; place-items: center; height: 22px; }
+.automations-bld-conn span {
+  width: 2px; height: 100%;
+  background: linear-gradient(var(--accent2), var(--accent1));
+  box-shadow: 0 0 8px var(--glow);
+}
+
+.automations-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.automations-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  background: var(--panel); border: 1px solid var(--border); color: var(--text-muted);
+  transition: all .15s var(--ease);
+}
+.automations-chip:hover {
+  border-color: var(--border-hi); color: var(--text);
+  background: var(--panel-hi); transform: translateY(-1px);
+}
+
+/* ── RECIPE CARDS ─────────────────────────────────────────────────────────── */
+.automations-recipe { display: flex; flex-direction: column; gap: 7px; }
+.automations-recipe-top { display: flex; align-items: center; justify-content: space-between; }
+.automations-recipe-ico {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; font-size: 20px;
+  background: var(--panel-hi); border: 1px solid var(--border);
+}
+.automations-recipe:hover .automations-recipe-ico {
+  border-color: var(--border-hi); box-shadow: 0 0 16px var(--weather);
+}
+.automations-recipe-name {
+  font-family: var(--font-display); font-size: 14px; font-weight: 600; margin-top: 3px;
+}
+.automations-recipe-desc {
+  font-size: 12px; color: var(--text-muted); line-height: 1.45; flex: 1;
+}
+.automations-recipe-uses {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: .6px; color: var(--text-faint);
+}
+
+/* ── RUN HISTORY TABLE ────────────────────────────────────────────────────── */
+.automations-history td strong { font-weight: 600; }
+.automations-history tbody tr:hover { background: var(--panel-hi); }
+
+/* ── RESPONSIVE ───────────────────────────────────────────────────────────── */
+@media (max-width: 820px) {
+  .automations-rule-line { font-size: 12px; }
+  .automations-rule-edit { display: none; }
+}
+@media (max-width: 560px) {
+  .automations-rule { padding: 11px 12px; gap: 10px; }
+  .automations-action { width: 100%; }
+}

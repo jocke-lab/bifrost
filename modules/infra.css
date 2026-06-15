@@ -1,0 +1,120 @@
+/* ============================================================================
+   infra.css — tweaks specific to the Infra module ONLY.
+   No fonts/colors/global styles here (core.css owns all tokens).
+   Everything leans on documented .card/.kpi/.table/.list/.progress/.pill
+   classes; this file only adds: the status banner, the node-fleet cards with
+   their CPU/MEM/DISK bar rows, the live-metrics waveform chrome, the public
+   status-page block, and the deploy/incident accents.
+   All classes are prefixed .infra-* and use ONLY palette tokens.
+   ========================================================================== */
+
+/* ── shared status dot (fleet + status page) ─────────────────────────────── */
+.infra-status-dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--text-faint);box-shadow:0 0 7px currentColor}
+.infra-status-dot.up{background:var(--success);color:var(--success);animation:infraPulse 2.4s var(--ease) infinite}
+.infra-status-dot.degraded{background:var(--warn);color:var(--warn);animation:infraPulse 1.5s var(--ease) infinite}
+.infra-status-dot.down{background:var(--danger);color:var(--danger);animation:infraPulse 1s var(--ease) infinite}
+@keyframes infraPulse{0%,100%{box-shadow:0 0 5px currentColor}50%{box-shadow:0 0 12px currentColor}}
+
+/* ── headline status banner ──────────────────────────────────────────────── */
+.infra-banner{
+  display:flex;align-items:center;gap:14px;
+  padding:15px 18px;border-radius:var(--radius);
+  border:1px solid var(--border);border-left-width:3px;
+  background:linear-gradient(180deg,var(--panel-hi),var(--panel));
+  position:relative;overflow:hidden;transition:border-color .2s var(--ease)}
+.infra-banner.ok{border-left-color:var(--success);background:linear-gradient(90deg,color-mix(in srgb,var(--success) 7%,transparent),var(--panel) 60%)}
+.infra-banner.warn{border-left-color:var(--warn);background:linear-gradient(90deg,color-mix(in srgb,var(--warn) 8%,transparent),var(--panel) 60%)}
+.infra-banner.bad{border-left-color:var(--danger);background:linear-gradient(90deg,color-mix(in srgb,var(--danger) 9%,transparent),var(--panel) 60%)}
+.infra-banner-led{width:12px;height:12px;border-radius:50%;flex:none;background:var(--text-faint);box-shadow:0 0 10px currentColor}
+.infra-banner.ok .infra-banner-led{background:var(--success);color:var(--success);animation:infraPulse 2.4s var(--ease) infinite}
+.infra-banner.warn .infra-banner-led{background:var(--warn);color:var(--warn);animation:infraPulse 1.4s var(--ease) infinite}
+.infra-banner.bad .infra-banner-led{background:var(--danger);color:var(--danger);animation:infraPulse .9s var(--ease) infinite}
+.infra-banner-body{flex:1;min-width:0}
+.infra-banner-title{font-family:var(--font-display);font-size:17px;font-weight:600;letter-spacing:-.2px}
+.infra-banner-sub{font-size:12px;color:var(--text-muted);margin-top:2px}
+.infra-banner-meta{display:flex;align-items:center;gap:10px;flex:none}
+.infra-banner.infra-rechecking{opacity:.7}
+
+/* ── KPI sparks hug bottom like Command Deck vitals ──────────────────────── */
+.infra-kpi .spark{margin-top:10px}
+
+/* ── live metrics waveform card ──────────────────────────────────────────── */
+.infra-live-meta{display:inline-flex;align-items:center;gap:7px}
+.infra-live-dot{width:7px;height:7px;border-radius:50%;background:var(--danger);box-shadow:0 0 7px var(--danger);animation:infraPulse 1.3s var(--ease) infinite}
+.infra-wave-legend{display:flex;align-items:center;gap:16px;margin-bottom:10px;flex-wrap:wrap}
+.infra-wl{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:10px;letter-spacing:1.5px;color:var(--text-muted)}
+.infra-wl i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.infra-wl.rps i{background:var(--accent1);box-shadow:0 0 7px var(--accent1)}
+.infra-wl.p95 i{background:var(--accent3);box-shadow:0 0 7px var(--accent3)}
+.infra-wl-now{margin-left:auto;font-family:var(--font-mono);font-size:11px;letter-spacing:1px;color:var(--text-faint)}
+.infra-wl-now b{color:var(--accent1);font-weight:700}
+.infra-wave svg{transition:opacity .5s var(--ease)}
+
+/* ── public-style status page card ───────────────────────────────────────── */
+.infra-statuspage{display:flex;flex-direction:column}
+.infra-sp-banner{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:var(--radius-sm);
+  font-size:12.5px;font-weight:600;margin-bottom:12px;border:1px solid var(--border)}
+.infra-sp-banner.ok{color:var(--success);background:color-mix(in srgb,var(--success) 7%,transparent);border-color:color-mix(in srgb,var(--success) 28%,transparent)}
+.infra-sp-banner.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.infra-sp-banner.bad{color:var(--danger);background:color-mix(in srgb,var(--danger) 9%,transparent);border-color:color-mix(in srgb,var(--danger) 30%,transparent)}
+.infra-sp-led{width:9px;height:9px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.infra-sp-list{display:flex;flex-direction:column;flex:1}
+.infra-sp-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.infra-sp-row:last-child{border-bottom:none}
+.infra-sp-name{flex:1;font-size:13px;color:var(--text)}
+.infra-sp-row .tag{flex:none}
+.infra-sp-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+
+/* ── FLEET GRID ──────────────────────────────────────────────────────────── */
+.infra-node{display:flex;flex-direction:column;gap:9px;cursor:pointer;transition:border-color .18s var(--ease),transform .18s var(--ease)}
+.infra-node:hover{transform:translateY(-2px)}
+.infra-node.warn{border-color:color-mix(in srgb,var(--warn) 32%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 10%,transparent),0 0 20px color-mix(in srgb,var(--warn) 6%,transparent)}
+.infra-node.bad{border-color:color-mix(in srgb,var(--danger) 34%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--danger) 12%,transparent),0 0 22px color-mix(in srgb,var(--danger) 7%,transparent)}
+.infra-node-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.infra-node-id{display:flex;align-items:center;gap:8px;min-width:0}
+.infra-node-name{font-size:14px;font-weight:700;letter-spacing:.3px;color:var(--text)}
+.infra-node-meta{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text-muted)}
+.infra-node-role{font-weight:600;color:var(--text)}
+.infra-node-region{font-size:10.5px;letter-spacing:.3px;margin-top:-4px}
+
+.infra-node-bars{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.infra-bar-row{display:grid;grid-template-columns:38px 1fr 40px;align-items:center;gap:9px}
+.infra-bar-label{font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;color:var(--text-faint)}
+.infra-bar-val{font-size:11px;text-align:right;color:var(--text-muted)}
+.infra-val-warn{color:var(--warn)}
+.infra-val-bad{color:var(--danger)}
+
+.infra-node-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;padding-top:9px;border-top:1px solid var(--border)}
+.infra-uptime{font-size:12px;font-weight:600;color:var(--success)}
+.infra-node.warn .infra-uptime{color:var(--warn)}
+.infra-node.bad .infra-uptime{color:var(--danger)}
+
+/* ── DEPLOYS table ───────────────────────────────────────────────────────── */
+.infra-deploy-scroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
+.infra-deploy-table{min-width:560px}
+.infra-by{display:inline-flex;align-items:center;gap:7px}
+.infra-mini-av{width:20px;height:20px;font-size:9px;border-radius:6px}
+
+/* ── INCIDENTS list ──────────────────────────────────────────────────────── */
+.infra-incidents{display:flex;flex-direction:column}
+.infra-inc-list{gap:0}
+.infra-inc{padding:12px 2px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .14s var(--ease);border-radius:8px}
+.infra-inc:last-child{border-bottom:none}
+.infra-inc:hover{background:var(--panel)}
+.infra-inc-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.infra-inc-id{font-size:11px}
+.infra-inc-state{margin-left:auto;flex:none}
+.infra-inc-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.35}
+.infra-inc-sub{font-size:11.5px;color:var(--text-muted);margin-top:3px;line-height:1.45}
+.infra-inc-foot{display:flex;align-items:center;gap:12px;font-size:10px;letter-spacing:.5px;margin-top:8px;flex-wrap:wrap}
+.infra-inc-foot span:last-child{margin-left:auto}
+
+/* ── responsive: fleet reflows; tables already scroll ────────────────────── */
+@media (max-width:820px){
+  .infra-banner{flex-wrap:wrap}
+  .infra-banner-meta{width:100%;justify-content:space-between}
+}
+@media (max-width:560px){
+  .infra-wl-now{margin-left:0;width:100%}
+  .infra-banner-title{font-size:15px}
+}

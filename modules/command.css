@@ -1,0 +1,129 @@
+/* ============================================================================
+   command.css — tweaks specific to the Command Deck module ONLY.
+   No fonts/colors/global styles here (core.css owns all tokens).
+   Everything visual leans on the documented .card/.kpi/.grid/etc classes;
+   this file just arranges the hero health ring + a couple of layout accents.
+   Every selector is namespaced "command-"; colors use var(--...) tokens only.
+   ========================================================================== */
+
+/* hero health block: ring + sub-system gauges side by side */
+.command-health{display:grid;grid-template-columns:minmax(0,1fr) 1.3fr;gap:22px;align-items:center}
+@media (max-width:680px){.command-health{grid-template-columns:1fr}}
+
+/* the radial health gauge wrapper */
+.command-ring{position:relative;display:grid;place-items:center;aspect-ratio:1;max-width:230px;margin:0 auto;width:100%}
+.command-ring .chart{position:absolute;inset:0}
+.command-ring-core{position:relative;text-align:center;z-index:2}
+.command-ring-num{font-family:var(--font-display);font-size:54px;font-weight:600;letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums}
+.command-ring-lbl{font-family:var(--font-mono);font-size:9px;letter-spacing:3px;color:var(--text-faint);text-transform:uppercase;margin-top:5px}
+.command-ring-state{font-family:var(--font-mono);font-size:10px;letter-spacing:2px;margin-top:7px;color:var(--success)}
+
+/* five sub-system bars */
+.command-subs{display:flex;flex-direction:column;gap:13px}
+.command-sub{display:grid;grid-template-columns:74px 1fr 42px;align-items:center;gap:11px}
+.command-sub-name{font-family:var(--font-mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted)}
+.command-sub-val{font-family:var(--font-mono);font-size:12px;font-weight:600;text-align:right;color:var(--text);font-variant-numeric:tabular-nums}
+
+/* telemetry waveform card gets a slightly inset feel */
+.command-wave{position:relative}
+.command-wave-legend{position:absolute;top:14px;right:16px;display:flex;gap:14px;font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;color:var(--text-faint);z-index:2}
+.command-wl{display:flex;align-items:center;gap:5px}
+.command-wl i{width:14px;height:2px;border-radius:2px;display:inline-block}
+.command-wl.rev i{background:var(--accent1)}
+.command-wl.sig i{background:var(--accent3)}
+
+/* vitals tiles: keep the spark hugging the bottom */
+.command-vital .spark{margin-top:10px}
+
+/* attention queue tightens its internal stack */
+.command-attn-stack{display:flex;flex-direction:column;gap:10px}
+
+/* cash/burn legend pills (BURN uses the violet "signal" accent) */
+.command-pill-burn{color:var(--accent3);border-color:var(--border-hi)}
+.command-pill-live{font-size:9px}
+
+/* ── COMPANY PULSE feed (celebratory wins from the audit stream) ─────────── */
+.command-pulse-feed{display:flex;flex-direction:column;gap:9px;max-height:340px;overflow-y:auto}
+.command-pulse-empty{padding:20px 4px;text-align:center;font-size:12px}
+.command-pulse-item{display:flex;align-items:flex-start;gap:11px;padding:10px;border:1px solid var(--border);border-radius:11px;
+  background:linear-gradient(90deg,var(--accent-soft),transparent);transition:border-color .16s var(--ease),transform .16s var(--ease)}
+.command-pulse-item:hover{border-color:var(--border-hi);transform:translateX(2px)}
+.command-pulse-av{width:34px;height:34px;font-size:13px;flex:none}
+.command-pulse-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.command-pulse-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.command-pulse-kind{font-size:9px;letter-spacing:.8px}
+.command-pulse-amt{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--success);letter-spacing:.3px}
+.command-pulse-sum{font-size:12.5px;color:var(--text);line-height:1.4;overflow:hidden;text-overflow:ellipsis}
+.command-pulse-ts{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;color:var(--text-faint);flex:none;margin-top:3px}
+
+/* ── COMPANY OVERVIEW canvas (fills the shell's .overview-body) ──────────── */
+.command-ov{display:flex;flex-direction:column;gap:18px}
+
+/* org header */
+.command-ov-hero{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:16px 18px;border:1px solid var(--border-hi);border-radius:var(--radius);
+  background:linear-gradient(120deg,var(--panel-hi),var(--panel));box-shadow:0 0 28px var(--weather)}
+.command-ov-id{display:flex;align-items:center;gap:14px;flex:1;min-width:220px}
+.command-ov-mark{width:50px;height:50px;border-radius:13px;flex:none;display:grid;place-items:center;
+  font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--bg);background:var(--accent-grad);box-shadow:0 0 20px var(--glow)}
+.command-ov-name{font-family:var(--font-display);font-size:21px;font-weight:600;letter-spacing:-.3px}
+.command-ov-meta{font-family:var(--font-mono);font-size:10px;letter-spacing:1.2px;color:var(--text-muted);text-transform:uppercase;margin-top:3px}
+.command-ov-health{display:flex;flex-direction:column;gap:5px;min-width:170px}
+.command-ov-health-num{font-family:var(--font-display);font-size:30px;font-weight:600;letter-spacing:-.5px;line-height:1;font-variant-numeric:tabular-nums}
+.command-ov-health-num small{font-size:14px;color:var(--text-faint);font-weight:500}
+.command-ov-health-lbl{font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;color:var(--text-faint);text-transform:uppercase}
+.command-ov-ok{color:var(--success)}
+.command-ov-health-bar{width:100%}
+.command-ov-x{flex:none}
+
+/* value-flow visualization */
+.command-flow-card{padding:18px}
+.command-flow{display:grid;grid-template-columns:minmax(0,1.1fr) 0.7fr minmax(0,1fr) 0.9fr 0.9fr;gap:14px;align-items:center}
+.command-flow-h{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px}
+.command-flow-col{min-width:0}
+.command-flow-bars{display:flex;flex-direction:column;gap:11px}
+.command-flow-bar-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--text);margin-bottom:5px}
+.command-flow-bar-v{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);white-space:nowrap}
+.command-flow-bar-track{height:8px;border-radius:6px;background:var(--bg);border:1px solid var(--border);overflow:hidden}
+.command-flow-bar-fill{height:100%;border-radius:6px;transition:width 1s var(--ease);box-shadow:0 0 10px var(--glow)}
+.command-flow-link{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.command-flow-arrow{font-family:var(--font-mono);font-size:18px;color:var(--accent1);line-height:1;text-shadow:0 0 10px var(--glow)}
+.command-flow-area{width:100%}
+.command-flow-caption{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;color:var(--text-faint);text-transform:uppercase;text-align:center}
+.command-flow-waterfall{width:100%}
+.command-flow-mix{display:flex;flex-direction:column;align-items:center}
+.command-flow-donut{width:100%;max-width:160px}
+.command-flow-net{text-align:center;padding:14px 10px;border-radius:12px;border:1px solid var(--border-hi);
+  background:linear-gradient(180deg,var(--accent-soft),transparent)}
+.command-flow-net-val{font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:-.5px;color:var(--accent1);font-variant-numeric:tabular-nums}
+.command-flow-net-sub{font-family:var(--font-mono);font-size:10px;letter-spacing:1px;color:var(--success);text-transform:uppercase;margin-top:3px}
+.command-flow-net-foot{font-size:10px;color:var(--text-muted);margin-top:7px;line-height:1.4}
+@media (max-width:920px){.command-flow{grid-template-columns:1fr 1fr;gap:16px}
+  .command-flow-link{flex-direction:row}.command-flow-arrow{transform:rotate(90deg)}}
+@media (max-width:560px){.command-flow{grid-template-columns:1fr}.command-flow-arrow{transform:rotate(90deg)}}
+
+/* org-wide KPI band */
+.command-ov-band{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.command-ov-kpi{padding:13px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg2);display:flex;flex-direction:column;gap:4px}
+.command-ov-kpi-l{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-faint)}
+.command-ov-kpi-v{font-family:var(--font-display);font-size:24px;font-weight:600;letter-spacing:-.4px;line-height:1;font-variant-numeric:tabular-nums}
+.command-ov-kpi-v small{font-size:13px;color:var(--text-faint);font-weight:500}
+.command-ov-kpi-t{margin-top:2px}
+@media (max-width:820px){.command-ov-band{grid-template-columns:repeat(2,1fr)}}
+
+/* subsystem map */
+.command-ov-map{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.command-ov-tile{text-align:left;padding:15px;border:1px solid var(--border);border-radius:13px;
+  background:linear-gradient(180deg,var(--panel-hi),var(--panel));display:flex;flex-direction:column;gap:7px;
+  transition:border-color .16s var(--ease),transform .16s var(--ease),box-shadow .16s var(--ease)}
+.command-ov-tile:hover{border-color:var(--border-hi);transform:translateY(-2px);box-shadow:0 8px 26px var(--bg),0 0 18px var(--weather)}
+.command-ov-tile-head{display:flex;align-items:center;gap:8px}
+.command-ov-tile-ico{font-size:16px}
+.command-ov-tile-name{font-family:var(--font-display);font-size:13px;font-weight:600;flex:1}
+.command-ov-tile-arrow{font-family:var(--font-mono);font-size:14px;color:var(--text-faint);transition:color .16s var(--ease),transform .16s var(--ease)}
+.command-ov-tile:hover .command-ov-tile-arrow{color:var(--accent1);transform:translateX(3px)}
+.command-ov-tile-metric{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+.command-ov-tile-sub{font-size:11px;color:var(--text-muted);line-height:1.4;min-height:30px}
+.command-ov-tile-bar{margin-top:2px}
+@media (max-width:920px){.command-ov-map{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:560px){.command-ov-map{grid-template-columns:1fr 1fr}.command-ov-tile-sub{min-height:0}}
