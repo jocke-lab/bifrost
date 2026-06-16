@@ -420,6 +420,20 @@
       ${r.collections && r.collections.length ? `<div><div class="opx-sec-t">Collections (${r.collections.length})</div>${table([{ h: 'Name', cell: (c) => esc(c.name) }, { h: 'State', cell: (c) => c.published ? pill('published', 'ok') : pill('draft', 'mut') }], r.collections)}</div>` : ''}`;
     const acts = `${d.status !== 'approved' ? `<button class="opx-btn pri" data-a="approve">Approve</button>` : ''}${!d.verified ? `<button class="opx-btn" data-a="verify">Verify</button>` : ''}${d.custom_domain ? `<button class="opx-btn" data-a="domain">${d.custom_domain_verified ? 'Unverify domain' : 'Verify domain'}</button>` : ''}${d.status !== 'suspended' ? `<button class="opx-btn danger" data-a="suspend">Suspend</button>` : `<button class="opx-btn" data-a="reinstate">Reinstate</button>`}`;
     const ov = sheet(ttl, copyable(d.id), body, acts);
+    // Chats with this dealer — pulled from the inbox, opened in a modal.
+    const sb = ov.querySelector('.opx-sheet-b');
+    if (sb) {
+      const sec = document.createElement('div');
+      sec.innerHTML = `<div class="opx-sec-t">Chats with this dealer</div><div id="dlr-chats"><div class="opx-loading" style="padding:14px 0"><span class="opx-spin"></span> Loading…</div></div>`;
+      sb.appendChild(sec);
+      get('/api/inbox').then((ir) => {
+        const host = sec.querySelector('#dlr-chats'); if (!host) return;
+        const convs = ((ir && ir.rows) || []).filter((c) => c.dealer_id === id);
+        if (!convs.length) { host.innerHTML = '<div style="color:var(--t3);font-size:12.5px">No conversations with this dealer yet.</div>'; return; }
+        host.innerHTML = convs.map((c) => `<button class="opx-btn ghost" data-chat="${esc(c.id)}" style="width:100%;justify-content:space-between;margin-bottom:6px"><span>${esc(c.party || c.kind || 'conversation')} · ${ago(c.last_message_at)}</span><span style="color:var(--ac)">Open chat →</span></button>`).join('');
+        host.querySelectorAll('[data-chat]').forEach((b) => b.addEventListener('click', () => openChatModal(b.dataset.chat, d.name)));
+      });
+    }
     const run = async (payload, msg) => { const r2 = await patch('dealers', payload); if (r2.ok) { toast(msg, 'ok'); dealerDetail(id); paint(); } else toast('Failed: ' + (r2.error || ''), 'bad'); };
     ov.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
       const a = b.dataset.a;
@@ -606,6 +620,17 @@
     const send = async () => { const inp = host.querySelector('#opx-reply'); const v = inp.value.trim(); if (!v) return; inp.value = ''; const r = await post('ops', { action: 'reply', conversation_id: cid, body: v }); if (r.ok) load(); else toast('Send failed', 'bad'); };
     host.querySelector('#opx-send').onclick = send;
     host.querySelector('#opx-reply').addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+  }
+  // Open a conversation thread in a modal (used from a dealer record).
+  function openChatModal(cid, title) {
+    const ov = document.createElement('div'); ov.className = 'opx-modal';
+    ov.innerHTML = `<div class="opx-modal-box" style="padding:0;width:min(560px,96vw);height:72vh;max-height:72vh;display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line);font-weight:600;font-size:14px">${ic('inbox')}${esc(title || 'Conversation')}<button data-x style="margin-left:auto;width:30px;height:30px;border:0;background:var(--panel);border-radius:var(--r1);color:var(--t2);cursor:pointer;display:grid;place-items:center">${icRaw('close')}</button></div>
+      <div class="opx-thread" style="flex:1;min-height:0" id="opx-cm-host"></div></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+    ov.querySelector('[data-x]').onclick = () => ov.remove();
+    openThread(cid, ov.querySelector('#opx-cm-host'));
   }
 
   /* PROVISIONING */
