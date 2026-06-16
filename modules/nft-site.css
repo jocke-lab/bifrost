@@ -6,20 +6,20 @@
    ========================================================================== */
 
 .opx, .opx-over, .opx-cmd, .opx-modal, .opx-toast-wrap {
-  /* warm obsidian canvas */
-  --bg:#0b0b0d; --bg-2:#0e0e10; --panel:#141416; --panel-2:#1a1a1d; --panel-3:#212125; --rail:#0c0c0e;
+  /* Bifrost aurora obsidian canvas (matches assets/core.css company palette) */
+  --bg:#05070d; --bg-2:#070c14; --panel:#0a1019; --panel-2:#0e1622; --panel-3:#152233; --rail:#06090f;
   /* quiet hairlines */
-  --line:rgba(255,255,255,.05); --line-2:rgba(255,255,255,.09); --line-3:rgba(255,255,255,.14);
-  /* warm-neutral text ramp (no blue) */
-  --t1:#f4f3f0; --t2:#a8a6a0; --t3:#74726c; --t4:#4f4d48;
-  /* single champagne accent */
-  --ac:#c9a86a; --ac-2:#b8945a; --ac-soft:rgba(201,168,106,.12); --ac-line:rgba(201,168,106,.34); --ac-ink:#1a1407;
-  /* status (tinted text+bg, dot optional) */
-  --ok:#5fb37a; --ok-bg:rgba(95,179,122,.13);
-  --warn:#cf9f49; --warn-bg:rgba(207,159,73,.14);
-  --bad:#e06c63; --bad-bg:rgba(224,108,99,.13);
-  --info:#8aa9d6; --info-bg:rgba(138,169,214,.13);
-  --mut:#8f8d85; --mut-bg:rgba(255,255,255,.06);
+  --line:rgba(255,255,255,.06); --line-2:rgba(255,255,255,.10); --line-3:rgba(255,255,255,.16);
+  /* cool text ramp */
+  --t1:#eaf2f8; --t2:#8aa4bc; --t3:#5f7488; --t4:#44566b;
+  /* bridge-cyan accent (violet as the secondary/brand tone) */
+  --ac:#19d3ff; --ac-2:#7c5cff; --ac-soft:rgba(25,211,255,.12); --ac-line:rgba(25,211,255,.40); --ac-ink:#04121a;
+  /* status (the company's aurora status set) */
+  --ok:#46e6a6; --ok-bg:rgba(70,230,166,.13);
+  --warn:#f5a524; --warn-bg:rgba(245,165,36,.14);
+  --bad:#ff4d6d; --bad-bg:rgba(255,77,109,.13);
+  --info:#4d8dff; --info-bg:rgba(77,141,255,.13);
+  --mut:#8aa4bc; --mut-bg:rgba(255,255,255,.06);
   /* radii (3 steps) */
   --r1:8px; --r2:12px; --r3:16px;
   /* elevation — overlays only */
@@ -47,7 +47,7 @@
 .opx-shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
 .opx-rail{position:sticky;top:0;align-self:start;height:100vh;display:flex;flex-direction:column;background:var(--rail);border-right:1px solid var(--line);padding:16px 12px;gap:2px;overflow:hidden}
 .opx-brand{display:flex;align-items:center;gap:11px;padding:6px 8px 16px}
-.opx-brand .mk{width:32px;height:32px;border-radius:10px;flex:none;display:grid;place-items:center;background:linear-gradient(150deg,#1c1a16,#141210);border:1px solid var(--line-2);color:var(--ac)}
+.opx-brand .mk{width:32px;height:32px;border-radius:10px;flex:none;display:grid;place-items:center;background:linear-gradient(145deg,#7c5cff,#19d3ff);border:0;color:#04121a;box-shadow:0 2px 14px rgba(25,211,255,.25)}
 .opx-brand .mk .opx-ic{width:18px;height:18px}
 .opx-brand b{font-size:14px;font-weight:600;letter-spacing:-.2px;display:block;line-height:1.15;color:var(--t1)}
 .opx-brand span{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--t4)}
@@ -165,7 +165,7 @@ select.opx-inp{cursor:pointer}
 .opx-btn:hover{border-color:var(--line-3)}
 .opx-btn .opx-ic{width:15px;height:15px}
 .opx-btn.pri{background:var(--ac);border-color:var(--ac);color:var(--ac-ink)}
-.opx-btn.pri:hover{background:#d4b577;border-color:#d4b577;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.opx-btn.pri:hover{background:#3dd8ff;border-color:#3dd8ff;box-shadow:0 1px 2px rgba(0,0,0,.3)}
 .opx-btn.danger{color:var(--bad);border-color:rgba(224,108,99,.4);background:transparent}
 .opx-btn.danger:hover{background:var(--bad-bg);border-color:var(--bad)}
 .opx-btn.ghost{background:transparent}
