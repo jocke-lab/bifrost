@@ -1,713 +1,310 @@
 /* ============================================================================
-   HELM — nft-site.css
-   OPULENCE Control Center · NFT Site operator console.
-   Unified glass-and-aurora system fusing NEXUS (warm-paper ledger atlas, per-
-   entity hue, magnitude, slide-overs) + Constellation (deep-navy glass, platinum
-   accent, redundant colour+dash status, mono UIDs, SVG node map) re-keyed onto
-   bifrost's dark aurora base (assets/core.css).
+   OPX — NFT Platform operator console (v2, ground-up rewrite)
+   An award-level, dense, fast control room for running the numismatic NFT
+   marketplace. Warm near-black, monochrome chrome, colour reserved for status.
+   Design language drawn from Stripe / Linear / Vercel operator tooling:
+   left rail · global search + Cmd-K · KPI strips · filterable tables ·
+   slide-over record detail · confirm-with-reason · audit-everywhere.
 
-   Self-contained: every core token is referenced with a sensible fallback.
-   Two reconciliations baked into the tokens:
-     · bifrost references var(--muted,#8aa4bc) but core only defines
-       --text-muted  →  --muted is DEFINED here so both resolve.
-     · the green #46E6A6 in .nft-live/.nft-chip.ok/.nft-adm-ok is routed through
-       --ok (literal #46E6A6) so existing markup is visually unchanged.
+   Everything is namespaced `.opx`. Overlays (.opx-over / .opx-cmd) attach to
+   <body>, so tokens are redeclared on them too.
    ========================================================================== */
 
-/* ── 1. TOKENS ─────────────────────────────────────────────────────────────── */
-/* Declared on BOTH .nftsite and .nft-modal: the JS appends modals/sheets
-   directly to <body> (outside .nftsite), so they need their own token scope or
-   every var() collapses to empty. */
-.nftsite,
-.nft-modal{
-  /* ---- Base canvas (bifrost dark aurora) ---- */
-  /* core (assets/core.css :root) defines --bg/--bg2/--panel/--panel-hi/--border…
-     and they cascade down to here. We restate literals (NOT self-referential
-     var(--x,…), which would create a token cycle and invalidate the value) so
-     this file stays correct even if loaded standalone. */
-  --bg:#05070D;
-  --bg2:#070C14;
-  --canvas:#080B12;
-
-  /* ---- Layered glass surfaces (low → high) ---- */
-  --panel:#0A1019;
-  --panel-hi:#0E1622;
-  --surface-1:rgba(14,21,34,.55);
-  --surface-2:rgba(13,19,31,.72);
-  --surface-3:rgba(12,18,29,.85);
-  --surface-solid:#10131A;
-
-  /* ---- Hairlines & borders ---- */
-  --border:#122433;
-  --border-hi:#1C3A44;
-  --border-glass:rgba(255,255,255,.07);
-  --border-glass-strong:rgba(255,255,255,.12);
-
-  /* ---- Text tints ---- */
-  --text:#EAF2F8;
-  --t1:#EAF2F8;
-  --text-muted:#8AA4BC;
-  --muted:#8AA4BC;                 /* DEFINE so var(--muted,…) always resolves */
-  --t2:#8AA4BC;
-  --text-faint:#46637A;
-  --t3:#46637A;
-
-  /* ---- Accents (aurora) ---- */
-  --accent1:#19D3FF;
-  --accent2:#4D8DFF;
-  --accent3:#7C5CFF;
-  --accent-grad:linear-gradient(120deg,#7C5CFF,#4D8DFF 40%,#19D3FF 72%,#46E6A6);
-  --accent-soft:rgba(25,211,255,.10);
-  --violet-soft:rgba(124,92,255,.14);
-  --glow:rgba(25,211,255,.09);
-
-  /* ---- Platinum metal (Constellation accent, demoted to secondary) ---- */
-  --platinum:#E8E2D4;
-  --platinum-soft:rgba(232,226,212,.10);
-
-  /* ---- Status colours (5-tier, redundant with dash patterns) ---- */
-  --ok:#46E6A6;        --ok-deep:#0F8A6B;  --ok-wash:rgba(70,230,166,.12);
-  --warn:#F5A524;                          --warn-wash:rgba(245,165,36,.13);
-  --danger:#FF4D6D;                        --danger-wash:rgba(255,77,109,.13);
-  --coral:#FF6B5E;                         --coral-wash:rgba(255,107,94,.13);
-  --blue:#5FA8FF;                          --blue-wash:rgba(95,168,255,.12);
-  --violet-st:#A78BFA;                     --violet-st-wash:rgba(167,139,250,.13);
-
-  /* ---- Rarity ladder (NEXUS) ---- */
-  --rar-common:#8AA4BC; --rar-rare:#5FA8FF; --rar-epic:#A78BFA;
-  --rar-legendary:#F5A524; --rar-mythic:#E8E2D4;
-
-  /* ---- Per-entity hue (injected per collection at runtime) ---- */
-  --h:205;
-  --brand:#19D3FF;
-  --t:.5;
-  --w:50%;
-  --p:50;
-
-  /* ---- Radii ladder ---- */
-  --r-xs:6px;
-  --r-sm:9px;
-  --r-md:12px;
-  --r-lg:16px;
-  --r-xl:20px;
-  --r-2xl:24px;
-  --r-pill:99px;
-
-  /* ---- Multi-layer shadows (deep on dark) ---- */
-  --shadow-sm:0 1px 2px rgba(0,0,0,.5), 0 1px 1px rgba(0,0,0,.4);
-  --shadow-md:0 2px 8px rgba(0,0,0,.5), 0 12px 30px rgba(0,0,0,.45);
-  --shadow-lg:0 8px 24px rgba(0,0,0,.55), 0 28px 70px rgba(0,0,0,.6);
-  --shadow-glow:0 0 0 1px rgba(25,211,255,.18), 0 8px 30px rgba(25,211,255,.12);
-  --inset-top:inset 0 1px 0 rgba(255,255,255,.06);
-
-  /* ---- Backdrop blur ladder ---- */
-  --blur-sm:blur(8px);
-  --blur-md:blur(14px);
-  --blur-lg:blur(20px);
-
-  /* ---- Focus rings (aurora double-ring) ---- */
-  --focus-ring:0 0 0 2px var(--bg), 0 0 0 4px var(--accent1);
-  --focus-halo:0 0 0 1px var(--accent1), 0 0 0 4px var(--accent-soft);
-
-  /* ---- Type families ---- */
-  --font-display:'Space Grotesk', system-ui, sans-serif;
-  --font-body:'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono:'JetBrains Mono','IBM Plex Mono', ui-monospace, monospace;
-
-  /* ---- Motion ---- */
-  --ease:cubic-bezier(.2,.7,.2,1);
-  --ease-spring:cubic-bezier(.22,1,.36,1);
-  --dur-fast:.14s; --dur:.2s; --dur-slow:.32s;
+.opx, .opx-over, .opx-cmd, .opx-toast-wrap {
+  /* canvas */
+  --bg:#0a0a0c; --bg-2:#0d0e11; --panel:#121318; --panel-2:#171922; --panel-3:#1c1f2a;
+  --rail:#0c0d10;
+  /* hairlines */
+  --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.11); --line-3:rgba(255,255,255,.16);
+  /* text */
+  --t1:#f2f4f8; --t2:#aab3c2; --t3:#6b7585; --t4:#49515e;
+  /* single restrained accent */
+  --ac:#6e9bff; --ac-2:#8a7bff; --ac-soft:rgba(110,155,255,.14); --ac-line:rgba(110,155,255,.38);
+  /* semantic status (color + always paired with dot/label) */
+  --ok:#3fb950; --ok-bg:rgba(63,185,80,.13);
+  --warn:#d8a02a; --warn-bg:rgba(216,160,42,.14);
+  --bad:#f85149; --bad-bg:rgba(248,81,73,.13);
+  --info:#58a6ff; --info-bg:rgba(88,166,255,.13);
+  --mut:#8b949e; --mut-bg:rgba(139,148,158,.12);
+  /* radii */
+  --r1:7px; --r2:10px; --r3:14px; --r4:20px;
+  /* shadow */
+  --sh-1:0 1px 2px rgba(0,0,0,.4);
+  --sh-2:0 8px 24px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
+  --sh-3:0 24px 70px rgba(0,0,0,.55), 0 8px 24px rgba(0,0,0,.4);
+  --mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
 }
 
-/* ── 2. ROOT / SHELL ───────────────────────────────────────────────────────── */
-.nftsite{
-  position:relative;
-  padding:24px;
-  background:
-    radial-gradient(1200px 620px at 82% -8%, rgba(124,92,255,.10), transparent 60%),
-    radial-gradient(960px 540px at -8% 108%, rgba(25,211,255,.07), transparent 55%),
-    radial-gradient(900px 760px at 50% 44%, rgba(28,58,68,.18), transparent 70%),
-    var(--canvas);
-  color:var(--text);
-  font-family:var(--font-body);
-  letter-spacing:.1px;
-  -webkit-font-smoothing:antialiased;
-  text-rendering:optimizeLegibility;
+.opx{
+  font-family:var(--sans); color:var(--t1); background:var(--bg);
+  -webkit-font-smoothing:antialiased; letter-spacing:.1px;
+  min-height:100%;
 }
-.nftsite ::selection{background:var(--accent1);color:var(--bg)}
-.nftsite ::-webkit-scrollbar{width:10px;height:10px}
-.nftsite ::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
-.nftsite ::-webkit-scrollbar-thumb:hover{background:var(--border-hi)}
+.opx *{box-sizing:border-box}
+.opx ::selection{background:var(--ac-soft);color:#fff}
+.opx-num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.opx-mono{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px}
+.opx ::-webkit-scrollbar{width:10px;height:10px}
+.opx ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+.opx ::-webkit-scrollbar-thumb:hover{background:var(--line-3)}
 
-/* ── 3. TYPE UTILITIES ─────────────────────────────────────────────────────── */
-.nftsite .tnum{font-family:var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-.nft-mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--muted);letter-spacing:0}
-.nft-mono b{color:var(--text);font-weight:600}
-.nftsite .eyebrow{font:600 11px/1 var(--font-body);letter-spacing:1.4px;text-transform:uppercase;color:var(--accent1)}
+/* ── SHELL ────────────────────────────────────────────────────────────────── */
+.opx-shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
+.opx-rail{
+  position:sticky;top:0;align-self:start;height:100vh;display:flex;flex-direction:column;
+  background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;gap:2px;overflow:hidden;
+}
+.opx-brand{display:flex;align-items:center;gap:10px;padding:4px 8px 12px}
+.opx-brand .mk{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;font-size:15px;
+  background:linear-gradient(135deg,var(--ac-2),var(--ac));box-shadow:0 4px 14px rgba(110,155,255,.35)}
+.opx-brand b{font-size:13.5px;font-weight:650;letter-spacing:-.2px;display:block;line-height:1.1}
+.opx-brand span{font-size:9.5px;font-weight:600;letter-spacing:1.3px;text-transform:uppercase;color:var(--t3)}
+.opx-nav{display:flex;flex-direction:column;gap:1px;overflow-y:auto;flex:1;margin:0 -4px;padding:0 4px}
+.opx-nav::-webkit-scrollbar{width:6px}
+.opx-grp{font-size:9.5px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--t4);padding:13px 9px 5px}
+.opx-link{
+  position:relative;display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;cursor:pointer;
+  padding:7px 9px;border-radius:var(--r1);background:transparent;color:var(--t2);font:550 13px/1 var(--sans);
+  transition:background .12s,color .12s;
+}
+.opx-link .ic{font-size:14px;width:18px;text-align:center;flex:none;filter:grayscale(.2)}
+.opx-link:hover{background:var(--panel);color:var(--t1)}
+.opx-link.on{background:var(--ac-soft);color:#fff}
+.opx-link.on::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--ac)}
+.opx-link .ct{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:99px;display:grid;place-items:center;
+  font:700 10.5px/1 var(--mono);color:#160c00;background:var(--warn)}
+.opx-link .ct.bad{background:var(--bad);color:#fff}
+.opx-railfoot{border-top:1px solid var(--line);padding:10px 8px 2px;display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--t3)}
 
-/* ── 4. HEADER ─────────────────────────────────────────────────────────────── */
-.nft-head{
-  display:flex;align-items:flex-start;justify-content:space-between;
-  gap:24px;flex-wrap:wrap;margin-bottom:22px;
-}
-.nft-headmain{min-width:0;flex:1 1 auto}
-.nft-title{
-  margin:0;
-  font:600 28px/1.1 var(--font-display);
-  letter-spacing:-.4px;color:var(--text);
-  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-}
-.nft-sub{margin:6px 0 0;font-size:12.5px;color:var(--muted);max-width:64ch}
+.opx-main{min-width:0;display:flex;flex-direction:column}
 
-/* Live / auth chips — breathing dot (Constellation .heartbeat idiom) */
-.nft-live{
-  display:inline-flex;align-items:center;gap:6px;
-  font:600 11px/1 var(--font-body);letter-spacing:.3px;
-  padding:4px 10px;border-radius:var(--r-pill);
-  color:var(--ok);background:var(--ok-wash);
-  border:1px solid color-mix(in srgb, var(--ok) 30%, transparent);
-  white-space:nowrap;
+/* ── TOPBAR ───────────────────────────────────────────────────────────────── */
+.opx-top{
+  position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;
+  height:56px;padding:0 22px;background:rgba(10,10,12,.82);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
 }
-.nft-live::before{
-  content:"";width:6px;height:6px;border-radius:50%;
-  background:var(--ok);box-shadow:0 0 8px var(--ok);
-  animation:nftbreathe 4s ease-in-out infinite;
+.opx-search{position:relative;flex:1;max-width:560px}
+.opx-search input{
+  width:100%;height:36px;padding:0 12px 0 34px;border-radius:var(--r2);
+  background:var(--panel);border:1px solid var(--line);color:var(--t1);font:400 13px/1 var(--sans);
 }
-.nft-live.off{
-  color:var(--warn);background:var(--warn-wash);
-  border-color:color-mix(in srgb, var(--warn) 30%, transparent);
+.opx-search input:focus{outline:none;border-color:var(--ac-line);background:var(--panel-2);box-shadow:0 0 0 3px var(--ac-soft)}
+.opx-search .sx{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:13px;pointer-events:none}
+.opx-search .kbd{position:absolute;right:9px;top:50%;transform:translateY(-50%);font:600 10px/1 var(--mono);color:var(--t3);
+  background:var(--bg);border:1px solid var(--line-2);border-radius:5px;padding:3px 6px}
+.opx-results{
+  position:absolute;top:44px;left:0;right:0;z-index:40;max-height:60vh;overflow:auto;
+  background:var(--panel-2);border:1px solid var(--line-2);border-radius:var(--r3);box-shadow:var(--sh-3);padding:6px;
 }
-.nft-live.off::before{background:var(--warn);box-shadow:0 0 8px var(--warn);animation:none}
-#nft-auth{cursor:pointer;transition:filter var(--dur)}
-#nft-auth:hover{filter:brightness(1.1)}
-@keyframes nftbreathe{0%,100%{opacity:.4}50%{opacity:1}}
+.opx-res-grp{font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t4);padding:9px 10px 4px}
+.opx-res{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r1);cursor:pointer}
+.opx-res:hover,.opx-res.sel{background:var(--ac-soft)}
+.opx-res .rt{font-size:13px;color:var(--t1);font-weight:550}
+.opx-res .rs{font-size:11.5px;color:var(--t3);margin-left:auto;font-family:var(--mono)}
+.opx-topbtn{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:var(--r1);cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);color:var(--t2);font-size:14px;transition:.12s}
+.opx-topbtn:hover{color:var(--t1);border-color:var(--line-2)}
+.opx-live{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 var(--sans);color:var(--ok);padding:6px 10px;border-radius:99px;background:var(--ok-bg);border:1px solid rgba(63,185,80,.28);white-space:nowrap}
+.opx-live::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:opxpulse 3.5s ease-in-out infinite}
+.opx-live.off{color:var(--warn);background:var(--warn-bg);border-color:rgba(216,160,42,.3)}
+.opx-live.off::before{background:var(--warn);box-shadow:0 0 8px var(--warn);animation:none}
+@keyframes opxpulse{0%,100%{opacity:.45}50%{opacity:1}}
 
-/* KPI grid + tiles */
-.nft-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-@media(min-width:920px){.nft-kpis{grid-template-columns:repeat(8,1fr)}}
-.nft-kpi{
-  position:relative;overflow:hidden;
-  display:flex;flex-direction:column;gap:6px;
-  padding:15px 15px 14px;border-radius:var(--r-md);
-  background:var(--surface-2);backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
-  border:1px solid var(--border-glass);
-  box-shadow:var(--shadow-sm), var(--inset-top);
-  transition:transform var(--dur) var(--ease), box-shadow var(--dur), border-color var(--dur);
-}
-.nft-kpi::before{
-  content:"";position:absolute;inset:0 auto auto 0;width:100%;height:2px;
-  background:var(--accent-grad);opacity:.5;
-}
-.nft-kpi:hover{
-  transform:translateY(-2px);
-  border-color:var(--border-glass-strong);
-  box-shadow:var(--shadow-md), var(--inset-top);
-}
-.nft-kpi .k{
-  font:600 26px/1 var(--font-display);letter-spacing:-.5px;
-  color:var(--text);font-variant-numeric:tabular-nums;
-}
-.nft-kpi .l{
-  font:600 10.5px/1.2 var(--font-body);letter-spacing:1.4px;
-  text-transform:uppercase;color:var(--muted);
-}
-.nft-kpi.skel{min-height:74px}
-.nft-kpi.skel::after{
-  content:"";position:absolute;inset:0;border-radius:inherit;
-  background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.05) 50%,transparent 80%);
-  background-size:200% 100%;animation:nftpulse 1.4s ease-in-out infinite;
-}
-@keyframes nftpulse{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* ── CONTENT ──────────────────────────────────────────────────────────────── */
+.opx-body{padding:24px 28px 80px;max-width:1500px;width:100%;margin:0 auto}
+.opx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.opx-head h1{margin:0;font:650 24px/1.1 var(--sans);letter-spacing:-.5px;color:var(--t1)}
+.opx-head p{margin:5px 0 0;font-size:13px;color:var(--t3);max-width:70ch}
+.opx-head .opx-actions{display:flex;gap:8px;flex-wrap:wrap}
 
-/* ── 5. TABS NAV ───────────────────────────────────────────────────────────── */
-.nft-tabs{
-  display:flex;gap:4px;align-items:center;flex-wrap:wrap;
-  margin:0 0 18px;padding-bottom:0;
-  border-bottom:1px solid var(--border);
-}
-.nft-tab{
-  position:relative;display:inline-flex;align-items:center;gap:7px;
-  padding:9px 14px;border:0;background:transparent;cursor:pointer;
-  border-radius:var(--r-sm) var(--r-sm) 0 0;
-  font:600 12.5px/1 var(--font-body);color:var(--muted);
-  transition:color var(--dur), background var(--dur);
-}
-.nft-tab:hover{color:var(--text);background:var(--surface-1)}
-.nft-tab.active{color:var(--accent1)}
-.nft-tab.active::after{
-  content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:2px;
-  border-radius:2px;background:var(--accent1);
-  box-shadow:0 0 10px var(--accent1), 0 0 4px var(--accent1);
-}
-.nt-ico{font-size:14px;line-height:1;display:inline-grid;place-items:center}
+/* ── KPI ──────────────────────────────────────────────────────────────────── */
+.opx-kpis{display:grid;gap:12px;margin-bottom:20px}
+.opx-kpi{position:relative;overflow:hidden;padding:15px 16px;border-radius:var(--r3);background:var(--panel);border:1px solid var(--line);transition:.15s}
+.opx-kpi:hover{border-color:var(--line-2);transform:translateY(-1px)}
+.opx-kpi .l{display:flex;align-items:center;gap:6px;font:600 10.5px/1 var(--sans);letter-spacing:.8px;text-transform:uppercase;color:var(--t3)}
+.opx-kpi .v{font:680 25px/1.1 var(--sans);letter-spacing:-.6px;margin-top:9px;color:var(--t1)}
+.opx-kpi .s{font-size:11.5px;color:var(--t3);margin-top:5px;display:flex;align-items:center;gap:5px}
+.opx-kpi .dl{font-weight:650}.opx-kpi .dl.up{color:var(--ok)}.opx-kpi .dl.down{color:var(--bad)}
+.opx-kpi.accent::after{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--ac)}
+.opx-kpi.ok::after{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--ok)}
+.opx-kpi.warn::after{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--warn)}
+.opx-kpi.bad::after{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--bad)}
 
-/* Body scroll/paint region */
-.nft-body{position:relative}
+/* ── PANELS ───────────────────────────────────────────────────────────────── */
+.opx-panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r3);margin-bottom:18px;overflow:hidden}
+.opx-panel-h{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.opx-panel-h h3{margin:0;font:620 14px/1.2 var(--sans);color:var(--t1);display:flex;align-items:center;gap:8px}
+.opx-panel-h .sub{font-size:12px;color:var(--t3);font-weight:400}
+.opx-panel-h .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.opx-panel-b{padding:16px}
+.opx-panel-b.flush{padding:0}
+.opx-grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}
+@media(max-width:1100px){.opx-grid2{grid-template-columns:1fr}}
 
-/* NFC-tab filter reuse: .nft-tabs gets inline border:0;margin:0 → become full pills */
-.nft-tabs[style] .nft-tab{border-radius:var(--r-pill)}
-.nft-tabs[style] .nft-tab.active{background:var(--accent-soft);color:var(--accent1)}
-.nft-tabs[style] .nft-tab.active::after{display:none}
+/* ── TABLES ───────────────────────────────────────────────────────────────── */
+.opx-tablewrap{overflow:auto}
+.opx-table{width:100%;border-collapse:collapse;font-size:13px}
+.opx-table thead th{
+  position:sticky;top:0;z-index:1;text-align:left;padding:9px 14px;white-space:nowrap;
+  font:600 10.5px/1.2 var(--sans);letter-spacing:.6px;text-transform:uppercase;color:var(--t3);
+  background:var(--panel-2);border-bottom:1px solid var(--line);
+}
+.opx-table tbody td{padding:11px 14px;border-bottom:1px solid var(--line);color:var(--t1);vertical-align:middle;white-space:nowrap}
+.opx-table tbody tr{transition:background .1s;cursor:default}
+.opx-table tbody tr.click{cursor:pointer}
+.opx-table tbody tr:hover{background:var(--panel-2)}
+.opx-table tbody tr:last-child td{border-bottom:0}
+.opx-table .num{text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.opx-table td.empty,.opx-empty{color:var(--t3);text-align:center;padding:34px 14px;font-size:13px}
+.opx-id{font-family:var(--mono);font-size:11.5px;color:var(--t2)}
+.opx-idcell{display:flex;align-items:center;gap:9px;min-width:0}
+.opx-av{width:26px;height:26px;border-radius:7px;flex:none;object-fit:cover;background:var(--panel-3)}
+.opx-av.round{border-radius:50%}
+.opx-strong{font-weight:600;color:var(--t1)}
+.opx-copy{cursor:pointer;color:var(--t4);font-size:11px;transition:.1s}
+.opx-copy:hover{color:var(--ac)}
 
-/* ── 6. PANELS ─────────────────────────────────────────────────────────────── */
-.nft-panel{
-  position:relative;overflow:hidden;
-  padding:20px;margin-bottom:16px;border-radius:var(--r-lg);
-  background:var(--surface-2);backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
-  border:1px solid var(--border-glass);
-  box-shadow:var(--shadow-md), var(--inset-top);
-}
-.nft-panel h3{
-  margin:0 0 14px;
-  font:600 16px/1.2 var(--font-display);letter-spacing:-.2px;color:var(--text);
-  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
-}
-.nft-panel h3 .nft-muted{font:400 12.5px/1.3 var(--font-body);color:var(--muted)}
-.nft-grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
-@media(max-width:1080px){.nft-grid2{grid-template-columns:1fr}}
+/* filter bar */
+.opx-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.opx-seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:var(--r1);padding:2px;gap:2px}
+.opx-seg button{border:0;background:transparent;color:var(--t3);font:600 12px/1 var(--sans);padding:6px 11px;border-radius:5px;cursor:pointer}
+.opx-seg button.on{background:var(--panel-3);color:var(--t1)}
+.opx-inp{height:34px;padding:0 11px;border-radius:var(--r1);background:var(--bg);border:1px solid var(--line);color:var(--t1);font:400 13px/1 var(--sans)}
+.opx-inp:focus{outline:none;border-color:var(--ac-line);box-shadow:0 0 0 3px var(--ac-soft)}
+textarea.opx-inp{height:auto;min-height:76px;padding:9px 11px;resize:vertical;line-height:1.45;width:100%}
+select.opx-inp{cursor:pointer}
 
-/* ── 7. CARDS ──────────────────────────────────────────────────────────────── */
-.nft-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-.nft-card{
-  position:relative;overflow:hidden;text-align:left;
-  border-radius:var(--r-lg);
-  background:var(--surface-2);backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
-  border:1px solid var(--border-glass);
-  box-shadow:var(--shadow-sm), var(--inset-top);
-  transition:transform var(--dur) var(--ease), box-shadow var(--dur), border-color var(--dur);
-}
-.nft-card::before{
-  content:"";position:absolute;top:0;left:0;right:0;height:2px;z-index:2;
-  background:hsl(var(--h) 80% 60%);opacity:.55;
-}
-.nft-card:hover{
-  transform:translateY(-3px);
-  box-shadow:var(--shadow-md), var(--inset-top);
-  border-color:color-mix(in srgb, hsl(var(--h) 80% 60%) 45%, var(--border-glass));
-}
-.nft-card-btn{
-  display:block;width:100%;font:inherit;padding:0;cursor:pointer;
-  color:inherit;background:var(--surface-2);border:0;
-}
-.nft-cardimg{position:relative;aspect-ratio:1/1;overflow:hidden;background:var(--bg2)}
-.nft-thumb{width:100%;height:100%;object-fit:cover;display:block}
-.nft-noimg{
-  display:grid;place-items:center;width:100%;height:100%;
-  font:400 38px/1 var(--font-display);color:var(--text-faint);
-  background:radial-gradient(120% 120% at 50% 20%, hsl(var(--h) 40% 22% /.5), var(--bg2));
-}
-.nft-cardmeta{padding:12px 13px 13px}
-.nft-cardmeta b{
-  display:flex;align-items:center;gap:6px;
-  font:600 14.5px/1.25 var(--font-display);color:var(--text);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.nft-cardmeta .nft-muted{display:block;margin-top:3px;font-size:11.5px;color:var(--muted)}
+/* ── PILLS / DOTS ─────────────────────────────────────────────────────────── */
+.opx-pill{display:inline-flex;align-items:center;gap:5px;font:600 11px/1 var(--sans);padding:3px 9px;border-radius:99px;
+  color:var(--mut);background:var(--mut-bg);border:1px solid var(--line-2);white-space:nowrap}
+.opx-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.opx-pill.ok{color:var(--ok);background:var(--ok-bg);border-color:rgba(63,185,80,.3)}
+.opx-pill.warn{color:var(--warn);background:var(--warn-bg);border-color:rgba(216,160,42,.3)}
+.opx-pill.bad{color:var(--bad);background:var(--bad-bg);border-color:rgba(248,81,73,.3)}
+.opx-pill.info{color:var(--info);background:var(--info-bg);border-color:rgba(88,166,255,.3)}
+.opx-pill.nodot::before{display:none}
 
-/* Magnitude option (NEXUS) — lift intensity by --t rather than card size */
-.nft-card[style*="--t"]:hover{box-shadow:var(--shadow-md), var(--inset-top)}
+/* ── BUTTONS ──────────────────────────────────────────────────────────────── */
+.opx-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:34px;padding:0 14px;border-radius:var(--r1);
+  cursor:pointer;font:600 12.5px/1 var(--sans);border:1px solid var(--line-2);background:var(--panel-2);color:var(--t1);transition:.12s;white-space:nowrap}
+.opx-btn:hover{border-color:var(--line-3);background:var(--panel-3)}
+.opx-btn.pri{background:var(--ac);border-color:var(--ac);color:#08121f}
+.opx-btn.pri:hover{filter:brightness(1.08)}
+.opx-btn.danger{color:var(--bad);border-color:rgba(248,81,73,.4)}
+.opx-btn.danger:hover{background:var(--bad-bg);border-color:var(--bad)}
+.opx-btn.sm{height:28px;padding:0 10px;font-size:12px}
+.opx-btn:disabled{opacity:.5;cursor:default}
+.opx-btn.ghost{background:transparent}
+.opx-mini{height:26px;padding:0 9px;border-radius:6px;cursor:pointer;font:600 11.5px/1 var(--sans);border:1px solid var(--line-2);background:transparent;color:var(--t2);transition:.1s}
+.opx-mini:hover{color:var(--ac);border-color:var(--ac-line);background:var(--ac-soft)}
+.opx-mini.danger{color:var(--bad);border-color:rgba(248,81,73,.35)}
+.opx-mini.danger:hover{background:var(--bad-bg);border-color:var(--bad)}
+.opx-rowacts{display:flex;gap:6px;justify-content:flex-end}
 
-/* Inline thumb + label (dealers) */
-.nft-inline{display:flex;align-items:center;gap:9px;min-width:0}
-.nft-inline .nft-thumb{width:28px;height:28px;border-radius:var(--r-sm);object-fit:cover;flex:none}
-.nft-inline b{font:600 13px/1.2 var(--font-display);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ── SLIDE-OVER ───────────────────────────────────────────────────────────── */
+.opx-over{position:fixed;inset:0;z-index:80;display:none;background:rgba(4,5,8,.5);backdrop-filter:blur(2px)}
+.opx-over.open{display:block;animation:opxfade .15s ease}
+@keyframes opxfade{from{opacity:0}to{opacity:1}}
+.opx-sheet{position:absolute;top:0;right:0;height:100%;width:min(540px,96vw);background:var(--bg-2);border-left:1px solid var(--line-2);
+  box-shadow:var(--sh-3);display:flex;flex-direction:column;transform:translateX(100%);animation:opxslide .26s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes opxslide{to{transform:none}}
+.opx-sheet-h{display:flex;align-items:flex-start;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.opx-sheet-h .ttl{font:650 17px/1.2 var(--sans);letter-spacing:-.3px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.opx-sheet-h .meta{font-size:12px;color:var(--t3);margin-top:5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.opx-sheet-x{margin-left:auto;width:32px;height:32px;flex:none;border:0;background:var(--panel);border-radius:var(--r1);color:var(--t2);cursor:pointer;font-size:14px;display:grid;place-items:center}
+.opx-sheet-x:hover{color:var(--t1);background:var(--panel-2)}
+.opx-sheet-b{flex:1;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+.opx-sheet-acts{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;background:var(--bg-2)}
+.opx-facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r2);overflow:hidden}
+.opx-fact{background:var(--panel);padding:11px 13px}
+.opx-fact .k{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--t3);font-weight:600}
+.opx-fact .v{font-size:14px;color:var(--t1);margin-top:4px;font-weight:550;word-break:break-word}
+.opx-sec-t{font:600 11px/1 var(--sans);letter-spacing:.8px;text-transform:uppercase;color:var(--t3);margin:2px 0 2px}
 
-/* ── 8. TABLES ─────────────────────────────────────────────────────────────── */
-.nft-table{width:100%;border-collapse:collapse;font-size:12.5px}
-.nft-table th{
-  position:sticky;top:0;z-index:1;text-align:left;
-  padding:10px 12px;
-  font:600 10.5px/1.2 var(--font-body);letter-spacing:.6px;text-transform:uppercase;
-  color:var(--muted);
-  background:var(--surface-2);backdrop-filter:var(--blur-sm);-webkit-backdrop-filter:var(--blur-sm);
-  border-bottom:1px solid var(--border);
-}
-.nft-table td{padding:11px 12px;color:var(--text);border-bottom:1px solid var(--border);vertical-align:middle}
-.nft-table tbody tr{transition:background var(--dur-fast)}
-.nft-table tbody tr:hover{background:var(--surface-1)}
-.nft-table tbody tr:last-child td{border-bottom:0}
-.nft-table td.num,.nft-table th.num{
-  text-align:right;
-  font-family:var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:-.01em;
-}
-.nft-table td[colspan]{color:var(--muted);text-align:center;padding:18px 12px}
+/* timeline */
+.opx-tl{display:flex;flex-direction:column;gap:0;position:relative;padding-left:6px}
+.opx-tl-i{display:flex;gap:11px;padding:8px 0;position:relative}
+.opx-tl-i::before{content:"";position:absolute;left:4px;top:18px;bottom:-8px;width:1px;background:var(--line-2)}
+.opx-tl-i:last-child::before{display:none}
+.opx-tl-dot{width:9px;height:9px;border-radius:50%;background:var(--ac);flex:none;margin-top:5px;z-index:1;box-shadow:0 0 0 3px var(--bg-2)}
+.opx-tl-c .tt{font-size:13px;color:var(--t1)}
+.opx-tl-c .td{font-size:11px;color:var(--t3);margin-top:1px}
 
-/* ── 9. CHIPS & TEXT UTILITIES ─────────────────────────────────────────────── */
-.nft-chip{
-  display:inline-flex;align-items:center;gap:5px;
-  font:600 11px/1 var(--font-body);
-  padding:3px 9px;border-radius:var(--r-pill);
-  color:var(--muted);background:var(--surface-1);
-  border:1px solid var(--border-glass);white-space:nowrap;
-}
-.nft-chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.9}
-.nft-chip.ok{color:var(--ok);background:var(--ok-wash);border-color:color-mix(in srgb, var(--ok) 30%, transparent)}
-.nft-chip.warn{color:var(--warn);background:var(--warn-wash);border-color:color-mix(in srgb, var(--warn) 30%, transparent)}
-.nft-chip.bad{color:var(--danger);background:var(--danger-wash);border-color:color-mix(in srgb, var(--danger) 30%, transparent)}
-.nft-chip.info{color:var(--blue);background:var(--blue-wash);border-color:color-mix(in srgb, var(--blue) 30%, transparent)}
-.nft-chip.special{color:var(--violet-st);background:var(--violet-st-wash);border-color:color-mix(in srgb, var(--violet-st) 30%, transparent)}
+/* ── INBOX / CHAT ─────────────────────────────────────────────────────────── */
+.opx-inbox{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 56px - 104px);min-height:440px;border:1px solid var(--line);border-radius:var(--r3);overflow:hidden;background:var(--panel)}
+@media(max-width:820px){.opx-inbox{grid-template-columns:1fr}}
+.opx-convs{border-right:1px solid var(--line);overflow:auto;background:var(--bg-2)}
+.opx-conv{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.opx-conv:hover{background:var(--panel)}
+.opx-conv.on{background:var(--ac-soft)}
+.opx-conv .cp{font-size:13px;font-weight:600;color:var(--t1);display:flex;align-items:center;gap:7px}
+.opx-conv .cm{font-size:11.5px;color:var(--t3)}
+.opx-thread{display:flex;flex-direction:column;min-width:0}
+.opx-thread-h{padding:13px 16px;border-bottom:1px solid var(--line);font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+.opx-msgs{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.opx-msg{max-width:74%;padding:9px 13px;border-radius:13px;font-size:13px;line-height:1.45}
+.opx-msg.them{align-self:flex-start;background:var(--panel-2);border:1px solid var(--line);border-bottom-left-radius:4px}
+.opx-msg.me{align-self:flex-end;background:var(--ac);color:#08121f;border-bottom-right-radius:4px}
+.opx-msg .mt{font-size:10px;opacity:.6;margin-top:4px}
+.opx-compose{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:var(--bg-2)}
+.opx-compose input{flex:1}
 
-.nft-muted{color:var(--muted);font-size:12.5px}
+/* ── COMMAND PALETTE ──────────────────────────────────────────────────────── */
+.opx-cmd{position:fixed;inset:0;z-index:120;display:none;align-items:flex-start;justify-content:center;padding-top:14vh;
+  background:rgba(4,5,8,.55);backdrop-filter:blur(3px)}
+.opx-cmd.open{display:flex;animation:opxfade .12s ease}
+.opx-cmd-box{width:min(620px,94vw);background:var(--panel-2);border:1px solid var(--line-2);border-radius:var(--r3);
+  box-shadow:var(--sh-3);overflow:hidden;transform:translateY(-8px);animation:opxpop .18s ease forwards}
+@keyframes opxpop{to{transform:none}}
+.opx-cmd-in{width:100%;height:52px;padding:0 18px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--t1);font:400 16px/1 var(--sans)}
+.opx-cmd-in:focus{outline:none}
+.opx-cmd-list{max-height:50vh;overflow:auto;padding:6px}
+.opx-cmd-i{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--r1);cursor:pointer;font-size:13.5px;color:var(--t2)}
+.opx-cmd-i .ic{width:18px;text-align:center}
+.opx-cmd-i.sel{background:var(--ac-soft);color:#fff}
+.opx-cmd-i .hint{margin-left:auto;font:600 10px/1 var(--mono);color:var(--t4)}
 
-.nft-warn{
-  display:flex;align-items:flex-start;gap:8px;
-  padding:11px 13px;border-radius:var(--r-md);
-  color:var(--warn);background:var(--warn-wash);
-  border:1px solid color-mix(in srgb, var(--warn) 28%, transparent);
-  font-size:12.5px;line-height:1.4;
-}
+/* ── CONFIRM MODAL ────────────────────────────────────────────────────────── */
+.opx-modal{position:fixed;inset:0;z-index:130;display:grid;place-items:center;padding:20px;background:rgba(4,5,8,.6);backdrop-filter:blur(3px)}
+.opx-modal-box{width:min(440px,96vw);background:var(--panel-2);border:1px solid var(--line-2);border-radius:var(--r3);box-shadow:var(--sh-3);padding:22px}
+.opx-modal-box h4{margin:0 0 8px;font:650 17px/1.2 var(--sans)}
+.opx-modal-box p{margin:0 0 14px;font-size:13.5px;color:var(--t2);line-height:1.5}
+.opx-modal-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 
-.nft-locked{
-  display:flex;align-items:center;gap:7px;
-  padding:11px 13px;border-radius:var(--r-md);
-  color:var(--muted);background:var(--surface-1);
-  border:1px dashed var(--border-hi);font-size:12.5px;
-}
+/* ── SKELETON ─────────────────────────────────────────────────────────────── */
+.opx-sk{border-radius:6px;background:linear-gradient(100deg,var(--panel) 30%,var(--panel-3) 50%,var(--panel) 70%);background-size:200% 100%;animation:opxsh 1.3s infinite}
+@keyframes opxsh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.opx-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:50px;color:var(--t3);font-size:13px}
+.opx-spin{width:18px;height:18px;border:2px solid var(--line-3);border-top-color:var(--ac);border-radius:50%;animation:opxspin .7s linear infinite}
+@keyframes opxspin{to{transform:rotate(360deg)}}
 
-.nft-loading{
-  display:grid;place-items:center;gap:10px;
-  padding:40px;color:var(--muted);font-size:12.5px;
-}
-.nft-spin{
-  width:22px;height:22px;border-radius:50%;
-  border:2.5px solid var(--border-hi);border-top-color:var(--accent1);
-  animation:nftspin .8s linear infinite;
-}
-@keyframes nftspin{to{transform:rotate(360deg)}}
-
-/* ── 10. PRIVILEGE TILES ───────────────────────────────────────────────────── */
-.nft-privgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-.nft-priv{
-  display:flex;flex-direction:column;gap:5px;
-  padding:14px;border-radius:var(--r-md);
-  background:var(--surface-1);border:1px solid var(--border-glass);
-  box-shadow:var(--inset-top);
-}
-.nft-priv .pv-l{font:600 13px/1.2 var(--font-display);color:var(--text)}
-.nft-priv .pv-lock{display:inline-flex;align-items:center;gap:5px;font:600 11px/1.2 var(--font-body);color:var(--warn)}
-.nft-priv .pv-n{font-size:11.5px;line-height:1.4;color:var(--muted)}
-
-/* ── 11. ADMIN & CONTROLS ──────────────────────────────────────────────────── */
-.nft-adm-ok{
-  display:flex;align-items:center;gap:8px;
-  padding:11px 14px;margin-bottom:14px;border-radius:var(--r-md);
-  font:600 13px/1.3 var(--font-body);
-  color:var(--ok);background:var(--ok-wash);
-  border:1px solid color-mix(in srgb, var(--ok) 28%, transparent);
-}
-.nft-adm-ok::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);flex:none}
-
-.nft-adm-warn{
-  display:flex;align-items:center;gap:8px;
-  padding:11px 14px;margin-bottom:14px;border-radius:var(--r-md);
-  font:600 13px/1.3 var(--font-body);
-  color:var(--warn);background:var(--warn-wash);
-  border:1px solid color-mix(in srgb, var(--warn) 28%, transparent);
-}
-.nft-adm-warn code{
-  font-family:var(--font-mono);color:var(--text);
-  background:var(--surface-1);padding:1px 6px;border-radius:var(--r-xs);
-}
-
-.nft-adm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-.nft-adm-card{
-  display:flex;flex-direction:column;gap:10px;
-  padding:16px;border-radius:var(--r-lg);
-  background:var(--surface-2);backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
-  border:1px solid var(--border-glass);
-  box-shadow:var(--shadow-sm), var(--inset-top);
-}
-.nft-adm-card h4{margin:0 0 2px;font:600 15px/1.2 var(--font-display);color:var(--text)}
-
-.nft-in{
-  width:100%;height:38px;padding:0 12px;
-  border-radius:var(--r-sm);
-  background:var(--bg2);color:var(--text);
-  border:1px solid var(--border);
-  font:400 13px/1 var(--font-body);
-  transition:border-color var(--dur), box-shadow var(--dur), background var(--dur);
-}
-.nft-in::placeholder{color:var(--text-faint)}
-.nft-in:focus{
-  outline:none;border-color:var(--accent1);
-  background:var(--panel-hi);box-shadow:var(--focus-halo);
-}
-textarea.nft-in{height:auto;min-height:84px;padding:10px 12px;resize:vertical;line-height:1.45}
-select.nft-in{
-  appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:30px;
-  background-image:
-    linear-gradient(45deg,transparent 50%,var(--muted) 50%),
-    linear-gradient(135deg,var(--muted) 50%,transparent 50%);
-  background-position:calc(100% - 16px) 17px, calc(100% - 11px) 17px;
-  background-size:5px 5px, 5px 5px;
-  background-repeat:no-repeat;
-}
-
-.nft-adm-btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:7px;
-  height:38px;padding:0 16px;border:0;cursor:pointer;
-  border-radius:var(--r-sm);
-  font:600 13px/1 var(--font-body);color:#04121A;
-  background:linear-gradient(120deg, var(--accent3), var(--accent2) 45%, var(--accent1));
-  box-shadow:0 6px 18px rgba(25,211,255,.28);
-  transition:transform var(--dur), box-shadow var(--dur), filter var(--dur);
-}
-.nft-adm-btn:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(25,211,255,.4);filter:brightness(1.04)}
-.nft-adm-btn:active{transform:translateY(0)}
-.nft-adm-btn:focus-visible{outline:none;box-shadow:var(--focus-ring)}
-
-.nft-adm-sep{height:1px;background:var(--border);margin:4px 0;border:0}
-
-.nft-adm-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto;padding-right:2px}
-.nft-adm-row{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:9px 11px;border-radius:var(--r-sm);
-  background:var(--surface-1);border:1px solid var(--border-glass);
-  transition:background var(--dur-fast);
-}
-.nft-adm-row:hover{background:var(--panel-hi)}
-
-.nft-adm-mini{
-  height:30px;padding:0 11px;border-radius:var(--r-sm);cursor:pointer;
-  font:600 12px/1 var(--font-body);
-  color:var(--text);background:transparent;
-  border:1px solid var(--border-hi);
-  transition:color var(--dur), border-color var(--dur), background var(--dur);
-}
-.nft-adm-mini:hover{color:var(--accent1);border-color:var(--accent1);background:var(--accent-soft)}
-.nft-adm-mini:focus-visible{outline:none;box-shadow:var(--focus-halo)}
-/* danger variant for unlink / deactivate / revoke */
-.nft-adm-mini[data-nfc="deactivate"],
-.nft-adm-mini[data-nfc="unlink"]{
-  color:var(--danger);
-  border-color:color-mix(in srgb, var(--danger) 40%, var(--border-hi));
-}
-.nft-adm-mini[data-nfc="deactivate"]:hover,
-.nft-adm-mini[data-nfc="unlink"]:hover{background:var(--danger-wash);border-color:var(--danger);color:var(--danger)}
-
-/* ── 12. ATLAS / CONSTELLATION MAP ─────────────────────────────────────────── */
-.nft-map{
-  position:relative;overflow:hidden;border-radius:var(--r-lg);
-  background:
-    radial-gradient(1200px 760px at 50% 44%, rgba(28,58,68,.32), transparent 70%),
-    var(--bg2);
-  border:1px solid var(--border-glass);
-  box-shadow:var(--inset-top);
-}
-.nft-map svg{display:block;width:100%;height:auto}
-
-/* connector base; JS sets stroke + stroke-dasharray per status */
-.nft-map line,
-.nft-map path.link{fill:none;stroke-linecap:round;transition:opacity .25s}
-
-/* nodes */
-.nft-mapnode{cursor:pointer}
-.nft-mapnode circle{transition:filter var(--dur), opacity .25s}
-.nft-mapnode:hover circle{filter:drop-shadow(0 0 8px var(--accent1)) drop-shadow(0 0 3px var(--accent1))}
-.nft-mapnode text{
-  fill:var(--muted);font-family:var(--font-display);font-size:12px;
-  paint-order:stroke;stroke:var(--bg2);stroke-width:3.5px;stroke-linejoin:round;
-}
-.nft-mapnode.dim{opacity:.14}
-.nft-mapnode.dimfocus{opacity:.05}
-
-/* hub */
-.nft-hub{fill:var(--accent3)}
-.nft-hub-label{fill:var(--text);font-family:var(--font-display);font-size:13px;letter-spacing:.06em}
-
-/* problem-node + hub pulse rings */
-.nft-pulse{
-  transform-box:fill-box;transform-origin:center;
-  animation:nftpulsering 2.2s ease-out infinite;
-}
-@keyframes nftpulsering{0%{opacity:.5;transform:scale(.7)}70%,100%{opacity:0;transform:scale(1.9)}}
-
-/* ── 13. MODAL / SLIDE-OVER SHEET ──────────────────────────────────────────── */
-.nft-modal{
-  position:fixed;inset:0;z-index:90;display:none;
-  align-items:center;justify-content:center;padding:24px;
-  background:rgba(5,7,13,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
-}
-.nft-modal.open{display:flex;animation:nftfade var(--dur) var(--ease)}
-@keyframes nftfade{from{opacity:0}to{opacity:1}}
-
-.nft-modal-box{
-  position:relative;
-  width:min(560px,94vw);max-height:88vh;
-  display:flex;flex-direction:column;overflow:hidden;
-  border-radius:var(--r-xl);
-  background:var(--surface-3);backdrop-filter:var(--blur-lg);-webkit-backdrop-filter:var(--blur-lg);
-  border:1px solid var(--border-glass-strong);
-  box-shadow:var(--shadow-lg), var(--inset-top);
-  transform:translateY(12px) scale(.98);
-  animation:nftpop var(--dur-slow) var(--ease-spring) forwards;
-}
-.nft-modal-box::before{
-  content:"";position:absolute;top:0;left:0;right:0;height:2px;z-index:2;
-  background:var(--accent-grad);opacity:.6;
-}
-@keyframes nftpop{to{transform:none}}
-
-.nft-modal-head{
-  display:flex;align-items:center;justify-content:space-between;gap:12px;
-  padding:18px 20px;border-bottom:1px solid var(--border);
-}
-.nft-modal-head b{font:600 15px/1.2 var(--font-display);color:var(--text)}
-.nft-modal-x{
-  width:34px;height:34px;flex:none;border:0;cursor:pointer;
-  border-radius:var(--r-sm);display:grid;place-items:center;
-  color:var(--muted);background:transparent;font-size:15px;
-  transition:color var(--dur), background var(--dur);
-}
-.nft-modal-x:hover{background:var(--surface-1);color:var(--text)}
-.nft-modal-body{flex:1;overflow:auto;padding:18px 20px}
-
-/* cert list (also reused for chat messages) */
-.nft-cert-list{display:flex;flex-direction:column;gap:10px}
-.nft-cert{
-  padding:13px 14px;border-radius:var(--r-md);
-  background:var(--surface-1);border:1px solid var(--border-glass);
-}
-.nft-cert-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
-
-/* chat */
-.nft-chatbox{
-  display:flex;gap:9px;padding:14px 20px;
-  border-top:1px solid var(--border);
-  background:var(--surface-3);
-}
-.nft-chatbox .nft-in{flex:1}
-
-/* sign-in variant: dock-right slide-over rather than centered */
-.nft-modal.nft-signin{align-items:stretch;justify-content:flex-end;padding:0}
-.nft-modal.nft-signin .nft-modal-box{
-  margin-left:auto;height:100vh;max-height:100vh;width:min(420px,94vw);
-  border-radius:var(--r-2xl) 0 0 var(--r-2xl);
-  transform:translateX(4%);
-  animation:nftslide var(--dur-slow) var(--ease-spring) forwards;
-}
-@keyframes nftslide{to{transform:none}}
-
-/* ── 14. DETAIL HEADER / BACK ──────────────────────────────────────────────── */
-.nft-detail-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
-.nft-detail-head h3{
-  margin:0;font:600 18px/1.2 var(--font-display);letter-spacing:-.2px;color:var(--text);
-  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
-}
-.nft-detail-head h3 .nft-muted{font:400 12.5px/1.3 var(--font-body);color:var(--muted)}
-.nft-back{
-  display:inline-flex;align-items:center;gap:6px;
-  height:34px;padding:0 13px;border-radius:var(--r-sm);cursor:pointer;
-  font:600 12.5px/1 var(--font-body);color:var(--muted);
-  background:var(--surface-1);border:1px solid var(--border-glass);
-  transition:color var(--dur), border-color var(--dur), background var(--dur);
-}
-.nft-back:hover{color:var(--accent1);border-color:var(--accent1);background:var(--accent-soft)}
-.nft-back:focus-visible{outline:none;box-shadow:var(--focus-halo)}
-
-/* ── 14b. CONTROL-CENTER SHELL (sidebar layout) ────────────────────────────── */
-.nfc-shell{display:grid;grid-template-columns:252px minmax(0,1fr);gap:22px;align-items:start}
-.nfc-aside{
-  position:sticky;top:14px;align-self:start;
-  display:flex;flex-direction:column;gap:14px;
-  padding:16px 14px;border-radius:var(--r-xl);
-  background:var(--surface-2);backdrop-filter:var(--blur-md);-webkit-backdrop-filter:var(--blur-md);
-  border:1px solid var(--border-glass);box-shadow:var(--shadow-md), var(--inset-top);
-}
-.nfc-brand{display:flex;align-items:center;gap:11px;padding:4px 6px 12px;border-bottom:1px solid var(--border)}
-.nfc-brand .nfc-logo{
-  width:38px;height:38px;flex:none;border-radius:11px;display:grid;place-items:center;font-size:19px;
-  background:linear-gradient(135deg,var(--accent3),var(--accent1));box-shadow:0 6px 18px rgba(25,211,255,.3);
-}
-.nfc-brand .nfc-bt{display:flex;flex-direction:column;gap:2px;min-width:0}
-.nfc-brand .nfc-bt b{font:600 14px/1 var(--font-display);color:var(--text);letter-spacing:-.2px}
-.nfc-brand .nfc-bt span{font:600 9.5px/1 var(--font-body);letter-spacing:1.3px;text-transform:uppercase;color:var(--muted)}
-.nfc-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 4px}
-.nfc-nav{display:flex;flex-direction:column;gap:3px;overflow:auto;max-height:calc(100vh - 220px);padding-right:2px}
-.nfc-grp-h{font:600 9.5px/1 var(--font-body);letter-spacing:1.5px;text-transform:uppercase;color:var(--text-faint);padding:14px 8px 6px}
-.nfc-link{
-  position:relative;display:flex;align-items:center;gap:10px;
-  padding:9px 11px;border-radius:var(--r-sm);cursor:pointer;border:0;background:transparent;text-align:left;width:100%;
-  font:600 12.8px/1.1 var(--font-body);color:var(--muted);
-  transition:color var(--dur), background var(--dur);
-}
-.nfc-link .nfc-ico{font-size:15px;width:20px;text-align:center;flex:none}
-.nfc-link .nfc-badge{
-  margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:var(--r-pill);
-  display:grid;place-items:center;font:700 10.5px/1 var(--font-display);
-  color:#1a0f00;background:var(--warn);box-shadow:0 0 8px var(--warn-wash);
-}
-.nfc-link:hover{color:var(--text);background:var(--surface-1)}
-.nfc-link.on{color:var(--accent1);background:var(--accent-soft)}
-.nfc-link.on::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:3px;background:var(--accent1);box-shadow:0 0 10px var(--accent1)}
-.nfc-main{min-width:0}
-.nfc-viewhead{margin:2px 0 18px}
-.nfc-viewhead h1{margin:0;font:600 25px/1.1 var(--font-display);letter-spacing:-.4px;color:var(--text);display:flex;align-items:center;gap:11px;flex-wrap:wrap}
-.nfc-viewhead p{margin:6px 0 0;font-size:12.8px;color:var(--muted);max-width:72ch}
-.nfc-burger{display:none}
-
-/* contextual KPI tones */
-.nft-kpi.rev::before{background:var(--ok);opacity:.8}
-.nft-kpi.amber::before{background:var(--warn);opacity:.8}
-.nft-kpi.bad::before{background:var(--danger);opacity:.8}
-.nft-kpi .s{font:500 11px/1.3 var(--font-body);color:var(--text-faint)}
-
-/* one-time claim-code reveal + terminal command block */
-.nfc-codes{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11.5px;margin-top:10px}
-.nfc-codes th{text-align:left;padding:7px 10px;font:600 10px/1 var(--font-body);letter-spacing:.6px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
-.nfc-codes td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap}
-.nfc-codes td .code{color:var(--accent1);font-weight:600;letter-spacing:.5px}
-.nfc-once{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 var(--font-body);color:var(--warn);margin:2px 0 0}
-.nfc-cmd{
-  margin-top:12px;padding:12px 14px;border-radius:var(--r-md);
-  background:#06090F;border:1px solid var(--border);
-  font-family:var(--font-mono);font-size:11.5px;color:var(--accent1);
-  white-space:pre-wrap;word-break:break-all;position:relative;
-}
-.nfc-prov{display:grid;grid-template-columns:1fr;gap:12px}
-.nfc-prov-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.nfc-prov-meta{min-width:0;flex:1 1 260px}
-.nfc-prov-meta .pm-t{font:600 15px/1.2 var(--font-display);color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.nfc-prov-meta .pm-s{display:flex;gap:12px;flex-wrap:wrap;margin-top:7px;font-size:12px;color:var(--muted)}
-.nfc-prov-meta .pm-s b{color:var(--text);font-family:var(--font-display)}
-.nfc-prov-act{display:flex;flex-direction:column;gap:7px;align-items:stretch;flex:0 0 200px;max-width:240px}
-.nfc-row-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
-.nfc-seg{display:inline-flex;gap:6px;align-items:center}
-.nfc-seg .nft-in{width:auto;min-width:90px}
+/* ── CHART (bars) ─────────────────────────────────────────────────────────── */
+.opx-bars{display:flex;align-items:flex-end;gap:3px;height:120px;padding:4px 0}
+.opx-bar{flex:1;background:linear-gradient(180deg,var(--ac),var(--ac-2));border-radius:3px 3px 0 0;min-height:2px;opacity:.55;transition:opacity .12s}
+.opx-bar:hover{opacity:1}
 
 /* attention queue */
-.nfc-attn{display:flex;flex-direction:column;gap:14px}
-.nfc-attn .a-head{display:flex;align-items:center;gap:9px;margin:0 0 10px;font:600 14.5px/1.2 var(--font-display);color:var(--text)}
-.nfc-attn .a-head .nft-chip{margin-left:2px}
-.nfc-empty-ok{display:flex;align-items:center;gap:8px;color:var(--ok);font-size:12.5px;font-weight:600}
-.nfc-tablewrap{overflow:auto;border-radius:var(--r-md);border:1px solid var(--border)}
-.nfc-tablewrap .nft-table th{border-radius:0}
+.opx-attn{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.opx-attn-c{display:flex;flex-direction:column;gap:8px;padding:15px;border-radius:var(--r3);background:var(--panel);border:1px solid var(--line);cursor:pointer;transition:.14s}
+.opx-attn-c:hover{border-color:var(--line-3);transform:translateY(-2px);box-shadow:var(--sh-2)}
+.opx-attn-c .n{font:680 26px/1 var(--sans);letter-spacing:-.5px}
+.opx-attn-c .lbl{font-size:12.5px;color:var(--t2);display:flex;align-items:center;gap:7px}
+.opx-attn-c.hot .n{color:var(--bad)} .opx-attn-c.warm .n{color:var(--warn)} .opx-attn-c.calm .n{color:var(--ok)}
+.opx-attn-c .go{font-size:11px;color:var(--t3);margin-top:auto}
 
-@media(max-width:880px){
-  .nfc-shell{grid-template-columns:1fr}
-  .nfc-aside{position:relative;top:0}
-  .nfc-nav{max-height:none}
-  .nfc-prov-act{flex-basis:auto;max-width:none}
+.opx-toast-wrap{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center}
+.opx-toast{padding:10px 16px;border-radius:var(--r2);font:600 13px/1.3 var(--sans);background:var(--panel-3);border:1px solid var(--line-2);color:var(--t1);box-shadow:var(--sh-2);animation:opxtoast .2s ease}
+.opx-toast.ok{border-color:rgba(63,185,80,.4)} .opx-toast.bad{border-color:rgba(248,81,73,.45)} .opx-toast.warn{border-color:rgba(216,160,42,.4)}
+@keyframes opxtoast{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* responsive */
+@media(max-width:920px){
+  .opx-shell{grid-template-columns:1fr}
+  .opx-rail{position:fixed;left:0;top:0;z-index:60;transform:translateX(-100%);transition:transform .2s;width:236px}
+  .opx-rail.open{transform:none}
+  .opx-burger{display:inline-grid !important}
 }
-
-/* ── 15. VIEW TRANSITIONS · RESPONSIVE · REDUCED MOTION ────────────────────── */
-.nft-body > .view,
-.nft-body > section,
-.nft-body > div{animation:nftview .35s var(--ease) both}
-@keyframes nftview{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-
-@media(max-width:920px){.nft-kpis{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:680px){
-  .nftsite{padding:16px}
-  .nft-kpis{grid-template-columns:repeat(2,1fr)}
-  .nft-grid2{grid-template-columns:1fr}
-  .nft-title{font-size:24px}
-}
-
-@media(prefers-reduced-motion:reduce){
-  .nftsite *{animation-duration:.001s !important;transition-duration:.001s !important}
-  .nft-pulse,.nft-live::before{animation:none}
-  .nft-spin{animation-duration:1.6s !important}
-  .nft-live::before{opacity:.9}
-}
+.opx-burger{display:none}
+@media(prefers-reduced-motion:reduce){.opx *{animation-duration:.001s !important;transition-duration:.001s !important}}
