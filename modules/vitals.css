@@ -10,8 +10,9 @@
 /* who-am-i chip in the view-head actions */
 .vitals-who{
   display:inline-flex;align-items:center;gap:7px;
-  font-size:11.5px;font-weight:600;color:var(--text-muted);
-  padding:5px 11px;border:1px solid var(--border);border-radius:20px;background:var(--panel)}
+  font-size:12px;font-weight:600;color:var(--text-muted);
+  padding:5px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
 
 /* severity colour helpers (shared) */
 .vitals-ok{color:var(--success)!important}
@@ -32,8 +33,8 @@
 .vitals-ring-num{font-family:var(--font-display);font-size:44px;font-weight:600;letter-spacing:-1px;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
 .vitals-ring-lbl{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;color:var(--text-faint);margin-top:5px;text-transform:uppercase}
 
-.vitals-rec-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
-.vitals-mini{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border)}
+.vitals-rec-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.vitals-mini{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
 .vitals-mini-k{font-family:var(--font-mono);font-size:8.5px;letter-spacing:1.5px;color:var(--text-faint)}
 .vitals-mini-v{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text)}
 
@@ -71,21 +72,22 @@
 .vitals-field-k em{font-style:normal;color:var(--accent1);font-weight:600}
 .vitals-actmult{font-style:normal;color:var(--accent1);font-weight:600}
 
-.vitals-field-in{display:flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:0 11px;transition:border-color .16s var(--ease)}
-.vitals-field-in:focus-within{border-color:var(--border-hi);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent1) 25%,transparent)}
+.vitals-field-in{display:flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:0 11px;transition:border-color .16s var(--ease)}
+.vitals-field-in:hover{border-color:var(--line-2)}
+.vitals-field-in:focus-within{border-color:var(--accent1);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent1) 28%,transparent)}
 .vitals-field-in input{flex:1;width:100%;background:none;border:none;outline:none;color:var(--text);font-family:var(--font-display);font-size:19px;font-weight:600;padding:9px 0;font-variant-numeric:tabular-nums}
 .vitals-field-in input::-webkit-outer-spin-button,.vitals-field-in input::-webkit-inner-spin-button{opacity:.4}
 .vitals-field-in em{font-style:normal;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
 
 /* segmented sex/activity */
-.vitals-seg{display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
+.vitals-seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px}
 .vitals-seg button{flex:1;font-size:12px;font-weight:600;color:var(--text-muted);padding:8px 10px;border-radius:6px;transition:.15s var(--ease)}
 .vitals-seg button:hover{color:var(--text)}
 .vitals-seg button.active{background:var(--panel-hi);color:var(--accent1);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent1) 30%,transparent)}
 
 .vitals-act{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-.vitals-act button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 4px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);transition:.15s var(--ease)}
-.vitals-act button:hover{border-color:var(--border-hi);color:var(--text)}
+.vitals-act button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 4px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text-muted);transition:border-color .15s var(--ease),color .15s var(--ease)}
+.vitals-act button:hover{border-color:var(--line-3);color:var(--text)}
 .vitals-act button b{font-size:11px;font-weight:600}
 .vitals-act button small{font-family:var(--font-mono);font-size:9px;color:var(--text-faint)}
 .vitals-act button.active{border-color:transparent;background:linear-gradient(180deg,color-mix(in srgb,var(--accent1) 16%,var(--panel-hi)),var(--panel));color:var(--text);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent1) 38%,transparent),0 0 16px var(--weather)}
@@ -94,8 +96,8 @@
 @media (max-width:560px){.vitals-act{grid-template-columns:repeat(2,1fr)}}
 
 /* live results column */
-.vitals-results{display:flex;flex-direction:column;gap:10px}
-.vitals-result{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:13px 15px}
+.vitals-results{display:flex;flex-direction:column;gap:8px}
+.vitals-result{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
 .vitals-result--hero{background:linear-gradient(140deg,color-mix(in srgb,var(--accent1) 12%,var(--panel-hi)),var(--panel));border-color:var(--border-hi);box-shadow:0 0 22px var(--weather)}
 .vitals-result-k{font-family:var(--font-mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);display:flex;align-items:baseline;gap:7px}
 .vitals-result-k small{font-size:9px;color:var(--text-faint);letter-spacing:1px}
@@ -105,7 +107,7 @@
 
 /* formula readout — the code is nowrap, so the row scrolls internally on
    narrow screens (min-width:0 lets it shrink instead of pushing the card). */
-.vitals-formula{display:flex;align-items:center;gap:11px;margin-top:14px;padding:11px 13px;border-radius:var(--radius-sm);background:var(--bg);border:1px solid var(--border);overflow-x:auto;min-width:0}
+.vitals-formula{display:flex;align-items:center;gap:11px;margin-top:16px;padding:12px 13px;border-radius:8px;background:var(--bg);border:1px solid var(--line);overflow-x:auto;min-width:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
 .vitals-formula code{min-width:0}
 .vitals-formula-tag{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;color:var(--text-faint);flex:none}
 .vitals-formula code{font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);white-space:nowrap}
@@ -118,7 +120,7 @@
 .vitals-bmi-cat{text-align:center;font-family:var(--font-display);font-size:15px;font-weight:600;margin-bottom:14px}
 
 .vitals-bmi-scale{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-bottom:18px}
-.vitals-bmi-seg{height:34px;border-radius:6px;background:color-mix(in srgb,var(--c) 22%,var(--bg2));border:1px solid color-mix(in srgb,var(--c) 35%,transparent);display:grid;place-items:center}
+.vitals-bmi-seg{height:34px;border-radius:8px;background:color-mix(in srgb,var(--c) 22%,var(--bg2));border:1px solid color-mix(in srgb,var(--c) 35%,transparent);display:grid;place-items:center}
 .vitals-bmi-seg span{font-family:var(--font-mono);font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:color-mix(in srgb,var(--c) 75%,var(--text))}
 .vitals-bmi-marker{position:absolute;top:-6px;width:3px;height:46px;background:var(--text);border-radius:3px;box-shadow:0 0 10px var(--text);transition:left .5s var(--ease);transform:translateX(-50%)}
 .vitals-bmi-marker::before{content:'';position:absolute;top:-5px;left:50%;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--text)}
@@ -126,8 +128,8 @@
 
 /* ── 4. CALENDAR STRESS ─────────────────────────────────────────────────── */
 .vitals-stress-list{display:flex;flex-direction:column;gap:8px}
-.vitals-ev{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--border-hi);transition:border-color .16s var(--ease),transform .16s var(--ease)}
-.vitals-ev:hover{transform:translateX(2px);border-color:var(--border-hi)}
+.vitals-ev{display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--border-hi);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);transition:border-color .16s var(--ease)}
+.vitals-ev:hover{border-color:var(--line-3)}
 .vitals-ev--warn{border-left-color:var(--warn);background:linear-gradient(90deg,color-mix(in srgb,var(--warn) 6%,transparent),var(--bg2))}
 .vitals-ev--bad{border-left-color:var(--danger);background:linear-gradient(90deg,color-mix(in srgb,var(--danger) 7%,transparent),var(--bg2))}
 .vitals-ev-time{display:flex;flex-direction:column;font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text);min-width:46px;line-height:1.25;font-variant-numeric:tabular-nums}
@@ -136,7 +138,7 @@
 .vitals-ev-body{flex:1;min-width:0}
 .vitals-ev-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vitals-ev-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
-.vitals-rtag{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:2px 6px}
+.vitals-rtag{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
 .vitals-rtag.ok{color:var(--success);border-color:color-mix(in srgb,var(--success) 30%,transparent)}
 .vitals-ev-score{font-family:var(--font-display);font-size:18px;font-weight:600;min-width:34px;text-align:right;flex:none;font-variant-numeric:tabular-nums}
 
@@ -144,16 +146,16 @@
 .vitals-advice{display:flex;flex-direction:column}
 .vitals-advice-ring{display:grid;place-items:center;margin:2px 0 8px}
 .vitals-advice-ring .chart{height:132px;width:132px}
-.vitals-advice-text{font-size:12.5px;line-height:1.55;color:var(--text-muted);padding:11px 12px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--accent3);margin-bottom:11px}
+.vitals-advice-text{font-size:13px;line-height:1.55;color:var(--text-muted);padding:12px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--accent3);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);margin-bottom:12px}
 .vitals-advice-rows .stat-row{padding:8px 0}
 
 /* ── 6. DEVICES ─────────────────────────────────────────────────────────── */
-.vitals-dev-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.vitals-dev-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (max-width:560px){.vitals-dev-grid{grid-template-columns:1fr}}
-.vitals-dev{display:flex;align-items:center;gap:11px;padding:12px 13px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border);transition:border-color .16s var(--ease),transform .16s var(--ease)}
-.vitals-dev:hover{transform:translateY(-1px);border-color:var(--border-hi)}
+.vitals-dev{display:flex;align-items:center;gap:11px;padding:12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);transition:border-color .16s var(--ease)}
+.vitals-dev:hover{border-color:var(--line-3)}
 .vitals-dev--on{border-color:color-mix(in srgb,var(--da) 45%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--da) 9%,var(--bg2)),var(--bg2));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--da) 22%,transparent)}
-.vitals-dev-ico{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:20px;background:var(--panel);border:1px solid var(--border);flex:none}
+.vitals-dev-ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--text-muted);background:var(--panel);border:1px solid var(--line);flex:none}
 .vitals-dev--on .vitals-dev-ico{border-color:color-mix(in srgb,var(--da) 40%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--da) 30%,transparent)}
 .vitals-dev-body{flex:1;min-width:0}
 .vitals-dev-name{font-size:13px;font-weight:600;color:var(--text)}
@@ -169,11 +171,12 @@
 }
 
 /* ── v2 additions: TDEE targets + live wearable metric tiles ─────────────── */
-.vitals-target-rows{margin-top:6px;display:flex;flex-direction:column;gap:4px}
-.vitals-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;padding:4px 2px 2px}
-.vitals-metric{background:var(--bg2,rgba(255,255,255,.03));border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:14px 12px;text-align:center}
-.vitals-metric b{display:block;font-family:var(--font-display,inherit);font-size:24px;font-weight:600;color:var(--text,#fff);line-height:1.1}
-.vitals-metric span{display:block;margin-top:5px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-faint,#8aa4bc)}
+.vitals-target-rows{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.vitals-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;padding:4px 2px 2px}
+.vitals-metric{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:16px 12px;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);transition:border-color .16s var(--ease)}
+.vitals-metric:hover{border-color:var(--line-3)}
+.vitals-metric b{display:block;font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--text);line-height:1.1;font-variant-numeric:tabular-nums}
+.vitals-metric span{display:block;margin-top:5px;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-faint)}
 
 /* ════════════════════════════════════════════════════════════════════════
    v3 — REAL hub-backed tracker: header chip, Today HUD (dynamic budget),
@@ -194,9 +197,9 @@
 .vitals-hud-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:18px;align-items:stretch}
 @media (max-width:880px){.vitals-hud-grid{grid-template-columns:1fr}}
 
-.vitals-hud-budget{display:flex;align-items:center;gap:18px;min-width:0;
+.vitals-hud-budget{display:flex;align-items:center;gap:16px;min-width:0;
   background:linear-gradient(140deg,color-mix(in srgb,var(--accent1) 9%,var(--bg2)),var(--bg2));
-  border:1px solid var(--border-hi);border-radius:var(--radius-sm);padding:16px 18px}
+  border:1px solid var(--border-hi);border-radius:12px;padding:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
 .vitals-hud-rings{flex:none}
 .vitals-ring--sm{width:150px;height:150px;margin:0}
 .vitals-ring--sm svg{width:150px;height:150px}
@@ -205,7 +208,7 @@
 .vitals-hud-budget-v small{font-family:var(--font-mono);font-size:10px;letter-spacing:1px;color:var(--text-muted);font-weight:400}
 
 .vitals-budget-bd{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
-.vitals-bd-pill{font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--text);background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:3px 8px;white-space:nowrap}
+.vitals-bd-pill{font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .vitals-bd-pill.is-cut{color:var(--accent2);border-color:color-mix(in srgb,var(--accent2) 35%,transparent)}
 .vitals-bd-pill.is-gain{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
 .vitals-bd-pill.is-move{color:var(--success);border-color:color-mix(in srgb,var(--success) 35%,transparent)}
@@ -213,9 +216,9 @@
 .vitals-hud-tip{font-size:11.5px;line-height:1.5;color:var(--text-muted);margin-top:11px}
 .vitals-hud-tip b{color:var(--text)}
 
-.vitals-hud-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;align-content:start}
-.vitals-tile{display:flex;flex-direction:column;gap:3px;padding:13px 14px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border);transition:border-color .16s var(--ease)}
-.vitals-tile:hover{border-color:var(--border-hi)}
+.vitals-hud-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;align-content:start}
+.vitals-tile{display:flex;flex-direction:column;gap:3px;padding:13px 14px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);transition:border-color .16s var(--ease)}
+.vitals-tile:hover{border-color:var(--line-3)}
 .vitals-tile b{font-family:var(--font-display);font-size:23px;font-weight:600;letter-spacing:-.5px;color:var(--text);font-variant-numeric:tabular-nums;line-height:1}
 .vitals-tile span{font-family:var(--font-mono);font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-faint)}
 .vitals-tile--ok b{color:var(--success)}
@@ -225,14 +228,14 @@
 .vitals-hud-foot a:hover{text-decoration:underline}
 
 /* offline/info banner */
-.vitals-banner{margin-bottom:var(--gap);padding:11px 14px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border);font-size:12.5px;color:var(--text-muted)}
+.vitals-banner{margin-bottom:var(--gap);padding:12px 14px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);font-size:13px;color:var(--text-muted)}
 
 /* ── QUICK LOG + WORKOUT FORM ────────────────────────────────────────────── */
 .vitals-quick{display:flex;flex-direction:column;gap:10px}
 .vitals-quick-row{display:flex;align-items:center;gap:9px}
 .vitals-quick-row .vitals-field-in{flex:1}
 .vitals-quick-row .btn{flex:none}
-.vitals-hr{border:0;height:1px;background:var(--border);margin:15px 0}
+.vitals-hr{border:0;height:1px;background:var(--line-2);margin:16px 0}
 
 .vitals-wk-form{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .vitals-wk-form .nft-in{height:38px}
@@ -243,9 +246,9 @@
 
 /* ── RECENT WORKOUTS LIST ────────────────────────────────────────────────── */
 #vit-wk-list{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto;padding-right:2px}
-.vitals-wk-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--bg2);border:1px solid var(--border);transition:border-color .16s var(--ease),transform .16s var(--ease)}
-.vitals-wk-item:hover{transform:translateX(2px);border-color:var(--border-hi)}
-.vitals-wk-ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:var(--panel);border:1px solid var(--border);flex:none}
+.vitals-wk-item{display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);transition:border-color .16s var(--ease)}
+.vitals-wk-item:hover{border-color:var(--line-3)}
+.vitals-wk-ico{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;color:var(--text-muted);background:var(--panel);border:1px solid var(--line);flex:none}
 .vitals-wk-main{flex:1;min-width:0}
 .vitals-wk-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .vitals-wk-sub{font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);margin-top:2px;font-variant-numeric:tabular-nums}

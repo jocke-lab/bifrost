@@ -1,27 +1,96 @@
-/* team.css — Access management. Rides on nft-site.css tokens/classes. */
-.team-reg .team-regrow{display:grid;grid-template-columns:1.4fr 1.2fr .9fr auto;gap:10px;align-items:center}
-@media (max-width:760px){ .team-reg .team-regrow{grid-template-columns:1fr} }
-.team-in{background:rgba(255,255,255,.04);border:1px solid var(--border-hi,rgba(255,255,255,.12));border-radius:10px;
-  padding:10px 12px;color:var(--text,#eaf2fb);font-size:13.5px;outline:none;width:100%;box-sizing:border-box}
-.team-in:focus{border-color:var(--accent1,#19D3FF);box-shadow:0 0 0 3px rgba(25,211,255,.15)}
-.team-hint{font-size:12px;color:var(--text-faint,#8aa4bc);margin:11px 2px 0}
-.team-hint.warn{color:#ffb4a2}
-.team-hint.ok{color:#6ee7b7}
+/* ============================================================================
+   team.css — "Access" management. Rides on kit.css (.nftsite + .nft-* tokens).
+   Quiet aurora: hairline + inset top-sheen at rest, ONE hover (border brighten),
+   no idle animation. 8px rhythm · 8/12/16 radii · type ramp 11/12/13/14.
+   Only references core/kit CSS variables — never hardcodes new hex.
+   ========================================================================== */
 
+/* register-a-person row */
+.team-reg .team-regrow{
+  display:grid;grid-template-columns:1.4fr 1.2fr .9fr auto;gap:8px;align-items:center;
+}
+@media (max-width:760px){ .team-reg .team-regrow{grid-template-columns:1fr} }
+
+/* inputs/selects — match kit .nft-in recipe (hairline at rest, accent halo on focus) */
+.team-in{
+  width:100%;box-sizing:border-box;height:38px;padding:0 12px;
+  border-radius:var(--r-sm);
+  background:var(--bg2);color:var(--text);
+  border:1px solid var(--border);
+  font:400 13px/1 var(--font-body);
+  outline:none;
+  transition:border-color var(--dur), box-shadow var(--dur), background var(--dur);
+}
+.team-in::placeholder{color:var(--text-faint)}
+.team-in:focus{
+  border-color:var(--accent1);
+  background:var(--panel-hi);
+  box-shadow:var(--focus-halo);
+}
+
+/* hint line under the register row */
+.team-hint{font-size:12px;color:var(--muted);margin:12px 2px 0;line-height:1.4}
+.team-hint.warn{color:var(--warn)}
+.team-hint.ok{color:var(--ok)}
+
+/* people table */
 .team-table td{vertical-align:middle}
-.team-person{display:flex;align-items:center;gap:11px}
-.team-av{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:12px;font-weight:700;color:#04121a;
-  background:linear-gradient(120deg,#7C5CFF,#19D3FF 60%,#46E6A6);flex:0 0 auto}
-.team-name{font-weight:600;color:var(--text,#eaf2fb)}
+.team-person{display:flex;align-items:center;gap:12px}
+.team-av{
+  width:34px;height:34px;border-radius:var(--r-sm);flex:0 0 auto;
+  display:grid;place-items:center;
+  font:700 12px/1 var(--font-display);color:var(--bg);
+  font-variant-numeric:tabular-nums;
+  background:var(--accent-grad);
+}
+.team-name{font:600 13px/1.2 var(--font-display);color:var(--text)}
 .team-email{font-size:12px}
-.team-rolesel{background:rgba(255,255,255,.04);border:1px solid var(--border,rgba(255,255,255,.10));border-radius:9px;
-  padding:6px 9px;color:var(--text,#eaf2fb);font-size:12.5px;outline:none;cursor:pointer}
-.team-rolesel:focus{border-color:var(--accent1,#19D3FF)}
+
+/* inline role picker — quiet secondary control */
+.team-rolesel{
+  height:32px;padding:0 9px;border-radius:var(--r-sm);cursor:pointer;
+  background:var(--surface-1);color:var(--text);
+  border:1px solid var(--border-glass);
+  font:500 12.5px/1 var(--font-body);
+  outline:none;
+  transition:border-color var(--dur), background var(--dur);
+}
+.team-rolesel:hover{border-color:var(--border-glass-strong)}
+.team-rolesel:focus{border-color:var(--accent1);box-shadow:var(--focus-halo)}
+
 .team-actions{text-align:right;white-space:nowrap}
 
-/* safe fallbacks in case a button/chip variant isn't defined by nft-site.css */
-.nftsite .nft-btn.sm{padding:6px 11px;font-size:12px}
-.nftsite .nft-btn.danger{background:rgba(255,99,99,.14);border-color:rgba(255,99,99,.4);color:#ffb4a2}
-.nftsite .nft-chip.ok{color:#6ee7b7;border-color:rgba(110,231,183,.4)}
-.nftsite .nft-chip.warn{color:#ffd79a;border-color:rgba(255,196,109,.4)}
-.nftsite .nft-chip.bad{color:#ffb4a2;border-color:rgba(255,99,99,.4)}
+/* ── BUTTONS (kit.css defines no base .nft-btn — define it here, scoped) ───── */
+.nftsite .nft-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:38px;padding:0 16px;border:1px solid var(--border-hi);cursor:pointer;
+  border-radius:var(--r-sm);
+  font:600 13px/1 var(--font-body);color:var(--text);
+  background:var(--surface-1);
+  box-shadow:var(--inset-top);
+  transition:border-color var(--dur), background var(--dur), color var(--dur);
+}
+.nftsite .nft-btn:hover{border-color:var(--border-glass-strong)}
+.nftsite .nft-btn:focus-visible{outline:none;box-shadow:var(--focus-halo)}
+.nftsite .nft-btn .ic{width:15px;height:15px}
+
+/* primary — accent fill, dark ink (single hover = brighten) */
+.nftsite .nft-btn.primary{
+  border-color:var(--accent1);color:var(--ac-ink,#04121A);
+  background:linear-gradient(120deg, var(--accent3), var(--accent2) 45%, var(--accent1));
+  box-shadow:0 6px 18px rgba(25,211,255,.28);
+}
+.nftsite .nft-btn.primary:hover{filter:brightness(1.04);box-shadow:0 10px 26px rgba(25,211,255,.4)}
+
+/* small + danger variants */
+.nftsite .nft-btn.sm{height:30px;padding:0 11px;font-size:12px}
+.nftsite .nft-btn.danger{
+  color:var(--danger);background:transparent;
+  border-color:color-mix(in srgb, var(--danger) 40%, var(--border-hi));
+}
+.nftsite .nft-btn.danger:hover{background:var(--danger-wash);border-color:var(--danger)}
+
+/* chip variant fallbacks (in case kit ordering differs) — route through tokens */
+.nftsite .nft-chip.ok{color:var(--ok);background:var(--ok-wash);border-color:color-mix(in srgb, var(--ok) 30%, transparent)}
+.nftsite .nft-chip.warn{color:var(--warn);background:var(--warn-wash);border-color:color-mix(in srgb, var(--warn) 30%, transparent)}
+.nftsite .nft-chip.bad{color:var(--danger);background:var(--danger-wash);border-color:color-mix(in srgb, var(--danger) 30%, transparent)}

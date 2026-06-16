@@ -1,70 +1,102 @@
-/* connect.js — Connections hub styles (on-theme via core tokens + fallbacks). */
-.conn { padding: 4px 2px 48px; }
-.conn-head { margin-bottom: 16px; }
-.conn-title { font-family: var(--font-display, 'Space Grotesk', sans-serif); font-size: 28px; font-weight: 600; margin: 0; color: var(--text, #eaf2f8); }
-.conn-sub { color: var(--muted, #8aa4bc); margin: 6px 0 0; font-size: 13px; }
-.conn-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border, rgba(255, 255, 255, .08)); margin-bottom: 18px; }
-.conn-tab { background: none; border: none; color: var(--muted, #8aa4bc); font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 10px 10px 0 0; cursor: pointer; display: flex; align-items: center; gap: 7px; border-bottom: 2px solid transparent; }
-.conn-tab:hover { color: var(--text, #eaf2f8); background: rgba(255, 255, 255, .03); }
-.conn-tab.active { color: var(--text, #eaf2f8); border-bottom-color: var(--accent1, #19D3FF); }
+/* ============================================================================
+   connect.css — "Connections" hub. Restyled to the quiet-aurora command deck
+   (converged with the OPX NFT console). Tokens from assets/core.css only — no
+   hardcoded hex. 1px hairline + inset top-sheen at rest, one hover (border
+   brighten), no idle motion. Type ramp 11/12/13/14/18/22/28, 8px rhythm,
+   radii 8/12/16, tabular-nums for ids/metrics.
+   ========================================================================== */
 
-.conn-note { background: rgba(245, 165, 36, .1); border: 1px solid rgba(245, 165, 36, .25); color: var(--warn, #F5A524); border-radius: 12px; padding: 12px 14px; font-size: 13px; margin-bottom: 16px; }
-.conn-muted { color: var(--muted, #8aa4bc); font-size: 12px; }
-.conn-ok { color: #46E6A6; font-size: 13px; font-weight: 600; }
-.conn-need { color: var(--warn, #F5A524); font-size: 12px; }
-.conn-need code, .conn-help code, .conn-need-panel code { background: rgba(255, 255, 255, .08); padding: 1px 6px; border-radius: 5px; font-size: 11px; font-family: var(--font-mono, monospace); }
+.conn { padding: 4px 2px 48px; color: var(--text); }
 
-.conn-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
-.conn-card { background: rgba(255, 255, 255, .025); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 16px; padding: 16px; }
-.conn-card-h { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--text, #eaf2f8); margin-bottom: 8px; }
-.conn-card p { color: var(--muted, #8aa4bc); font-size: 12px; margin: 0 0 12px; }
-.conn-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.conn-dot.on { background: #46E6A6; box-shadow: 0 0 8px rgba(70, 230, 166, .6); }
-.conn-dot.off { background: #4a5568; }
+/* -- HEAD -- */
+.conn-head { margin-bottom: 24px; }
+.conn-title { font: 640 22px/1.15 var(--font-display); letter-spacing: -.4px; margin: 0; color: var(--text); }
+.conn-sub { color: var(--text-faint); margin: 6px 0 0; font-size: 13px; max-width: 72ch; }
 
-.conn-btn { font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 9px; cursor: pointer; color: var(--text, #eaf2f8); background: rgba(255, 255, 255, .06); border: 1px solid var(--border, rgba(255, 255, 255, .12)); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-.conn-btn:hover { background: rgba(255, 255, 255, .1); }
-.conn-btn.primary { background: linear-gradient(120deg, var(--accent3, #7C5CFF), var(--accent1, #19D3FF)); border-color: transparent; color: #07111a; font-weight: 600; }
+/* -- TABS -- */
+.conn-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.conn-tab { background: none; border: none; color: var(--text-faint); font: 600 13px/1 var(--font-body); padding: 9px 14px; border-radius: 8px 8px 0 0; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid transparent; transition: color .12s; }
+.conn-tab .ic { color: currentColor; }
+.conn-tab:hover { color: var(--text); }
+.conn-tab.active { color: var(--text); border-bottom-color: var(--accent1); }
+.conn-tab.active .ic { color: var(--accent1); }
 
-.conn-help { margin-top: 20px; background: rgba(255, 255, 255, .02); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 14px; padding: 16px; }
-.conn-help h3 { margin: 0 0 10px; font-size: 14px; color: var(--text, #eaf2f8); }
+/* -- NOTE / TEXT TONES -- */
+.conn-note { display: flex; align-items: center; gap: 8px; background: var(--warn-bg); border: 1px solid var(--line); border-left: 2px solid var(--warn); color: var(--warn); border-radius: 8px; padding: 12px 14px; font-size: 13px; margin-bottom: 24px; }
+.conn-note .ic { color: currentColor; }
+.conn-muted { color: var(--text-faint); font-size: 12px; }
+.conn-ok { display: inline-flex; align-items: center; gap: 5px; color: var(--ok); font-size: 13px; font-weight: 600; }
+.conn-ok .ic { width: 13px; height: 13px; color: currentColor; }
+.conn-need { color: var(--warn); font-size: 12px; }
+.conn-need code, .conn-help code, .conn-need-panel code { background: var(--mut-bg); padding: 1px 6px; border-radius: 6px; font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); }
+
+/* -- CARDS -- */
+.conn-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 16px; }
+.conn-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); transition: border-color .15s; }
+.conn-card:hover { border-color: var(--line-3); }
+.conn-card-h { display: flex; align-items: center; gap: 8px; font: 600 14px/1.2 var(--font-body); color: var(--text); margin-bottom: 8px; }
+.conn-card p { color: var(--text-faint); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
+.conn-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex: none; }
+.conn-dot.on { background: var(--ok); }
+.conn-dot.off { background: var(--text-faint); }
+
+/* -- BUTTONS -- */
+.conn-btn { font: 600 12.5px/1 var(--font-body); padding: 0 14px; height: 36px; border-radius: 8px; cursor: pointer; color: var(--text); background: var(--panel-hi); border: 1px solid var(--line-2); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px; transition: border-color .12s; white-space: nowrap; }
+.conn-btn .ic { width: 15px; height: 15px; }
+.conn-btn:hover { border-color: var(--line-3); }
+.conn-btn.primary { background: var(--accent1); border-color: var(--accent1); color: var(--ac-ink); }
+.conn-btn.primary:hover { border-color: var(--line-3); }
+
+/* -- HELP PANEL -- */
+.conn-help { margin-top: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+.conn-help h3 { margin: 0 0 12px; font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
 .conn-help ul { margin: 0; padding-left: 18px; }
-.conn-help li { color: var(--muted, #8aa4bc); font-size: 12.5px; margin-bottom: 8px; line-height: 1.5; }
+.conn-help li { color: var(--text-muted); font-size: 12.5px; margin-bottom: 8px; line-height: 1.5; }
 
-.conn-need-panel, .conn-connect { text-align: center; padding: 40px 24px; background: rgba(255, 255, 255, .02); border: 1px dashed var(--border, rgba(255, 255, 255, .14)); border-radius: 16px; }
-.conn-need-ico { font-size: 38px; margin-bottom: 10px; }
-.conn-need-panel h3 { margin: 0 0 8px; color: var(--text, #eaf2f8); }
-.conn-need-panel p, .conn-connect p { color: var(--muted, #8aa4bc); font-size: 13px; max-width: 60ch; margin: 6px auto; line-height: 1.55; }
+/* -- EMPTY / CONNECT PROMPT -- */
+.conn-need-panel, .conn-connect { text-align: center; padding: 56px 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+.conn-need-ico { display: inline-flex; margin-bottom: 12px; color: var(--text-faint); opacity: .7; }
+.conn-need-ico .ic { width: 28px; height: 28px; }
+.conn-need-panel h3 { margin: 0 0 8px; font: 600 14px/1.2 var(--font-body); color: var(--text-muted); }
+.conn-need-panel p, .conn-connect p { color: var(--text-faint); font-size: 12.5px; max-width: 60ch; margin: 6px auto; line-height: 1.55; }
 
-.conn-loading { color: var(--muted, #8aa4bc); padding: 40px; text-align: center; }
-.conn-spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255, 255, 255, .2); border-top-color: var(--accent1, #19D3FF); border-radius: 50%; animation: connspin .7s linear infinite; vertical-align: middle; margin-right: 8px; }
+/* -- LOADING -- */
+.conn-loading { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-faint); padding: 50px; text-align: center; font-size: 13px; }
+.conn-spin { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--line-3); border-top-color: var(--accent1); border-radius: 50%; animation: connspin .7s linear infinite; vertical-align: middle; }
 @keyframes connspin { to { transform: rotate(360deg) } }
 
-/* slack */
-.conn-slack { display: grid; grid-template-columns: 220px 1fr; gap: 14px; height: 540px; }
+/* -- SLACK -- */
+.conn-slack { display: grid; grid-template-columns: 220px 1fr; gap: 16px; height: 540px; }
 @media (max-width: 720px) { .conn-slack { grid-template-columns: 1fr; height: auto; } }
-.conn-slack-side { background: rgba(255, 255, 255, .025); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 14px; padding: 12px; overflow: auto; }
-.conn-slack-team { font-weight: 600; color: var(--text, #eaf2f8); font-size: 13px; padding: 4px 6px 10px; }
-.conn-chan { width: 100%; text-align: left; background: none; border: none; color: var(--muted, #8aa4bc); font: inherit; font-size: 13px; padding: 7px 8px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; }
-.conn-chan:hover { background: rgba(255, 255, 255, .04); color: var(--text, #eaf2f8); }
-.conn-chan.active { background: rgba(25, 211, 255, .12); color: var(--text, #eaf2f8); }
-.conn-slack-main { display: flex; flex-direction: column; background: rgba(255, 255, 255, .025); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 14px; overflow: hidden; }
-.conn-msgs { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.conn-msg { font-size: 13px; color: var(--text, #eaf2f8); }
-.conn-msg b { color: var(--accent1, #19D3FF); margin-right: 8px; }
-.conn-composer { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border, rgba(255, 255, 255, .08)); }
-.conn-composer input { flex: 1; font: inherit; font-size: 13px; padding: 9px 12px; border-radius: 9px; background: rgba(255, 255, 255, .04); border: 1px solid var(--border, rgba(255, 255, 255, .12)); color: var(--text, #eaf2f8); }
+.conn-slack-side { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow: auto; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+.conn-slack-team { font: 600 13px/1.2 var(--font-body); color: var(--text); padding: 4px 6px 10px; }
+.conn-chan { width: 100%; text-align: left; background: none; border: none; color: var(--text-faint); font: 500 13px/1 var(--font-body); padding: 7px 8px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; transition: color .12s, background .12s; }
+.conn-chan:hover { background: rgba(255,255,255,.03); color: var(--text); }
+.conn-chan.active { background: var(--accent-soft); color: var(--text); }
+.conn-slack-main { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+.conn-msgs { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.conn-msg { font-size: 13px; line-height: 1.45; color: var(--text); }
+.conn-msg b { color: var(--accent1); margin-right: 8px; }
+.conn-composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.conn-composer input { flex: 1; height: 36px; font: 400 13px/1 var(--font-body); padding: 0 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); color: var(--text); transition: border-color .12s; }
+.conn-composer input::placeholder { color: var(--text-faint); }
+.conn-composer input:focus-visible { outline: none; border-color: var(--accent1); box-shadow: 0 0 0 2px rgba(25,211,255,.4); }
 
-/* google panels */
-.conn-panel { background: rgba(255, 255, 255, .025); border: 1px solid var(--border, rgba(255, 255, 255, .08)); border-radius: 16px; padding: 16px; }
-.conn-panel h3 { margin: 0 0 12px; font-size: 14px; color: var(--text, #eaf2f8); }
+/* -- GOOGLE PANELS -- */
+.conn-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); transition: border-color .15s; }
+.conn-panel:hover { border-color: var(--line-3); }
+.conn-panel h3 { margin: 0 0 12px; font: 600 14px/1.2 var(--font-body); color: var(--text); display: flex; align-items: center; gap: 8px; }
+.conn-panel h3 .ic { color: var(--text-faint); }
 .conn-rows { display: flex; flex-direction: column; }
-.conn-row { padding: 10px 4px; border-bottom: 1px solid rgba(255, 255, 255, .05); display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--text, #eaf2f8); }
+.conn-row { padding: 13px 4px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--text); }
+.conn-row:last-child { border-bottom: 0; }
 .conn-row b { font-weight: 600; }
-.conn-row a { color: var(--accent1, #19D3FF); text-decoration: none; }
-.conn-snip { color: var(--muted, #8aa4bc); font-size: 12px; }
+.conn-row a { color: var(--accent1); text-decoration: none; }
+.conn-row a:hover { text-decoration: underline; }
+.conn-snip { color: var(--text-faint); font-size: 12px; }
 
-.conn-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.conn-metrics div { background: rgba(255, 255, 255, .03); border-radius: 10px; padding: 10px; text-align: center; }
-.conn-metrics b { display: block; font-size: 20px; color: var(--text, #eaf2f8); font-family: var(--font-display, sans-serif); }
-.conn-metrics span { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted, #8aa4bc); }
+/* -- METRICS (KPI tiles) -- */
+.conn-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.conn-metrics div { background: var(--panel-hi); border: 1px solid var(--line); border-radius: 8px; padding: 12px; text-align: center; }
+.conn-metrics b { display: block; font: 600 28px/1.05 var(--font-display); letter-spacing: -.8px; color: var(--text); font-variant-numeric: tabular-nums; }
+.conn-metrics span { font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); margin-top: 6px; display: block; }

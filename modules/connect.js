@@ -7,19 +7,19 @@
 (function () {
   const H = window.HELM;
   const TABS = [
-    { id: 'overview', label: 'Overview', icon: '🔌' },
-    { id: 'slack', label: 'Slack', icon: '💬' },
-    { id: 'calendar', label: 'Calendar', icon: '📅' },
-    { id: 'gmail', label: 'Gmail', icon: '✉️' },
-    { id: 'drive', label: 'Drive', icon: '📁' },
-    { id: 'wearables', label: 'Wearables', icon: '⌚' }
+    { id: 'overview', label: 'Overview', icon: window.icon('plug') },
+    { id: 'slack', label: 'Slack', icon: window.icon('inbox') },
+    { id: 'calendar', label: 'Calendar', icon: window.icon('calendar') },
+    { id: 'gmail', label: 'Gmail', icon: window.icon('mail') },
+    { id: 'drive', label: 'Drive', icon: window.icon('fileText') },
+    { id: 'wearables', label: 'Wearables', icon: window.icon('activity') }
   ];
   let active = 'overview', rootEl = null, status = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function fmtDate(s) { if (!s) return ''; const d = new Date(isNaN(s) ? s : Number(s)); return isNaN(d) ? '' : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
   async function api(path, opts) { opts = opts || {}; try { let token = null; try { const s = window.DB && window.DB.auth ? await window.DB.auth.getSession() : null; token = s && s.access_token; } catch (e) {} const headers = Object.assign({}, opts.headers || {}); if (token) headers.Authorization = 'Bearer ' + token; const r = await fetch(path, Object.assign({}, opts, { headers })); const t = await r.text(); try { return JSON.parse(t); } catch (e) { return { ok: false, _offline: true }; } } catch (e) { return { ok: false, _offline: true, error: e.message }; } }
   const dot = on => `<span class="conn-dot ${on ? 'on' : 'off'}"></span>`;
-  const needPanel = (title, html) => `<div class="conn-need-panel"><div class="conn-need-ico">🔌</div><h3>Connect ${esc(title)}</h3><p>${html}</p><p class="conn-muted">Add the env var(s) in Vercel → project <b>bifrost</b> → Settings → Environment Variables, then redeploy.</p></div>`;
+  const needPanel = (title, html) => `<div class="conn-need-panel"><div class="conn-need-ico">${window.icon('plug')}</div><h3>Connect ${esc(title)}</h3><p>${html}</p><p class="conn-muted">Add the env var(s) in Vercel → project <b>bifrost</b> → Settings → Environment Variables, then redeploy.</p></div>`;
   const section = (title, rows) => `<section class="conn-panel"><h3>${title}</h3><div class="conn-rows">${rows}</div></section>`;
   const emptyRow = t => `<div class="conn-row conn-muted">${esc(t)}</div>`;
 
@@ -52,12 +52,12 @@
     const i = (status && status.integrations) || {};
     const offline = status && status._offline;
     body.innerHTML = `
-      ${offline ? `<div class="conn-note">⚠ The serverless API isn't reachable here (local preview). On the live site <b>bifrostlkl.com</b> these light up automatically.</div>` : ''}
+      ${offline ? `<div class="conn-note">${window.icon('alertTriangle')} The serverless API isn't reachable here (local preview). On the live site <b>bifrostlkl.com</b> these light up automatically.</div>` : ''}
       <div class="conn-cards">
         <div class="conn-card">
           <div class="conn-card-h">${dot(i.nft_admin)}<b>NFT platform admin</b></div>
           <p>Create dealers, approve collections, mint certificates, link NFC — the whole circle.</p>
-          <div class="conn-status">${i.nft_admin ? '<span class="conn-ok">● Connected</span>' : '<span class="conn-need">needs <code>OPULENCE_TECH_SERVICE_ROLE</code></span>'}</div>
+          <div class="conn-status">${i.nft_admin ? '<span class="conn-ok">' + window.icon('dot') + ' Connected</span>' : '<span class="conn-need">needs <code>OPULENCE_TECH_SERVICE_ROLE</code></span>'}</div>
         </div>
         <div class="conn-card">
           <div class="conn-card-h">${dot(i.slack)}<b>Slack</b></div>
@@ -67,7 +67,7 @@
         <div class="conn-card">
           <div class="conn-card-h">${dot(i.google)}<b>Google Workspace</b></div>
           <p>Calendar, Gmail and Drive, unified.</p>
-          <div class="conn-status">${i.google ? '<a class="conn-btn primary" href="/api/google-start">🔗 Connect Google</a>' : '<span class="conn-need">needs <code>GOOGLE_CLIENT_ID</code> + <code>SECRET</code></span>'}</div>
+          <div class="conn-status">${i.google ? '<a class="conn-btn primary" href="/api/google-start">' + window.icon('link') + ' Connect Google</a>' : '<span class="conn-need">needs <code>GOOGLE_CLIENT_ID</code> + <code>SECRET</code></span>'}</div>
         </div>
         <div class="conn-card">
           <div class="conn-card-h">${dot(i.whoop || i.oura)}<b>Wearables</b></div>
@@ -133,11 +133,11 @@
     if (!i.google) { body.innerHTML = needPanel('Google', 'In Google Cloud, enable Gmail/Calendar/Drive APIs, create an OAuth web client (redirect <code>https://bifrostlkl.com/api/google-callback</code>), then add <code>GOOGLE_CLIENT_ID</code> + <code>GOOGLE_CLIENT_SECRET</code>.'); return; }
     body.innerHTML = `<div class="conn-loading"><span class="conn-spin"></span> Loading Google…</div>`;
     const hud = await api('/api/google-hud');
-    if (hud.ok && hud.connected === false) { body.innerHTML = `<div class="conn-connect"><div class="conn-need-ico">🔗</div><p>Google is configured — connect your account to see your ${esc(which)}.</p><a class="conn-btn primary" href="/api/google-start">Connect Google</a></div>`; return; }
+    if (hud.ok && hud.connected === false) { body.innerHTML = `<div class="conn-connect"><div class="conn-need-ico">${window.icon('link')}</div><p>Google is configured — connect your account to see your ${esc(which)}.</p><a class="conn-btn primary" href="/api/google-start">Connect Google</a></div>`; return; }
     if (!hud.ok) { body.innerHTML = needPanel('Google', 'Error: <code>' + esc(hud.error || 'unknown') + '</code>'); return; }
-    if (which === 'calendar') body.innerHTML = section('📅 Upcoming · ' + esc(hud.email || ''), (hud.calendar || []).map(e => `<div class="conn-row"><b>${esc(e.summary || '(no title)')}</b><span class="conn-muted">${esc(fmtDate(e.start))}${e.location ? ' · ' + esc(e.location) : ''}</span></div>`).join('') || emptyRow('No upcoming events'));
-    if (which === 'gmail') body.innerHTML = section('✉️ Inbox · ' + esc(hud.email || ''), (hud.gmail || []).map(m => `<div class="conn-row"><b>${esc(m.subject || '(no subject)')}</b><span class="conn-muted">${esc(m.from || '')}</span><span class="conn-snip">${esc(m.snippet || '')}</span></div>`).join('') || emptyRow('Inbox empty'));
-    if (which === 'drive') body.innerHTML = section('📁 Recent files · ' + esc(hud.email || ''), (hud.drive || []).map(f => `<div class="conn-row"><b><a href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener">${esc(f.name)}</a></b><span class="conn-muted">${esc(fmtDate(f.modifiedTime))}</span></div>`).join('') || emptyRow('No files'));
+    if (which === 'calendar') body.innerHTML = section(window.icon('calendar') + ' Upcoming · ' + esc(hud.email || ''), (hud.calendar || []).map(e => `<div class="conn-row"><b>${esc(e.summary || '(no title)')}</b><span class="conn-muted">${esc(fmtDate(e.start))}${e.location ? ' · ' + esc(e.location) : ''}</span></div>`).join('') || emptyRow('No upcoming events'));
+    if (which === 'gmail') body.innerHTML = section(window.icon('mail') + ' Inbox · ' + esc(hud.email || ''), (hud.gmail || []).map(m => `<div class="conn-row"><b>${esc(m.subject || '(no subject)')}</b><span class="conn-muted">${esc(m.from || '')}</span><span class="conn-snip">${esc(m.snippet || '')}</span></div>`).join('') || emptyRow('Inbox empty'));
+    if (which === 'drive') body.innerHTML = section(window.icon('fileText') + ' Recent files · ' + esc(hud.email || ''), (hud.drive || []).map(f => `<div class="conn-row"><b><a href="${esc(f.webViewLink || '#')}" target="_blank" rel="noopener">${esc(f.name)}</a></b><span class="conn-muted">${esc(fmtDate(f.modifiedTime))}</span></div>`).join('') || emptyRow('No files'));
   }
 
   async function paintWearables(body) {
@@ -152,11 +152,11 @@
         inner = key === 'whoop'
           ? `<div class="conn-metrics"><div><b>${data.recovery ?? '—'}%</b><span>Recovery</span></div><div><b>${data.hrv ? Math.round(data.hrv) : '—'}</b><span>HRV ms</span></div><div><b>${data.resting_hr ?? '—'}</b><span>RHR</span></div><div><b>${data.sleep_performance ?? '—'}%</b><span>Sleep</span></div></div>`
           : `<div class="conn-metrics"><div><b>${data.readiness ?? '—'}</b><span>Readiness</span></div><div><b>${data.sleep_score ?? '—'}</b><span>Sleep</span></div></div>`;
-      } else inner = `<a class="conn-btn primary" href="/api/${key}-start">🔗 Connect ${name}</a>`;
+      } else inner = `<a class="conn-btn primary" href="/api/${key}-start">${window.icon('link')} Connect ${name}</a>`;
       return `<div class="conn-card"><div class="conn-card-h">${dot(connected)}<b>${name}</b></div>${inner}</div>`;
     }
     body.innerHTML = `
-      ${hud && hud._offline ? `<div class="conn-note">⚠ Live on bifrostlkl.com — the API isn't reachable in this local preview.</div>` : ''}
+      ${hud && hud._offline ? `<div class="conn-note">${window.icon('alertTriangle')} Live on bifrostlkl.com — the API isn't reachable in this local preview.</div>` : ''}
       <div class="conn-cards">
         ${card('Whoop', 'whoop', hud && hud.whoop, 'WHOOP_CLIENT_ID')}
         ${card('Oura Ring', 'oura', hud && hud.oura, 'OURA_CLIENT_ID')}
@@ -167,5 +167,5 @@
       </ul></div>`;
   }
 
-  H.register({ id: 'connect', label: 'Connections', icon: '🔌', scope: 'company', render });
+  H.register({ id: 'connect', label: 'Connections', icon: window.icon('plug'), scope: 'company', render });
 })();

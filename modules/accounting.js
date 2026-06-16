@@ -15,13 +15,15 @@
 (function () {
   const H = window.HELM;
 
+  const ic = (k) => (window.icon ? window.icon(k) : '');
+
   const TABS = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'invoices', label: 'Invoices', icon: '🧾' },
-    { id: 'bills',    label: 'Bills',    icon: '📥' },
-    { id: 'expenses', label: 'Expenses', icon: '💳' },
-    { id: 'ledger',   label: 'Ledger',   icon: '📚' },
-    { id: 'export',   label: 'Export',   icon: '📤' }
+    { id: 'overview', label: 'Overview', icon: 'finance' },
+    { id: 'invoices', label: 'Invoices', icon: 'fileText' },
+    { id: 'bills',    label: 'Bills',    icon: 'download' },
+    { id: 'expenses', label: 'Expenses', icon: 'creditCard' },
+    { id: 'ledger',   label: 'Ledger',   icon: 'layers' },
+    { id: 'export',   label: 'Export',   icon: 'upload' }
   ];
 
   let active = 'overview';
@@ -86,10 +88,10 @@
     const el = (root || rootEl || document).querySelector('#acc-auth'); if (!el) return;
     let u = null; try { u = window.DB && window.DB.auth ? await window.DB.auth.getUser() : null; } catch (e) {}
     if (u && u.email) {
-      el.textContent = '✓ ' + u.email.split('@')[0]; el.classList.remove('off');
+      el.innerHTML = ic('check') + ' ' + esc(u.email.split('@')[0]); el.classList.remove('off');
       el.onclick = async () => { try { await window.DB.auth.signOut(); } catch (e) {} H.toast('Signed out', 'info'); updateAuthChip(); paint(); };
     } else {
-      el.textContent = '🔐 sign in'; el.classList.add('off');
+      el.innerHTML = ic('lock') + ' sign in'; el.classList.add('off');
       el.onclick = () => openSignIn();
     }
   }
@@ -99,7 +101,7 @@
     const ov = document.createElement('div'); ov.className = 'acc-modal signin open';
     ov.innerHTML = `
       <div class="acc-modal-box">
-        <div class="acc-modal-head"><b>🔐 Sign in to the books</b><button class="acc-modal-x" data-x>✕</button></div>
+        <div class="acc-modal-head"><b>${ic('lock')} Sign in to the books</b><button class="acc-modal-x" data-x>${ic('close')}</button></div>
         <div class="acc-modal-body">
           <p class="acc-muted" style="margin:0">Sign in with your admin email to manage Opulence Tech's accounting. One-time — just your email, no keys.</p>
           <div class="acc-field"><label>Email</label><input class="acc-in" id="acc-si-email" type="email" value="arivd.arvidsson@gmail.com"/></div>
@@ -121,7 +123,7 @@
       try {
         const r = await window.DB.auth.signInPassword(email, pass);
         if (r && r.error) { msg.textContent = r.error.message; return; }
-        H.toast('Signed in ✓', 'success'); close(); updateAuthChip(); paint();
+        H.toast('Signed in', 'success'); close(); updateAuthChip(); paint();
       } catch (e) { msg.textContent = e.message; }
     });
     ov.querySelector('#acc-si-magic').addEventListener('click', async () => {
@@ -138,10 +140,10 @@
     if (token) return true;
     body.innerHTML = `
       <div class="acc-gate">
-        <div class="g-mark">📒</div>
+        <div class="g-mark">${ic('finance')}</div>
         <h3>Sign in to manage the books</h3>
         <p>Accounting is admin-only. Sign in with your owner email to view invoices, bills, the ledger and run month-end.</p>
-        <button class="acc-btn" data-si>🔐 Sign in</button>
+        <button class="acc-btn" data-si>${ic('lock')} Sign in</button>
       </div>`;
     const b = body.querySelector('[data-si]'); if (b) b.onclick = () => openSignIn();
     return false;
@@ -149,9 +151,9 @@
 
   // shared {forbidden}/{_offline}/{error} renderer for a failed call
   function failNote(r) {
-    if (!r || r._offline) return `<div class="acc-note">⚠ Offline — the books run against the live hub edge function. Check your connection.</div>`;
-    if (r.forbidden) return `<div class="acc-warn">🔒 Admins only — your account isn't an owner of Opulence Tech's books.</div>`;
-    if (r.unauthorized) return `<div class="acc-warn">🔐 Session expired — sign in again to continue.</div>`;
+    if (!r || r._offline) return `<div class="acc-note">${ic('alertTriangle')} Offline — the books run against the live hub edge function. Check your connection.</div>`;
+    if (r.forbidden) return `<div class="acc-warn">${ic('lock')} Admins only — your account isn't an owner of Opulence Tech's books.</div>`;
+    if (r.unauthorized) return `<div class="acc-warn">${ic('lock')} Session expired — sign in again to continue.</div>`;
     return `<div class="acc-warn">${esc(r.error || 'Could not load.')}</div>`;
   }
 
@@ -161,7 +163,7 @@
     const ov = document.createElement('div'); ov.className = 'acc-modal open';
     ov.innerHTML = `
       <div class="acc-modal-box${opts.sm ? ' sm' : ''}">
-        <div class="acc-modal-head"><b>${esc(title)}</b><button class="acc-modal-x" data-x>✕</button></div>
+        <div class="acc-modal-head"><b>${esc(title)}</b><button class="acc-modal-x" data-x>${ic('close')}</button></div>
         <div class="acc-modal-body"></div>
         <div class="acc-modal-foot"><span class="msg"></span><div class="acc-actions"></div></div>
       </div>`;
@@ -189,14 +191,14 @@
         <header class="acc-head">
           <div class="acc-headmain">
             <h1 class="acc-title">Accounting
-              <span class="acc-live" id="acc-live">● live</span>
-              <span class="acc-live off auth" id="acc-auth" style="cursor:pointer">🔐 sign in</span>
+              <span class="acc-live" id="acc-live">live</span>
+              <span class="acc-live off auth" id="acc-auth" style="cursor:pointer">${ic('lock')} sign in</span>
             </h1>
             <p class="acc-sub">The books for <b>Opulence Tech AB</b> · SEK · moms (VAT) 25% default — fakturor, leverantörsfakturor, utgifter, verifikat &amp; export. <span class="acc-brandchip"><b>bifrost</b> · the bridge</span></p>
           </div>
         </header>
         <nav class="acc-tabs">
-          ${TABS.map(t => `<button class="acc-tab${t.id === active ? ' active' : ''}" data-tab="${t.id}"><span class="acc-tab-ico">${t.icon}</span>${t.label}</button>`).join('')}
+          ${TABS.map(t => `<button class="acc-tab${t.id === active ? ' active' : ''}" data-tab="${t.id}"><span class="acc-tab-ico">${ic(t.icon)}</span>${t.label}</button>`).join('')}
         </nav>
         <div class="acc-body" id="acc-body"></div>
       </div>`;
@@ -207,14 +209,14 @@
       paint();
     }));
 
-    if (!DBok()) { const live = root.querySelector('#acc-live'); if (live) { live.textContent = '● offline'; live.classList.add('off'); } }
+    if (!DBok()) { const live = root.querySelector('#acc-live'); if (live) { live.textContent = 'offline'; live.classList.add('off'); } }
     updateAuthChip(root);
     paint();
   }
 
   async function paint() {
     const body = rootEl && rootEl.querySelector('#acc-body'); if (!body) return;
-    if (!DBok()) { body.innerHTML = `<div class="acc-note">⚠ The live data layer is offline — ensure assets/data.js and the Supabase script loaded (needs network).</div>`; return; }
+    if (!DBok()) { body.innerHTML = `<div class="acc-note">${ic('alertTriangle')} The live data layer is offline — ensure assets/data.js and the Supabase script loaded (needs network).</div>`; return; }
     if (!(await gate(body))) return;
     body.innerHTML = `<div class="acc-loading"><span class="acc-spin"></span> Loading…</div>`;
     try {
@@ -393,7 +395,7 @@
       <section class="acc-panel">
         <div class="acc-panel-head">
           <h3>Invoices <span class="acc-muted">fakturor · ${rows.length}</span></h3>
-          <button class="acc-btn" id="acc-new-inv">＋ New invoice</button>
+          <button class="acc-btn" id="acc-new-inv">${ic('plus')} New invoice</button>
         </div>
         <div class="acc-tablewrap">
           <table class="acc-table">
@@ -441,7 +443,7 @@
             <label>Customer</label>
             <div class="acc-row" style="gap:8px">
               <select class="acc-in" id="iv-cust" style="flex:1 1 auto"><option value="">Select customer…</option>${custOpts}</select>
-              <button class="acc-mini" id="iv-quickcust" style="flex:none;height:38px">＋ New</button>
+              <button class="acc-mini" id="iv-quickcust" style="flex:none;height:38px">${ic('plus')} New</button>
             </div>
           </div>
           <div class="acc-row">
@@ -461,7 +463,7 @@
           <div class="acc-sep"></div>
           <div class="acc-line-head"><span>Description</span><span>Qty</span><span>Unit price</span><span>Moms</span><span></span></div>
           <div class="acc-lines" id="iv-lines"></div>
-          <button class="acc-mini" id="iv-addline" style="align-self:flex-start">＋ Add line</button>
+          <button class="acc-mini" id="iv-addline" style="align-self:flex-start">${ic('plus')} Add line</button>
 
           <div class="acc-field"><label>Notes</label><textarea class="acc-in" id="iv-notes" placeholder="Optional note on the invoice">${esc(inv && inv.notes || '')}</textarea></div>
         </div>
@@ -476,7 +478,7 @@
         <input class="acc-in l-qty" type="number" step="any" min="0" value="${l.qty != null ? esc(l.qty) : 1}"/>
         <input class="acc-in l-price" type="number" step="any" placeholder="0.00" value="${l.unit_price != null ? esc(l.unit_price) : ''}"/>
         <select class="acc-in l-vat">${VAT_RATES.map(v => `<option value="${v}"${Number(l.vat_rate) === v ? ' selected' : ''}>${v}%</option>`).join('')}</select>
-        <button class="acc-line-x" title="Remove line">✕</button>`;
+        <button class="acc-line-x" title="Remove line">${ic('close')}</button>`;
       row.querySelector('.acc-line-x').addEventListener('click', () => { row.remove(); recalc(); });
       row.querySelectorAll('input,select').forEach(i => i.addEventListener('input', recalc));
       return row;
@@ -534,7 +536,7 @@
       const res = invoiceId
         ? await api('invoices/' + invoiceId, { method: 'PUT', body: payload })
         : await api('invoices', { method: 'POST', body: payload });
-      if (res && res.ok) { H.toast(invoiceId ? 'Draft saved ✓' : 'Draft created ✓', 'success'); m.close(); paintInvoices(body); }
+      if (res && res.ok) { H.toast(invoiceId ? 'Draft saved' : 'Draft created', 'success'); m.close(); paintInvoices(body); }
       else m.msg(res && res.error ? res.error : (res && res.forbidden ? 'Admins only.' : 'Save failed.'));
     });
   }
@@ -572,7 +574,7 @@
           const opt = document.createElement('option'); opt.value = id; opt.textContent = name; opt.selected = true;
           selectEl.appendChild(opt);
         }
-        H.toast('Customer created ✓', 'success'); m.close();
+        H.toast('Customer created', 'success'); m.close();
       } else m.msg(res && res.error ? res.error : 'Create failed.');
     });
   }
@@ -596,10 +598,10 @@
     window.PdfSign.openSigner(bytes, {
       title: 'Sign faktura ' + (number || ''),
       fileName: 'Faktura-' + (number || 'utkast') + '.pdf',
-      saveLabel: '✓ Save signed to invoice',
+      saveLabel: 'Save signed to invoice',
       onSave: async (signed) => {
         const r = await saveInvoicePDF(invoiceId, signed);
-        if (r && r.ok) { if (viewer && viewer.setBytes) viewer.setBytes(signed); H.toast('Signed PDF saved to the invoice ✓', 'success'); }
+        if (r && r.ok) { if (viewer && viewer.setBytes) viewer.setBytes(signed); H.toast('Signed PDF saved to the invoice', 'success'); }
         else H.toast('Signed, but saving failed: ' + ((r && r.error) || 'error'), 'warn');
       }
     });
@@ -632,7 +634,7 @@
       m.msg('Assigning number…');
       const sent = await api('invoices/' + invoiceId + '/send', { method: 'POST' });
       if (!sent || !sent.ok) { m.msg(sent && sent.error ? sent.error : 'Send failed.'); return; }
-      H.toast('Invoice ' + (sent.invoice && sent.invoice.number ? '#' + sent.invoice.number : '') + ' sent ✓', 'success');
+      H.toast('Invoice ' + (sent.invoice && sent.invoice.number ? '#' + sent.invoice.number : '') + ' sent', 'success');
       // Build + store the PDF now the number exists (best-effort; non-fatal).
       if (hasFaktura()) {
         try {
@@ -678,7 +680,7 @@
         method: m.body.querySelector('#mp-method').value,
         reference: m.body.querySelector('#mp-ref').value.trim() || undefined
       }});
-      if (res && res.ok) { H.toast('Payment recorded ✓', 'success'); try { H._internal && H._internal.fireMoney && H._internal.fireMoney(); } catch (e) {} m.close(); paintInvoices(body); }
+      if (res && res.ok) { H.toast('Payment recorded', 'success'); try { H._internal && H._internal.fireMoney && H._internal.fireMoney(); } catch (e) {} m.close(); paintInvoices(body); }
       else m.msg(res && res.error ? res.error : 'Failed.');
     });
   }
@@ -687,7 +689,7 @@
     const m = modal('Void invoice', { sm: true });
     m.body.innerHTML = `<p class="acc-muted" style="margin:0">Voiding reverses the invoice with a credit voucher. Provide a reason for the audit trail.</p>
       <div class="acc-field"><label>Reason</label><input class="acc-in" id="vd-reason" placeholder="e.g. issued in error"/></div>`;
-    m.foot.innerHTML = `<button class="acc-mini" data-cancel>Cancel</button><button class="acc-btn" data-go style="background:linear-gradient(120deg,#FF4D6D,#7C5CFF)">Void invoice</button>`;
+    m.foot.innerHTML = `<button class="acc-mini" data-cancel>Cancel</button><button class="acc-btn danger" data-go>Void invoice</button>`;
     m.foot.querySelector('[data-cancel]').addEventListener('click', m.close);
     m.foot.querySelector('[data-go]').addEventListener('click', async () => {
       m.msg('Voiding…');
@@ -700,7 +702,7 @@
   async function deleteInvoice(invoiceId, body) {
     const m = modal('Delete draft', { sm: true });
     m.body.innerHTML = `<p class="acc-muted" style="margin:0">Delete this draft invoice permanently? Only drafts (no number, no voucher) can be deleted.</p>`;
-    m.foot.innerHTML = `<button class="acc-mini" data-cancel>Cancel</button><button class="acc-btn" data-go style="background:linear-gradient(120deg,#FF4D6D,#7C5CFF)">Delete draft</button>`;
+    m.foot.innerHTML = `<button class="acc-mini" data-cancel>Cancel</button><button class="acc-btn danger" data-go>Delete draft</button>`;
     m.foot.querySelector('[data-cancel]').addEventListener('click', m.close);
     m.foot.querySelector('[data-go]').addEventListener('click', async () => {
       m.msg('Deleting…');
@@ -758,7 +760,7 @@
       <section class="acc-panel">
         <div class="acc-panel-head">
           <h3>Bills <span class="acc-muted">leverantörsfakturor · ${rows.length}</span></h3>
-          <button class="acc-btn" id="acc-new-bill">＋ Enter a bill</button>
+          <button class="acc-btn" id="acc-new-bill">${ic('plus')} Enter a bill</button>
         </div>
         <div class="acc-tablewrap">
           <table class="acc-table">
@@ -786,7 +788,7 @@
           <label>Supplier</label>
           <div class="acc-row" style="gap:8px">
             <select class="acc-in" id="bl-part" style="flex:1 1 auto"><option value="">Select supplier…</option>${partOpts}</select>
-            <button class="acc-mini" id="bl-quickpart" style="flex:none;height:38px">＋ New</button>
+            <button class="acc-mini" id="bl-quickpart" style="flex:none;height:38px">${ic('plus')} New</button>
           </div>
         </div>
         <div class="acc-row">
@@ -808,7 +810,7 @@
         <div class="acc-sep"></div>
         <div class="acc-line-head"><span>Description</span><span style="grid-column:span 2">Amount (net)</span><span>Moms</span><span></span></div>
         <div class="acc-lines" id="bl-lines"></div>
-        <button class="acc-mini" id="bl-addline" style="align-self:flex-start">＋ Add line</button>
+        <button class="acc-mini" id="bl-addline" style="align-self:flex-start">${ic('plus')} Add line</button>
 
         <div class="acc-totals" id="bl-totals"></div>
 
@@ -824,7 +826,7 @@
         <input class="acc-in l-qty" type="number" value="1" style="visibility:hidden"/>
         <input class="acc-in l-amt" type="number" step="any" placeholder="0.00" value="${l.amount_net != null ? esc(l.amount_net) : ''}"/>
         <select class="acc-in l-vat">${VAT_RATES.map(v => `<option value="${v}"${Number(l.vat_rate) === v ? ' selected' : ''}>${v}%</option>`).join('')}</select>
-        <button class="acc-line-x" title="Remove line">✕</button>`;
+        <button class="acc-line-x" title="Remove line">${ic('close')}</button>`;
       row.querySelector('.acc-line-x').addEventListener('click', () => { row.remove(); recalc(); });
       row.querySelectorAll('input,select').forEach(i => i.addEventListener('input', recalc));
       return row;
@@ -890,7 +892,7 @@
           await api('bills/' + billId + '/attachment', { method: 'POST', body: { base64: b64, content_type: f.type || 'application/pdf', filename: f.name } });
         } catch (e) { H.toast('Bill saved, attachment failed: ' + e.message, 'warn'); }
       }
-      H.toast('Bill saved ✓', 'success'); m.close(); paintBills(body);
+      H.toast('Bill saved', 'success'); m.close(); paintBills(body);
     });
   }
 
@@ -924,7 +926,7 @@
       if (res && res.ok) {
         const id = (res.partner && res.partner.id) || (res.row && res.row.id) || res.id;
         if (selectEl && id) { const opt = document.createElement('option'); opt.value = id; opt.textContent = name; opt.selected = true; selectEl.appendChild(opt); }
-        H.toast('Supplier created ✓', 'success'); m.close();
+        H.toast('Supplier created', 'success'); m.close();
       } else m.msg(res && res.error ? res.error : 'Create failed.');
     });
   }
@@ -949,7 +951,7 @@
         <div><div class="acc-muted">Gross</div><b>${sek(b.gross, b.currency)}</b></div>
       </div>
       <table class="acc-table"><thead><tr><th>Description</th><th class="num">Net</th><th class="num">Moms</th></tr></thead><tbody>${lines}</tbody></table>
-      ${att ? `<a class="acc-btn" href="${esc(att)}" target="_blank" rel="noopener" style="text-decoration:none">📎 View attachment</a>` : `<div class="acc-note">No attachment uploaded for this bill.</div>`}`;
+      ${att ? `<a class="acc-btn" href="${esc(att)}" target="_blank" rel="noopener" style="text-decoration:none">${ic('fileText')} View attachment</a>` : `<div class="acc-note">No attachment uploaded for this bill.</div>`}`;
     m.foot.innerHTML = `<button class="acc-mini" data-cancel>Close</button>${b.status !== 'paid' ? `<button class="acc-btn" data-paid>Mark paid</button>` : ''}`;
     m.foot.querySelector('[data-cancel]').addEventListener('click', m.close);
     const pb = m.foot.querySelector('[data-paid]');
@@ -975,7 +977,7 @@
         method: m.body.querySelector('#bp-method').value,
         reference: m.body.querySelector('#bp-ref').value.trim() || undefined
       }});
-      if (res && res.ok) { H.toast('Bill marked paid ✓', 'success'); m.close(); paintBills(body); }
+      if (res && res.ok) { H.toast('Bill marked paid', 'success'); m.close(); paintBills(body); }
       else m.msg(res && res.error ? res.error : 'Failed.');
     });
   }
@@ -1037,7 +1039,7 @@
             <table class="acc-table"><thead><tr><th>Description</th><th>Category</th><th class="num">Net</th><th>Cadence</th><th>Next</th><th></th></tr></thead><tbody>${recRows}</tbody></table>
           </div>
           <div class="acc-sep"></div>
-          <button class="acc-btn" id="ex-reconcile" style="background:linear-gradient(120deg,#46E6A6,#19D3FF)">⟳ Run month-end (reconcile)</button>
+          <button class="acc-btn" id="ex-reconcile">${ic('refreshCw')} Run month-end (reconcile)</button>
           <p class="acc-muted" style="margin:8px 0 0">Materializes due recurring expenses, imports the NFT platform fees as our revenue, and flags overdue invoices.</p>
         </section>
       </div>
@@ -1063,7 +1065,7 @@
         occurred_at: dateVal,
         next_charge_at: recurrence !== 'once' ? dateVal : undefined
       }});
-      if (res && res.ok) { H.toast('Expense logged ✓', 'success'); paintExpenses(body); }
+      if (res && res.ok) { H.toast('Expense logged', 'success'); paintExpenses(body); }
       else msg.textContent = res && res.error ? res.error : 'Failed.';
     });
 
@@ -1080,7 +1082,7 @@
       const res = await api('reconcile', { method: 'POST', body: { period: thisMonth() } });
       if (res && res.ok) {
         m.body.innerHTML = `
-          <div class="acc-info" style="margin:0">✓ Reconcile complete for <b>${thisMonth()}</b>.</div>
+          <div class="acc-info" style="margin:0">${ic('checkCircle')} Reconcile complete for <b>${thisMonth()}</b>.</div>
           <div class="acc-kpis" style="grid-template-columns:1fr 1fr 1fr">
             <div class="acc-kpi"><span class="k">${num(res.materialized_expenses)}</span><span class="l">Recurring materialized</span></div>
             <div class="acc-kpi pos"><span class="k">${sek0(res.platform_revenue)}</span><span class="l">Platform revenue imported</span></div>
@@ -1088,7 +1090,7 @@
           </div>`;
         m.foot.innerHTML = `<button class="acc-btn" data-done>Done</button>`;
         m.foot.querySelector('[data-done]').addEventListener('click', () => { m.close(); paintExpenses(body); });
-        H.toast('Month-end reconciled ✓', 'success');
+        H.toast('Month-end reconciled', 'success');
       } else { m.body.innerHTML = failNote(res); m.foot.innerHTML = `<button class="acc-mini" data-done>Close</button>`; m.foot.querySelector('[data-done]').addEventListener('click', m.close); }
     });
   }
@@ -1105,7 +1107,7 @@
           <div class="acc-seg">
             <input class="acc-in" id="lg-period" type="month" value="${esc(ledgerPeriod)}"/>
             <button class="acc-mini" id="lg-go">Load</button>
-            <button class="acc-mini" id="lg-manual">＋ Manual journal</button>
+            <button class="acc-mini" id="lg-manual">${ic('plus')} Manual journal</button>
           </div>
         </div>
         <div id="lg-list"><div class="acc-loading"><span class="acc-spin"></span> Loading vouchers…</div></div>
@@ -1141,7 +1143,7 @@
           <span class="vch-id">${esc(v.series || 'V')}·${esc(String(v.id).slice(0, 8))}</span>
           <span class="vch-txt">${when(v.vdate)} — ${esc(v.vtext || '')}</span>
           <span class="vch-amt">${sek(dr)}</span>
-          <span class="vch-bal ${balanced ? 'ok' : 'bad'}">${balanced ? '⚖ balanced' : '⚠ off'}</span>
+          <span class="vch-bal ${balanced ? 'ok' : 'bad'}">${balanced ? ic('check') + ' balanced' : ic('alertTriangle') + ' off'}</span>
         </summary>
         <div class="vch-lines">
           <table class="acc-table"><thead><tr><th>Account</th><th>Text</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
@@ -1154,7 +1156,7 @@
     const tDr = num(totals.debit), tCr = num(totals.credit);
     const allBalanced = Math.abs(tDr - tCr) < 0.005;
     host.innerHTML = `
-      <div class="acc-${allBalanced ? 'info' : 'warn'}" style="margin-bottom:14px">${allBalanced ? '✓' : '⚠'} Period Σ debit ${sek(tDr)} ${allBalanced ? '=' : '≠'} Σ credit ${sek(tCr)} — ${rows.length} voucher(s)</div>
+      <div class="acc-${allBalanced ? 'info' : 'warn'}" style="margin-bottom:14px">${allBalanced ? ic('checkCircle') : ic('alertTriangle')} Period Σ debit ${sek(tDr)} ${allBalanced ? '=' : '≠'} Σ credit ${sek(tCr)} — ${rows.length} voucher(s)</div>
       ${html}`;
   }
 
@@ -1169,7 +1171,7 @@
       <div class="acc-sep"></div>
       <div class="acc-line-head" style="grid-template-columns:1fr 1fr 96px 96px 30px"><span>Account</span><span>Text</span><span>Debit</span><span>Credit</span><span></span></div>
       <div class="acc-lines" id="mj-lines"></div>
-      <button class="acc-mini" id="mj-add" style="align-self:flex-start">＋ Add entry</button>
+      <button class="acc-mini" id="mj-add" style="align-self:flex-start">${ic('plus')} Add entry</button>
       <div class="acc-totals" id="mj-totals"></div>`;
     const host = m.body.querySelector('#mj-lines');
     function row(e) {
@@ -1179,7 +1181,7 @@
         <input class="acc-in e-text" placeholder="text" value="${esc(e.text || '')}"/>
         <input class="acc-in e-dr" type="number" step="any" placeholder="0" value="${e.debit != null ? esc(e.debit) : ''}"/>
         <input class="acc-in e-cr" type="number" step="any" placeholder="0" value="${e.credit != null ? esc(e.credit) : ''}"/>
-        <button class="acc-line-x">✕</button>`;
+        <button class="acc-line-x">${ic('close')}</button>`;
       r.querySelector('.acc-line-x').addEventListener('click', () => { r.remove(); recalc(); });
       r.querySelectorAll('input').forEach(i => i.addEventListener('input', recalc));
       return r;
@@ -1201,7 +1203,7 @@
       m.body.querySelector('#mj-totals').innerHTML = `
         <div class="row"><span>Σ Debit</span><b>${sek(dr)}</b></div>
         <div class="row"><span>Σ Credit</span><b>${sek(cr)}</b></div>
-        <div class="row gross"><span>${bal ? '⚖ Balanced' : '⚠ Out of balance'}</span><b style="color:${bal ? 'var(--ok)' : 'var(--danger)'}">${sek(Math.abs(dr - cr))}</b></div>`;
+        <div class="row gross"><span>${bal ? ic('check') + ' Balanced' : ic('alertTriangle') + ' Out of balance'}</span><b style="color:${bal ? 'var(--ok)' : 'var(--danger)'}">${sek(Math.abs(dr - cr))}</b></div>`;
     }
     recalc();
     m.foot.innerHTML = `<button class="acc-mini" data-cancel>Cancel</button><button class="acc-btn" data-save>Post voucher</button>`;
@@ -1218,7 +1220,7 @@
         text: m.body.querySelector('#mj-text').value.trim() || 'Manual journal',
         entries
       }});
-      if (res && res.ok) { H.toast('Voucher posted ✓', 'success'); m.close(); loadVouchers(body); }
+      if (res && res.ok) { H.toast('Voucher posted', 'success'); m.close(); loadVouchers(body); }
       else m.msg(res && res.error ? res.error : 'Failed.');
     });
   }
@@ -1233,7 +1235,7 @@
     const partners = (partRes && partRes.rows) || [];
 
     body.innerHTML = `
-      <div class="acc-info">📤 Everything you hand your accountant. <b>CSV</b> = a full transaction journal for a month. <b>SIE</b> = the Swedish standard bookkeeping export (.se) that imports straight into Fortnox / Visma / Bokio. Per-party exports give each dealer or customer their own books.</div>
+      <div class="acc-info">${ic('upload')} Everything you hand your accountant. <b>CSV</b> = a full transaction journal for a month. <b>SIE</b> = the Swedish standard bookkeeping export (.se) that imports straight into Fortnox / Visma / Bokio. Per-party exports give each dealer or customer their own books.</div>
       <div class="acc-grid2">
         <section class="acc-panel">
           <h3>Monthly transaction CSV</h3>
@@ -1247,7 +1249,7 @@
           <h3>Year-end SIE (.se)</h3>
           <div class="acc-form">
             <div class="acc-field"><label>Fiscal year</label><input class="acc-in" id="ex-sie-year" type="number" min="2020" max="2099" value="${thisYear()}"/></div>
-            <button class="acc-btn" id="ex-sie-go" style="background:linear-gradient(120deg,#7C5CFF,#4D8DFF)">Download SIE</button>
+            <button class="acc-btn" id="ex-sie-go">${ic('download')} Download SIE</button>
             <p class="acc-muted" style="margin:0">The full year's chart of accounts + vouchers in SIE4 format — the file Swedish accounting software imports natively.</p>
           </div>
         </section>
@@ -1268,12 +1270,12 @@
 
     body.querySelector('#ex-csv-go').addEventListener('click', async () => {
       const period = body.querySelector('#ex-csv-month').value || thisMonth();
-      try { await window.DB.companyDownload('export?type=csv&period=' + period, 'opulence-tech-' + period + '.csv'); H.toast('CSV downloaded ✓', 'success'); }
+      try { await window.DB.companyDownload('export?type=csv&period=' + period, 'opulence-tech-' + period + '.csv'); H.toast('CSV downloaded', 'success'); }
       catch (e) { H.toast('Export failed: ' + e.message, 'danger'); }
     });
     body.querySelector('#ex-sie-go').addEventListener('click', async () => {
       const year = body.querySelector('#ex-sie-year').value || thisYear();
-      try { await window.DB.companyDownload('export?type=sie&year=' + year, 'opulence-tech-' + year + '.se'); H.toast('SIE downloaded ✓', 'success'); }
+      try { await window.DB.companyDownload('export?type=sie&year=' + year, 'opulence-tech-' + year + '.se'); H.toast('SIE downloaded', 'success'); }
       catch (e) { H.toast('Export failed: ' + e.message, 'danger'); }
     });
     body.querySelector('#ex-pt-go').addEventListener('click', async () => {
@@ -1287,11 +1289,11 @@
       const period = body.querySelector('#ex-pt-month').value || thisMonth();
       try {
         await window.DB.companyDownload('export?type=party&party_type=' + encodeURIComponent(party_type) + '&party_id=' + encodeURIComponent(party_id) + '&period=' + period, party_type + '-' + party_id.slice(0, 8) + '-' + period + '.csv');
-        H.toast('Party export downloaded ✓', 'success');
+        H.toast('Party export downloaded', 'success');
       } catch (e) { body.querySelector('#ex-pt-msg').textContent = 'Export failed: ' + e.message; }
     });
   }
 
   /* ── register ─────────────────────────────────────────────────────────── */
-  H.register({ id: 'accounting', label: 'Accounting', icon: '📒', scope: 'company', render });
+  H.register({ id: 'accounting', label: 'Accounting', icon: '◆', scope: 'company', render });
 })();

@@ -14,25 +14,25 @@
   function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
   H.register({
-    id: 'settings', label: 'Settings', icon: '⚙️', scope: 'personal',
+    id: 'settings', label: 'Settings', icon: window.icon('settings'), scope: 'personal',
     render(root) {
       const S = H.session;
       const me = S.user;
 
       const SECTIONS = [
-        { id: 'profile', ico: '🧑', label: 'Profile', sub: 'Name, email & body metrics' },
-        { id: 'workspace', ico: '🧩', label: 'Workspace', sub: 'Show or hide sections' },
-        { id: 'appearance', ico: '🎨', label: 'Appearance', sub: 'Accent theme' }
+        { id: 'profile', ico: window.icon('users'), label: 'Profile', sub: 'Name, email & body metrics' },
+        { id: 'workspace', ico: window.icon('layers'), label: 'Workspace', sub: 'Show or hide sections' },
+        { id: 'appearance', ico: window.icon('sparkles'), label: 'Appearance', sub: 'Accent theme' }
       ];
 
       root.innerHTML = `
         <div class="view-head">
           <div class="vh-title">
-            <div class="vh-ico">⚙️</div>
+            <div class="vh-ico">${window.icon('settings')}</div>
             <div><h1>Settings</h1><p>Your profile, body metrics and the look of the deck.</p></div>
           </div>
           <div class="vh-actions">
-            <button class="btn btn-ghost btn-sm" data-act="vitals">💗 Open Vitals</button>
+            <button class="btn btn-ghost btn-sm" data-act="vitals">${window.icon('heart')} Open Vitals</button>
           </div>
         </div>`;
 
@@ -59,7 +59,7 @@
         <button class="settings-nav-btn${i === 0 ? ' active' : ''}" data-sec="${s.id}">
           <span class="settings-nav-ico">${s.ico}</span>
           <span class="settings-nav-text"><span class="settings-nav-label">${s.label}</span><span class="settings-nav-sub">${s.sub}</span></span>
-          <span class="settings-nav-chev">›</span>
+          <span class="settings-nav-chev">${window.icon('chevronRight')}</span>
         </button>`)));
       shell.appendChild(nav);
       const host = H.el(`<div class="settings-host"></div>`);
@@ -76,7 +76,7 @@
 
         const idCard = H.el(`
           <div class="card">
-            ${panel('🧑', 'My profile', 'PERSONAL')}
+            ${panel(window.icon('users'), 'My profile', 'PERSONAL')}
             <div class="settings-fieldgrid"></div>
             <div class="row between mt">
               <span class="kpi-sub">Your display name shows on the deck and on signed documents.</span>
@@ -91,7 +91,7 @@
         ].forEach(([label, val, locked, key]) => {
           fg.appendChild(H.el(`
             <label class="settings-field${locked ? ' locked' : ''}">
-              <span class="settings-field-label">${label}${locked ? ' <span class="settings-lock">🔒</span>' : ''}</span>
+              <span class="settings-field-label">${label}${locked ? ` <span class="settings-lock">${window.icon('lock')}</span>` : ''}</span>
               <input class="settings-input${key === 'email' ? ' mono' : ''}" value="${esc(val)}" data-key="${key}" ${locked ? 'readonly' : ''} spellcheck="false" />
             </label>`));
         });
@@ -114,7 +114,7 @@
         };
         const bodyCard = H.el(`
           <div class="card settings-scorecard">
-            ${panel('💗', 'Body metrics', 'FEEDS VITALS + DASHBOARD')}
+            ${panel(window.icon('heart'), 'Body metrics', 'FEEDS VITALS + DASHBOARD')}
             <div class="settings-bodygrid"></div>
             <div class="settings-bmibar">
               <div class="row between"><span class="settings-field-label">BMI</span><span class="sr-val mono" data-out="bmi">—</span></div>
@@ -122,7 +122,7 @@
             </div>
             <div class="row gap-sm mt">
               <button class="btn btn-sm btn-primary fill" data-act="body-save">Save &amp; sync to Vitals</button>
-              <button class="btn btn-sm btn-ghost" data-act="open-vitals">Open Vitals →</button>
+              <button class="btn btn-sm btn-ghost" data-act="open-vitals">Open Vitals ${window.icon('arrowRight')}</button>
             </div>
           </div>`);
         const bgrid = bodyCard.querySelector('.settings-bodygrid');
@@ -181,7 +181,7 @@
         ];
         const card = H.el(`
           <div class="card">
-            ${panel('🎨', 'Theme & accent', 'APPLIES INSTANTLY')}
+            ${panel(window.icon('sparkles'), 'Theme & accent', 'APPLIES INSTANTLY')}
             <p class="kpi-sub" style="margin-bottom:13px">The accent tints charts, glows and active states across the whole deck.</p>
             <div class="settings-themes"></div>
           </div>`);
@@ -221,7 +221,7 @@
         const wrap = H.el(`<div class="settings-panel"></div>`);
         const card = H.el(`
           <div class="card">
-            ${panel('🧩', 'Deck sections', 'SHOW / HIDE')}
+            ${panel(window.icon('layers'), 'Deck sections', 'SHOW / HIDE')}
             <p class="kpi-sub" style="margin-bottom:13px">Turn sections on or off. Hidden sections leave the sidebar immediately.</p>
             <div class="settings-toggle-list" id="ws-toggles"></div>
           </div>`);

@@ -1,76 +1,91 @@
-/* pdfsign.js — "Sign PDF" module styles. On-theme via core tokens + fallbacks. */
+/* ============================================================================
+   pdfsign.css — "Sign PDF" tool. Quiet aurora aesthetic, converged with the
+   NFT operator console. Tokens come from assets/core.css — no hardcoded hex
+   for theme-aware surfaces (so theme-switching keeps working). 1px hairline +
+   inset top-sheen at rest, single hover (border brighten), no idle animation.
+   ========================================================================== */
 .psign { padding: 4px 2px 48px; }
-.psign-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; margin-bottom: 18px; }
-.psign-title { font-family: var(--font-display, 'Space Grotesk', sans-serif); font-size: 28px; font-weight: 600; margin: 0; color: var(--text, #eaf2f8); letter-spacing: -.01em; }
-.psign-sub { color: var(--muted, #8aa4bc); margin: 6px 0 0; font-size: 13px; max-width: 60ch; }
+
+.psign-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.psign-title { font: 640 22px/1.15 var(--font-display); letter-spacing: -.4px; margin: 0; color: var(--text); }
+.psign-sub { color: var(--text-faint); margin: 6px 0 0; font-size: 13px; max-width: 72ch; }
 .psign-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-.psign-btn { font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 10px; cursor: pointer; color: var(--text, #eaf2f8); background: rgba(255, 255, 255, .05); border: 1px solid var(--border, rgba(255, 255, 255, .12)); display: inline-flex; align-items: center; gap: 7px; transition: background .15s, border-color .15s, transform .1s; }
-.psign-btn:hover:not(:disabled) { background: rgba(255, 255, 255, .09); }
-.psign-btn:active:not(:disabled) { transform: translateY(1px); }
-.psign-btn:disabled { opacity: .4; cursor: not-allowed; }
-.psign-btn.primary { background: linear-gradient(120deg, var(--accent3, #7C5CFF), var(--accent1, #19D3FF)); border-color: transparent; color: #07111a; font-weight: 600; }
-.psign-btn.ghost { background: none; }
-.psign-btn.on { border-color: var(--accent1, #19D3FF); color: var(--accent1, #19D3FF); }
+/* ── buttons ── */
+.psign-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 8px; cursor: pointer; font: 600 12.5px/1 var(--font-body); color: var(--text); background: var(--panel-hi); border: 1px solid var(--line-2); transition: border-color .12s; white-space: nowrap; }
+.psign-btn:hover:not(:disabled) { border-color: var(--line-3); }
+.psign-btn:disabled { opacity: .45; cursor: not-allowed; }
+.psign-btn .ic { width: 15px; height: 15px; }
+.psign-btn.primary { background: var(--ac); border-color: var(--ac); color: var(--ac-ink); }
+.psign-btn.primary:hover:not(:disabled) { border-color: var(--line-3); }
+.psign-btn.ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+.psign-btn.ghost:hover:not(:disabled) { color: var(--text); border-color: var(--line-2); }
+.psign-btn.on { border-color: var(--ac); color: var(--ac); }
 
-.psign-drop { border: 2px dashed var(--border, rgba(255, 255, 255, .18)); border-radius: 18px; padding: 56px 24px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; background: rgba(255, 255, 255, .015); }
-.psign-drop:hover, .psign-drop.over { border-color: var(--accent1, #19D3FF); background: rgba(25, 211, 255, .05); }
-.psign-drop-ico { font-size: 44px; margin-bottom: 12px; }
-.psign-drop-title { font-size: 16px; font-weight: 600; color: var(--text, #eaf2f8); }
-.psign-drop-sub { font-size: 13px; color: var(--muted, #8aa4bc); margin-top: 6px; }
+/* ── drop zone ── */
+.psign-drop { border: 1px dashed var(--line-3); border-radius: 16px; padding: 56px 24px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; background: var(--panel); box-shadow: inset 0 1px 0 rgba(255,255,255,.03); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.psign-drop:hover, .psign-drop.over { border-color: var(--ac); background: var(--accent-soft); }
+.psign-drop-ico { color: var(--text-faint); opacity: .8; margin-bottom: 4px; }
+.psign-drop-ico .ic { width: 28px; height: 28px; }
+.psign-drop-title { font-size: 14px; font-weight: 600; color: var(--text-muted); }
+.psign-drop-sub { font-size: 12.5px; color: var(--text-faint); }
 
-.psign-hint { margin: 14px 0; padding: 10px 14px; border-radius: 10px; font-size: 13px; color: var(--accent1, #19D3FF); background: rgba(25, 211, 255, .08); border: 1px solid rgba(25, 211, 255, .22); }
+/* ── hint banner ── */
+.psign-hint { margin: 16px 0; padding: 10px 14px; border-radius: 8px; font-size: 13px; color: var(--ac); background: var(--accent-soft); border: 1px solid var(--line-2); }
 
-.psign-doc { display: flex; flex-direction: column; align-items: center; gap: 18px; margin-top: 8px; }
+/* ── document stage ── */
+.psign-doc { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 8px; }
 .psign-doc.placing { cursor: crosshair; }
-.psign-doc.placing .psign-page { outline: 2px solid rgba(25, 211, 255, .35); outline-offset: 3px; }
+.psign-doc.placing .psign-page { outline: 2px solid var(--accent-soft); outline-offset: 3px; }
 
-.psign-page { position: relative; background: #fff; border-radius: 6px; box-shadow: 0 10px 40px rgba(0, 0, 0, .45); overflow: hidden; }
+.psign-page { position: relative; background: #fff; border-radius: 8px; box-shadow: var(--sh-2); overflow: hidden; }
 .psign-page canvas { display: block; width: 100%; height: 100%; }
 
+/* ── placed signature ── */
 .psign-sig { position: absolute; cursor: grab; border: 1px dashed transparent; border-radius: 4px; }
-.psign-sig:hover { border-color: rgba(25, 211, 255, .6); }
+.psign-sig:hover { border-color: var(--ac-line, rgba(25,211,255,.5)); }
 .psign-sig.drag { cursor: grabbing; }
 .psign-sig img { width: 100%; height: 100%; display: block; pointer-events: none; user-select: none; }
-.psign-sig-bar { position: absolute; top: -28px; right: 0; display: none; gap: 4px; }
+.psign-sig-bar { position: absolute; top: -28px; right: 0; display: none; gap: 6px; }
 .psign-sig:hover .psign-sig-bar { display: flex; }
-.psign-sig-bar button { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border, rgba(255, 255, 255, .2)); background: #0e1726; color: #eaf2f8; cursor: pointer; font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center; }
-.psign-sig-bar button:hover { background: #16233a; }
+.psign-sig-bar button { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel-hi); color: var(--text); cursor: pointer; line-height: 1; display: flex; align-items: center; justify-content: center; transition: border-color .12s; }
+.psign-sig-bar button:hover { border-color: var(--line-3); }
+.psign-sig-bar button .ic { width: 14px; height: 14px; }
 
-/* signature modal */
+/* ── signature modal ── */
 .psign-modal { position: fixed; inset: 0; z-index: 600; background: rgba(4, 8, 14, .66); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px; }
-.psign-modal-box { width: min(680px, 96vw); background: var(--panel, #0c1422); border: 1px solid var(--border, rgba(255, 255, 255, .12)); border-radius: 18px; padding: 18px; box-shadow: 0 24px 80px rgba(0, 0, 0, .6); }
-.psign-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; color: var(--text, #eaf2f8); font-size: 15px; }
-.psign-x { background: none; border: none; color: var(--muted, #8aa4bc); font-size: 16px; cursor: pointer; }
+.psign-modal-box { width: min(680px, 96vw); background: var(--panel-hi); border: 1px solid var(--line-2); border-radius: 16px; padding: 24px; box-shadow: var(--sh-3); }
+.psign-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; color: var(--text); font: 640 18px/1.25 var(--font-display); letter-spacing: -.3px; }
+.psign-x { background: var(--panel); border: 1px solid var(--line); width: 34px; height: 34px; flex: none; border-radius: 8px; color: var(--text-muted); cursor: pointer; display: grid; place-items: center; transition: border-color .12s, color .12s; }
+.psign-x:hover { color: var(--text); border-color: var(--line-3); }
+.psign-x .ic { width: 16px; height: 16px; }
 .psign-modal-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-.psm-tab { font: inherit; font-size: 13px; padding: 7px 14px; border-radius: 9px; cursor: pointer; background: rgba(255, 255, 255, .04); border: 1px solid var(--border, rgba(255, 255, 255, .1)); color: var(--muted, #8aa4bc); }
-.psm-tab.on { color: var(--text, #eaf2f8); border-color: var(--accent1, #19D3FF); }
+.psm-tab { font: 600 12px/1 var(--font-body); padding: 7px 14px; border-radius: 8px; cursor: pointer; background: var(--panel); border: 1px solid var(--line); color: var(--text-muted); transition: border-color .12s, color .12s; }
+.psm-tab:hover { color: var(--text); border-color: var(--line-2); }
+.psm-tab.on { color: var(--text); border-color: var(--ac); }
 .psign-pad { background: #fff; border-radius: 12px; overflow: hidden; }
 .psign-canvas { display: block; width: 100%; height: 200px; touch-action: none; cursor: crosshair; }
 .psign-pad[data-pane="type"] { background: #fff; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
-.psign-typed { font: inherit; font-size: 15px; padding: 10px 12px; border-radius: 9px; border: 1px solid #cdd6e0; color: #0b1220; }
+.psign-typed { font: 400 15px/1 var(--font-body); padding: 10px 12px; border-radius: 8px; border: 1px solid #cdd6e0; color: #0b1220; }
 .psign-typed-preview { min-height: 90px; display: flex; align-items: center; justify-content: center; font-family: "Segoe Script", "Brush Script MT", cursive; font-size: 52px; color: #0b1220; }
-.psign-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
-.psign-legal { font-size: 11px; color: var(--muted, #8aa4bc); max-width: 40ch; }
+.psign-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.psign-legal { font-size: 11px; color: var(--text-faint); max-width: 40ch; }
 .row.gap-sm { display: inline-flex; gap: 8px; }
 
 /* ── shared PDF viewer + signer overlay (pdfsign-core.js) ─────────────────── */
-.pdfx-overlay{position:fixed;inset:0;z-index:6000;background:rgba(4,7,14,.72);backdrop-filter:blur(6px);
-  display:flex;align-items:center;justify-content:center;padding:26px}
-.pdfx-shell{width:min(1000px,96vw);height:92vh;display:flex;flex-direction:column;
-  background:var(--bg2,#0d131f);border:1px solid var(--border-hi,rgba(255,255,255,.12));border-radius:16px;overflow:hidden;
-  box-shadow:0 40px 100px rgba(0,0,0,.6)}
-.pdfx-bar{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));
-  background:linear-gradient(180deg,rgba(255,255,255,.03),transparent)}
-.pdfx-title{font-family:var(--font-display,'Space Grotesk',sans-serif);font-weight:600;color:var(--text,#eaf2fb);font-size:15px;flex:1;min-width:0;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pdfx-actions{display:flex;gap:8px;flex-wrap:wrap}
-.pdfx-btn{border:1px solid var(--border-hi,rgba(255,255,255,.14));background:rgba(255,255,255,.05);color:var(--text,#eaf2fb);
-  border-radius:9px;padding:7px 12px;font-size:12.5px;cursor:pointer;transition:filter .15s,background .15s}
-.pdfx-btn:hover{background:rgba(255,255,255,.10)}
-.pdfx-btn.go{border:none;color:#04121a;font-weight:600;background:linear-gradient(120deg,#7C5CFF,#19D3FF 55%,#46E6A6)}
-.pdfx-btn.ghost{background:transparent;color:var(--text-faint,#8aa4bc)}
-.pdfx-body{flex:1;min-height:0;overflow:auto;background:#1b2230}
-.pdfx-frame{width:100%;height:100%;border:0;background:#525659}
-.pdfx-hint{padding:8px 14px;font-size:12px;color:var(--accent1,#19D3FF);background:rgba(25,211,255,.08);border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
-.pdfx-overlay.signer .pdfx-body{padding:20px;display:flex;flex-direction:column;align-items:center;gap:18px}
+.pdfx-overlay { position: fixed; inset: 0; z-index: 6000; background: rgba(4, 7, 14, .72); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 26px; }
+.pdfx-shell { width: min(1000px, 96vw); height: 92vh; display: flex; flex-direction: column; background: var(--bg2); border: 1px solid var(--line-2); border-radius: 16px; overflow: hidden; box-shadow: var(--sh-3); }
+.pdfx-bar { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.pdfx-title { font: 640 18px/1.25 var(--font-display); letter-spacing: -.3px; color: var(--text); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pdfx-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pdfx-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--line-2); background: var(--panel-hi); color: var(--text); border-radius: 8px; padding: 0 12px; height: 36px; font: 600 12.5px/1 var(--font-body); cursor: pointer; transition: border-color .12s; white-space: nowrap; }
+.pdfx-btn:hover { border-color: var(--line-3); }
+.pdfx-btn .ic { width: 15px; height: 15px; }
+.pdfx-btn.go { background: var(--ac); border-color: var(--ac); color: var(--ac-ink); }
+.pdfx-btn.go:hover { border-color: var(--line-3); }
+.pdfx-btn.ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+.pdfx-btn.ghost:hover { color: var(--text); border-color: var(--line-2); }
+.pdfx-body { flex: 1; min-height: 0; overflow: auto; background: var(--panel); }
+.pdfx-frame { width: 100%; height: 100%; border: 0; background: #525659; }
+.pdfx-hint { padding: 10px 20px; font-size: 12.5px; color: var(--ac); background: var(--accent-soft); border-bottom: 1px solid var(--line); }
+.pdfx-overlay.signer .pdfx-body { padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; }

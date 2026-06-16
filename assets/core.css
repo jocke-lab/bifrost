@@ -40,6 +40,15 @@
   --accent-grad:linear-gradient(120deg,#7C5CFF,#4D8DFF 40%,#19D3FF 72%,#46E6A6);
   --accent-soft:rgba(25,211,255,0.10);
 
+  /* clean-aurora additions (deck-wide redesign — shared by kit.css + all modules) */
+  --line:rgba(255,255,255,.06); --line-2:rgba(255,255,255,.10); --line-3:rgba(255,255,255,.16);
+  --rail:#06090F; --ac:var(--accent1); --ac-ink:#04121A;
+  --ok:#46E6A6; --ok-bg:rgba(70,230,166,.13);
+  --warn-bg:rgba(245,165,36,.14); --danger-bg:rgba(255,77,109,.13);
+  --info:#4D8DFF; --info-bg:rgba(77,141,255,.13);
+  --mut:#8AA4BC; --mut-bg:rgba(255,255,255,.06);
+  --sh-2:0 10px 30px rgba(0,0,0,.45); --sh-3:0 28px 80px rgba(0,0,0,.6),0 6px 18px rgba(0,0,0,.4);
+
   /* fonts */
   --font-display:'Space Grotesk', system-ui, sans-serif;
   --font-body:'Inter', system-ui, sans-serif;

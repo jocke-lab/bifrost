@@ -16,7 +16,7 @@
       <div class="nftsite">
         <header class="nft-head">
           <div class="nft-headmain">
-            <h1 class="nft-title">Access <span class="nft-live">🔐</span></h1>
+            <h1 class="nft-title">Access <span class="nft-live">${window.icon('lock')}</span></h1>
             <p class="nft-sub">Who can sign in to bifrost, and what each person can reach. You register people by email — they create their own password the first time they log in.</p>
           </div>
         </header>
@@ -27,7 +27,7 @@
             <input class="team-in" id="t-email" type="email" placeholder="name@company.com" autocomplete="off">
             <input class="team-in" id="t-name" type="text" placeholder="Full name">
             <select class="team-in" id="t-role">${ROLES.map(r => `<option value="${r[0]}"${r[0] === 'member' ? ' selected' : ''}>${r[1]}</option>`).join('')}</select>
-            <button class="nft-btn primary" id="t-add">＋ Register</button>
+            <button class="nft-btn primary" id="t-add">${window.icon('plus')} Register</button>
           </div>
           <p class="team-hint" id="t-hint">They’ll appear below as <b>invited</b> until they set a password on first sign-in.</p>
         </section>
@@ -111,5 +111,5 @@
   }
   function cssq(s) { return String(s).replace(/"/g, '\\"'); }
 
-  H.register({ id: 'team', label: 'Access', icon: '🔐', scope: 'company', render });
+  H.register({ id: 'team', label: 'Access', icon: window.icon('lock'), scope: 'company', render });
 })();

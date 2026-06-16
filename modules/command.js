@@ -15,7 +15,7 @@
       <div class="nftsite">
         <header class="nft-head">
           <div class="nft-headmain">
-            <h1 class="nft-title">Dashboard <span class="nft-live" id="dash-live">● live</span></h1>
+            <h1 class="nft-title">Dashboard <span class="nft-live" id="dash-live">live</span></h1>
             <p class="nft-sub">Your company at a glance — the NFT platform, what needs you today, and your vitals.</p>
           </div>
           <div class="nft-kpis" id="dash-kpis">${'<div class="nft-kpi skel"></div>'.repeat(6)}</div>
@@ -26,7 +26,7 @@
         </div>
         <section class="nft-panel"><h3>Your vitals</h3><div id="dash-vitals"></div></section>
       </div>`;
-    if (!DBok()) { const l = root.querySelector('#dash-live'); if (l) { l.textContent = '● offline'; l.classList.add('off'); } }
+    if (!DBok()) { const l = root.querySelector('#dash-live'); if (l) { l.textContent = 'offline'; l.classList.add('off'); } }
     loadKpis(root); loadAttn(root); loadSales(root); loadVitals(root);
     // live-refresh the vitals card when body metrics are saved elsewhere
     if (!render._wired) {
@@ -54,10 +54,10 @@
         window.DB.nft_read('collections', { select: 'name,approved', eq: { approved: false }, limit: 50 })
       ]);
       const pd = dz.data || [], pc = cz.data || [];
-      if (!pd.length && !pc.length) { host.innerHTML = '<span class="nft-muted">✓ All clear — no pending dealers or collection requests.</span>'; return; }
+      if (!pd.length && !pc.length) { host.innerHTML = '<span class="nft-muted">' + window.icon('check') + ' All clear — no pending dealers or collection requests.</span>'; return; }
       host.innerHTML =
-        pd.map(d => `<div class="nft-adm-row"><span>🏷️ Dealer application — <b>${esc(d.name)}</b></span><span class="nft-muted">NFT Site → Admin</span></div>`).join('') +
-        pc.map(c => `<div class="nft-adm-row"><span>🗂️ Collection request — <b>${esc(c.name)}</b></span><span class="nft-muted">NFT Site → Admin</span></div>`).join('');
+        pd.map(d => `<div class="nft-adm-row"><span>${window.icon('dealers')} Dealer application — <b>${esc(d.name)}</b></span><span class="nft-muted">NFT Site → Admin</span></div>`).join('') +
+        pc.map(c => `<div class="nft-adm-row"><span>${window.icon('collections')} Collection request — <b>${esc(c.name)}</b></span><span class="nft-muted">NFT Site → Admin</span></div>`).join('');
     } catch (e) { host.innerHTML = '<span class="nft-muted">' + esc(e.message) + '</span>'; }
   }
 
@@ -95,5 +95,5 @@
       <p class="nft-muted" style="margin-top:10px">${bmr ? 'Calculated from your body stats (edit in Vitals).' : 'Add your body stats in Vitals to see BMR/TDEE.'} Connect Whoop or Oura in <b>Connections → Wearables</b> for live recovery, sleep and strain.</p>`;
   }
 
-  H.register({ id: 'command', label: 'Dashboard', icon: '🛰️', scope: 'company', render });
+  H.register({ id: 'command', label: 'Dashboard', icon: window.icon('overview'), scope: 'company', render });
 })();

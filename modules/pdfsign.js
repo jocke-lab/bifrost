@@ -16,7 +16,7 @@
           </div>
         </header>
         <div class="psign-drop" id="ps-drop">
-          <div class="psign-drop-ico">📄</div>
+          <div class="psign-drop-ico">${window.icon('fileText')}</div>
           <div class="psign-drop-title">Drop a PDF here, or click to choose</div>
           <div class="psign-drop-sub">Contracts, NDAs, offers — any PDF. It stays on your device.</div>
           <input type="file" accept="application/pdf,.pdf" id="ps-file" hidden />
@@ -51,5 +51,5 @@
     }
   }
 
-  H.register({ id: 'sign', label: 'Sign PDF', icon: '🖊️', scope: 'company', render });
+  H.register({ id: 'sign', label: 'Sign PDF', icon: window.icon('signature'), scope: 'company', render });
 })();

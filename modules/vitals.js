@@ -142,15 +142,15 @@
     root.innerHTML = `
       <div class="view-head">
         <div class="vh-title">
-          <div class="vh-ico">❤️</div>
+          <div class="vh-ico">${window.icon('heart')}</div>
           <div>
             <h1>Vitals</h1>
             <p>Your private health tracker — body &amp; metabolism, a movement-aware calorie budget, workouts and live wearables.</p>
           </div>
         </div>
         <div class="vh-actions">
-          <span class="vitals-who" title="This is your own data — nobody else on the team can see it.">🔒 ${esc(who.name || 'You')} · private</span>
-          <button class="btn btn-sm" id="vit-sync">⟳ Sync now</button>
+          <span class="vitals-who" title="This is your own data — nobody else on the team can see it.">${window.icon('lock')} ${esc(who.name || 'You')} · private</span>
+          <button class="btn btn-sm" id="vit-sync">${window.icon('refreshCw')} Sync now</button>
         </div>
       </div>
 
@@ -159,7 +159,7 @@
       <!-- ── TODAY HUD ─────────────────────────────────────────────────── -->
       <div class="card vitals-hud" id="vit-hud">
         <div class="card-head">
-          <h3><span class="hico">🛰️</span> Today</h3>
+          <h3><span class="hico">${window.icon('activity')}</span> Today</h3>
           <span class="ch-meta" id="vit-hud-meta">LOADING…</span>
         </div>
         <div id="vit-hud-body"><div class="nft-loading" style="padding:20px"><span class="nft-spin"></span> Reading today…</div></div>
@@ -169,7 +169,7 @@
       <div class="grid cols-3" style="margin:var(--gap) 0">
         <div class="card span-2 vitals-body">
           <div class="card-head">
-            <h3><span class="hico">🧬</span> Body &amp; Metabolism</h3>
+            <h3><span class="hico">${window.icon('gauge')}</span> Body &amp; Metabolism</h3>
             <span class="ch-meta" id="vit-body-meta">MIFFLIN-ST JEOR · LIVE</span>
           </div>
           <div class="vitals-body-grid">
@@ -230,7 +230,7 @@
 
         <div class="card vitals-bmi">
           <div class="card-head">
-            <h3><span class="hico">⚖️</span> Body Mass Index</h3>
+            <h3><span class="hico">${window.icon('barChart2')}</span> Body Mass Index</h3>
             <span class="ch-meta">LIVE</span>
           </div>
           <div class="vitals-bmi-big"><span data-out="bmi">—</span><small>BMI</small></div>
@@ -254,7 +254,7 @@
       <div class="grid cols-2" style="margin-bottom:var(--gap)">
         <div class="card vitals-log">
           <div class="card-head">
-            <h3><span class="hico">✍️</span> Quick log</h3>
+            <h3><span class="hico">${window.icon('signature')}</span> Quick log</h3>
             <span class="ch-meta">→ HUB</span>
           </div>
           <div class="vitals-quick">
@@ -269,7 +269,7 @@
           </div>
           <hr class="vitals-hr">
           <div class="card-head" style="margin-bottom:10px">
-            <h3 style="font-size:13px"><span class="hico">🏋️</span> Log a workout</h3>
+            <h3 style="font-size:13px"><span class="hico">${window.icon('activity')}</span> Log a workout</h3>
           </div>
           <div class="vitals-wk-form">
             <select class="nft-in" id="vit-wk-type">
@@ -283,13 +283,13 @@
             <span class="vitals-field-in"><input type="number" id="vit-wk-cal" min="0" step="10" placeholder="Calories"><em>kcal</em></span>
             <span class="vitals-field-in"><input type="number" id="vit-wk-dist" min="0" step="0.1" placeholder="Distance"><em>km</em></span>
             <input class="nft-in vitals-wk-note" id="vit-wk-note" placeholder="Note (optional)">
-            <button class="btn btn-sm btn-primary vitals-wk-add" data-q="workout">＋ Add workout</button>
+            <button class="btn btn-sm btn-primary vitals-wk-add" data-q="workout">${window.icon('plus')} Add workout</button>
           </div>
         </div>
 
         <div class="card vitals-workouts">
           <div class="card-head">
-            <h3><span class="hico">📋</span> Recent workouts</h3>
+            <h3><span class="hico">${window.icon('fileText')}</span> Recent workouts</h3>
             <span class="ch-meta" id="vit-wk-meta">—</span>
           </div>
           <div id="vit-wk-list"><div class="nft-loading" style="padding:16px"><span class="nft-spin"></span> Loading…</div></div>
@@ -300,14 +300,14 @@
       <div class="grid cols-2" style="margin-bottom:var(--gap)">
         <div class="card vitals-hist">
           <div class="card-head">
-            <h3><span class="hico">📊</span> Steps · last 14 days</h3>
+            <h3><span class="hico">${window.icon('barChart2')}</span> Steps · last 14 days</h3>
             <span class="ch-meta" id="vit-steps-meta">—</span>
           </div>
           <div id="vit-steps-chart" class="vitals-chart"><div class="nft-loading" style="padding:16px"><span class="nft-spin"></span></div></div>
         </div>
         <div class="card vitals-hist">
           <div class="card-head">
-            <h3><span class="hico">🌙</span> Recovery &amp; sleep trend</h3>
+            <h3><span class="hico">${window.icon('activity')}</span> Recovery &amp; sleep trend</h3>
             <span class="ch-meta" id="vit-trend-meta">—</span>
           </div>
           <div id="vit-trend-chart" class="vitals-chart"><div class="nft-loading" style="padding:16px"><span class="nft-spin"></span></div></div>
@@ -317,7 +317,7 @@
       <!-- ── WEARABLES ─────────────────────────────────────────────────── -->
       <div class="card vitals-devices" id="vit-wear">
         <div class="card-head">
-          <h3><span class="hico">⌚</span> Wearables</h3>
+          <h3><span class="hico">${window.icon('activity')}</span> Wearables</h3>
           <span class="ch-meta" id="vit-wear-meta">CHECKING…</span>
         </div>
         <div id="vit-wear-body"><div class="nft-loading" style="padding:16px"><span class="nft-spin"></span> Checking connections…</div></div>
@@ -478,7 +478,7 @@
                 <span class="vitals-bd-pill is-move">Move +${num(b.movementBonus)}</span>
               </div>
               <p class="vitals-hud-tip">${stepPct >= 100
-                ? `🎉 You hit 10,000 steps — that added <b>+${num(b.movementBonus)} kcal</b> to today's budget.`
+                ? `${window.icon('checkCircle')} You hit 10,000 steps — that added <b>+${num(b.movementBonus)} kcal</b> to today's budget.`
                 : `Every step earns calories back. Reaching <b>10,000 steps</b> would raise today's budget by about <b>+${num(stepBonusTo(state.body, b, stepGoal))} kcal</b>.`}</p>
             </div>
           </div>
@@ -576,7 +576,7 @@
         listEl.innerHTML = offlineRow('Workout logging is live on bifrostlkl.com.');
       }
     }
-    const WK_ICO = { run: '🏃', walk: '🚶', ride: '🚴', strength: '🏋️', swim: '🏊', hiit: '🔥', yoga: '🧘', row: '🚣', other: '⚡' };
+    const WK_ICO = { run: 'activity', walk: 'activity', ride: 'activity', strength: 'activity', swim: 'activity', hiit: 'zap', yoga: 'activity', row: 'activity', other: 'zap' };
     function workoutRow(w) {
       const when = w.performed_at ? new Date(w.performed_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '';
       const bits = [];
@@ -584,12 +584,12 @@
       if (w.calories) bits.push(num(w.calories) + ' kcal');
       if (w.distance_m) bits.push((w.distance_m / 1000).toFixed(1) + ' km');
       return `<div class="vitals-wk-item">
-        <div class="vitals-wk-ico">${WK_ICO[w.type] || '⚡'}</div>
+        <div class="vitals-wk-ico">${window.icon(WK_ICO[w.type] || 'zap')}</div>
         <div class="vitals-wk-main">
           <div class="vitals-wk-title">${esc((w.type || 'workout').replace(/^\w/, c => c.toUpperCase()))}${w.note ? ` · <span class="muted">${esc(w.note)}</span>` : ''}</div>
           <div class="vitals-wk-sub">${esc(bits.join(' · ') || '—')}${when ? ' · ' + esc(when) : ''}</div>
         </div>
-        <button class="nft-adm-mini" data-nfc="deactivate" data-del="${esc(w.id)}" title="Delete">✕</button>
+        <button class="nft-adm-mini" data-nfc="deactivate" data-del="${esc(w.id)}" title="Delete">${window.icon('close')}</button>
       </div>`;
     }
     async function deleteWorkout(id) {
@@ -693,11 +693,11 @@
         const on = st === 'connected';
         const conf = on || st === 'configured' || cfg[key];
         let action;
-        if (on) action = `<span class="vitals-dev-state">● Connected — syncing your data</span>`;
-        else if (conf) action = `<a class="btn btn-sm btn-primary" href="/api/${key}-start">🔗 Connect ${name}</a>`;
+        if (on) action = `<span class="vitals-dev-state">${window.icon('checkCircle')} Connected — syncing your data</span>`;
+        else if (conf) action = `<a class="btn btn-sm btn-primary" href="/api/${key}-start">${window.icon('link')} Connect ${name}</a>`;
         else action = `<span class="vitals-dev-state muted">needs <code>${env}</code> in Vercel</span>`;
         return `<div class="vitals-dev ${on ? 'vitals-dev--on' : ''}" style="--da:var(--accent1)">
-          <div class="vitals-dev-ico">${key === 'whoop' ? '🟢' : '💍'}</div>
+          <div class="vitals-dev-ico">${window.icon('activity')}</div>
           <div class="vitals-dev-body">
             <div class="vitals-dev-name">${name}</div>
             <div class="vitals-dev-sub">${on ? 'Recovery · sleep · HRV · resting HR' : key === 'whoop' ? 'Recovery, strain & sleep' : 'Readiness & sleep'}</div>
@@ -769,9 +769,9 @@
     /* ── Sync now ───────────────────────────────────────────────────────── */
     root.querySelector('#vit-sync').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
-      btn.disabled = true; const orig = btn.textContent; btn.textContent = '⟳ Syncing…';
+      btn.disabled = true; const orig = btn.innerHTML; btn.innerHTML = window.icon('refreshCw') + ' Syncing…';
       const res = await api('/api/vitals-sync', { method: 'POST' });
-      btn.disabled = false; btn.textContent = orig;
+      btn.disabled = false; btn.innerHTML = orig;
       if (res && res._offline) { H.toast('Wearable sync is live on bifrostlkl.com.', 'info'); return; }
       if (res && (res.ok || res.synced != null)) {
         const n = res.synced != null ? res.synced : '';
@@ -804,5 +804,5 @@
   }
   function offlineRow(msg) { return `<div class="nft-locked">${esc(msg)}</div>`; }
 
-  H.register({ id: 'vitals', label: 'Vitals', icon: '❤️', scope: 'personal', render });
+  H.register({ id: 'vitals', label: 'Vitals', icon: window.icon('heart'), scope: 'personal', render });
 })();
