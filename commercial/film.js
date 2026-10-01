@@ -201,7 +201,12 @@
   async function settle(timeout = 12000) {
     for (let round = 0; round < 4 && pending.length; round++) {
       const list = pending; pending = [];
-      await Promise.race([Promise.all(list), delay(timeout).then(() => console.warn('[BV] preload timeout after ' + timeout + 'ms'))]);
+      let done = false, timer = 0;
+      await Promise.race([
+        Promise.all(list).then(() => { done = true; }),
+        new Promise(r => { timer = setTimeout(() => { if (!done) console.warn('[BV] preload timeout after ' + timeout + 'ms'); r(); }, timeout); })
+      ]);
+      clearTimeout(timer);
     }
   }
 

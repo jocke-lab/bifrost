@@ -614,7 +614,7 @@
     var FACE = 'M414,352C410,362 408,370 410,377C412,383 410,389 406,395C402,401 398,407 397,411C397,415 401,418 408,418' +
       'C407,423 406,427 408,429C411,431 412,433 410,435C407,438 407,442 411,445C414,447 414,450 412,454' +
       'C410,462 414,470 426,474C440,478 454,474 464,466L480,430L476,380L446,350Z';
-    var NECK = 'M430,470C440,492 452,516 462,548L556,540C540,512 530,486 524,452L480,440Z';
+    var NECK = 'M432,472C444,494 456,516 466,552L560,540C546,512 534,484 526,450L480,440Z';
     var HELM = 'M404,354C398,302 444,266 500,266C558,266 590,312 584,368L572,412C552,400 528,396 510,398L504,446C494,462 474,466 462,456L456,394C446,372 428,360 404,354Z';
     var HELM_LINES = 'M408,350C440,338 476,334 506,338C538,342 566,354 584,370M414,334C446,322 478,318 508,322C540,326 568,340 586,356' +
       'M470,272C476,296 478,316 476,330M456,396C468,400 486,401 504,400M458,418C472,421 488,421 504,418M460,438C472,441 486,441 500,436';
@@ -622,56 +622,64 @@
     function helmWing() {
       var d = '', lines = '';
       for (var i = 0; i < 6; i++) {
-        var B = [520 + i * 9, 322 + i * 7];
-        var ang = (-78 + i * 13) * D, L = 104 - i * 9;
-        var T = [B[0] + Math.cos(ang) * L + 18, B[1] + Math.sin(ang) * L];
-        d += featherBT(B, T, 22 - i, 1.2);
+        var B = [522 + i * 8, 326 + i * 6];
+        var ang = (-80 + i * 13) * D, L = 96 - i * 9;
+        var T = [B[0] + Math.cos(ang) * L + 22, B[1] + Math.sin(ang) * L];
+        d += featherBT(B, T, 20 - i, 1.8);
         lines += 'M' + P(lerp(B[0], T[0], 0.15), lerp(B[1], T[1], 0.15)) + 'L' + P(lerp(B[0], T[0], 0.82), lerp(B[1], T[1], 0.82));
       }
       return { d: d, lines: lines };
     }
     var HW = helmWing();
-    // flowing hair: three locks streaming back behind the far shoulder
-    function lock(x0, y0, dx, dy, w, seed) {
-      var sp = [];
-      for (var i = 0; i <= 12; i++) {
-        var t = i / 12;
-        sp.push([x0 + dx * t + Math.sin(t * PI * 1.6 + seed) * 18 * t, y0 + dy * t + Math.sin(t * PI * 1.1 + seed) * 6]);
-      }
-      var rb = ribbonPts(sp, function (t) { return w * (1 - t * 0.85) * (0.55 + 0.45 * Math.sin(Math.min(t * 3, 1) * PI / 2)); });
-      var d = smooth(rb.L.concat(rb.R.reverse()), true, 0.9);
+    // flowing hair: an S-curved mass streaming behind the neck over the far shoulder
+    function lock(sp, w0, w1, wEnd) {
+      var rb = ribbonPts(sp, function (t) { return lerp(lerp(w0, w1, Math.sin(Math.min(t / 0.5, 1) * PI / 2)), wEnd, Math.pow(Math.max(0, (t - 0.5) / 0.5), 1.4)); });
+      var d = smooth(rb.L.concat(rb.R.slice().reverse()), true, 0.9);
       var lines = '';
-      for (var k = -1; k <= 1; k++) {
-        var lp = sp.map(function (p, i) { var q = rb.L[i], r = rb.R[rb.R.length - 1 - i]; return [lerp(p[0], (k < 0 ? q : r)[0], Math.abs(k) * 0.5), lerp(p[1], (k < 0 ? q : r)[1], Math.abs(k) * 0.5)]; });
-        lines += smooth(lp.slice(1, 11), false);
-      }
+      [-0.36, -0.12, 0.12, 0.36].forEach(function (k) {
+        var lp = sp.map(function (p, i) { var q = rb.L[i], r = rb.R[i]; return [lerp(q[0], r[0], 0.5 + k), lerp(q[1], r[1], 0.5 + k)]; });
+        lines += smooth(lp.slice(1, lp.length - 1), false);
+      });
       return { d: d, lines: lines };
     }
-    var LOCKS = [lock(552, 404, 120, 250, 44, 0.2), lock(572, 396, 150, 210, 38, 1.4), lock(540, 420, 70, 280, 34, 2.4)];
+    function sCurve(pts) { var out = []; for (var i = 0; i < pts.length - 1; i++) for (var k = 0; k < 4; k++) { var t = k / 4; out.push([lerp(pts[i][0], pts[i + 1][0], t), lerp(pts[i][1], pts[i + 1][1], t)]); } out.push(pts[pts.length - 1]); return out; }
+    var LOCKS = [
+      lock(sCurve([[548, 396], [590, 430], [606, 486], [632, 540], [672, 580], [690, 630], [672, 690]]), 60, 84, 8),
+      lock(sCurve([[574, 388], [626, 410], [640, 460], [672, 500], [712, 528], [726, 570]]), 34, 42, 6),
+      lock(sCurve([[540, 430], [556, 480], [552, 540], [574, 600], [600, 640], [598, 690]]), 30, 38, 6)
+    ];
     var HAIR = LOCKS.map(function (l) { return l.d; }).join('');
     var HAIR_LINES = LOCKS.map(function (l) { return l.lines; }).join('');
     var EYE = 'M420,388C426,384 434,384 440,388C434,392 426,393 420,388Z';
-    var FACE_LINES = 'M416,379C424,375 434,375 444,379M436,400C442,406 444,414 442,422M411,431L418,432';
-    var TORSO = 'M352,600C372,566 414,552 456,550L560,546C604,546 644,566 662,600C676,632 680,700 678,840L330,840C326,740 330,640 352,600Z';
-    var PAULDRON = 'M318,652C316,602 352,568 404,564C452,562 484,590 486,628C442,614 392,618 352,640C338,648 326,658 318,670Z';
-    var PAULDRON2 = 'M324,700C340,670 384,650 430,650C458,650 480,662 488,680C450,672 406,678 370,694C352,702 336,712 326,724Z';
-    var GORGET = 'M456,546C486,562 528,562 560,544L566,580C530,598 486,598 452,582Z';
-    var CHEST_LINES = 'M520,600L520,840M478,640L520,664L562,640M470,692L520,722L570,692M462,746L520,782L578,746';
-    var SCALES = (function () {
-      var d = '';
-      for (var r = 0; r < 7; r++) for (var c = 0; c < 5; c++) {
-        var x = 588 + c * 17 + (r % 2) * 8.5, y = 620 + r * 15;
-        d += 'M' + P(x - 8.5, y) + 'Q' + P(x - 8.5, y + 11) + ' ' + P(x, y + 12) + 'Q' + P(x + 8.5, y + 11) + ' ' + P(x + 8.5, y);
-      }
+    var FACE_LINES = 'M416,379C424,375 434,375 444,379M411,431L418,432M422,408C426,412 430,413 434,412';
+    var TORSO = 'M466,550C440,554 410,558 388,568C362,580 348,604 344,640C340,700 346,780 352,840L668,840C672,770 674,700 672,652C670,612 652,584 626,570C604,558 582,548 560,540Z';
+    // near-shoulder pauldron: a dome with three lames
+    var PAULDRON = 'M334,644C332,598 364,566 410,562C448,560 474,582 480,614C442,604 400,608 364,626C352,632 342,640 334,652Z';
+    var PAULDRON2 = 'M336,672C352,644 390,630 430,630C456,630 474,638 482,652C448,646 408,652 374,668C360,674 346,684 338,696Z' +
+      'M340,716C356,690 392,678 430,678C454,678 472,684 480,696C448,692 410,698 380,712C364,718 352,728 342,740Z';
+    var GORGET = 'M462,546C494,562 532,560 562,540L570,576C536,596 490,598 456,582Z';
+    // breastplate: rising-sun emblem + deco chevrons
+    var CHEST_LINES = (function () {
+      var cx = 532, cy = 714;
+      var d = 'M' + cx + ',' + cy + 'L' + cx + ',840M' + (cx - 40) + ',774L' + cx + ',798L' + (cx + 40) + ',774M' + (cx - 48) + ',810L' + cx + ',838L' + (cx + 48) + ',810';
+      d += 'M' + (cx - 46) + ',' + cy + 'A46,46 0 0 1 ' + (cx + 46) + ',' + cy + 'Z';
+      for (var i = 0; i <= 10; i++) { var a = lerp(186, 354, i / 10) * D, p0 = pol(cx, cy, 17, a), p1 = pol(cx, cy, 42, a); d += 'M' + P(p0[0], p0[1]) + 'L' + P(p1[0], p1[1]); }
+      d += 'M' + (cx - 14) + ',' + cy + 'A14,14 0 0 1 ' + (cx + 14) + ',' + cy;
+      // cloak pleats falling from a brooch on the far shoulder
+      for (var k = 0; k < 5; k++) { var x0 = 606 + k * 13; d += 'M' + P(x0, 604) + 'C' + P(x0 + 4, 680) + ' ' + P(x0 - 6, 760) + ' ' + P(x0 + 2 + k * 2, 840); }
       return d;
     })();
+    var SCALES = '';
+    var BROOCH = [604, 588];
     var GORGET_FAN = (function () {
-      var d = '';
+      var d = 'M' + P(BROOCH[0] - 10, BROOCH[1]) + 'A10,10 0 1 0 ' + P(BROOCH[0] + 10, BROOCH[1]) + 'A10,10 0 1 0 ' + P(BROOCH[0] - 10, BROOCH[1]);
       for (var i = 0; i <= 8; i++) { var a = lerp(200, 340, i / 8) * D; var p0 = pol(508, 600, 10, a), p1 = pol(508, 600, 40, a); d += 'M' + P(p0[0], p0[1]) + 'L' + P(p1[0], p1[1]); }
       return d;
     })();
+    var BROOCH_D = 'M' + P(BROOCH[0] - 18, BROOCH[1]) + 'A18,18 0 1 0 ' + P(BROOCH[0] + 18, BROOCH[1]) + 'A18,18 0 1 0 ' + P(BROOCH[0] - 18, BROOCH[1]) + 'Z';
     var BODY = TORSO + NECK + FACE + HELM + HW.d;
-    var ARMOUR = PAULDRON + PAULDRON2 + GORGET;
+    var BODY_BACK = TORSO + NECK, BODY_FRONT = FACE + HELM + HW.d;
+    var ARMOUR = PAULDRON + PAULDRON2 + GORGET + BROOCH_D;
     var GLINTS = (function () {
       var out = [], r = rng(1912);
       [WL, WR].forEach(function (W) {
@@ -699,15 +707,20 @@
     var RAYS = rays(30, 520, 64);
     function wingCells(W, gid) { return W.cells.map(function (c) { return '<path d="' + c.d + '" fill="url(#' + gid + ')"/>'; }).join(''); }
     function wingMask(W) {
-      return W.cells.map(function (c) { return '<path d="' + c.d + '" fill="#ececec" stroke="#000" stroke-width="2.4" stroke-linejoin="round"/>'; }).join('') + path(W.bone, 'fill="#000"');
+      return W.cells.map(function (c) { return '<path d="' + c.d + '" fill="#f4f4f4" stroke="#000" stroke-width="2.4" stroke-linejoin="round"/>'; }).join('') + path(W.bone, 'fill="#000"');
     }
 
     function field(u) {
-      var wg = [[0, '#3a22a8'], [0.3, '#6a4cf0'], [0.55, '#7C5CFF'], [0.8, '#5b80ff'], [1, '#4D8DFF']];
+      var wg = [[0, '#2c1690'], [0.3, '#5a3df0'], [0.55, '#7C5CFF'], [0.8, '#5a84ff'], [1, '#4D8DFF']];
       var defs = rg(u + '-wl', 430, 540, 330, wg) + rg(u + '-wr', 570, 530, 330, wg) +
         lg(u + '-frost', 0, 266, 0, 840, [[0, '#FFF8E2'], [0.45, '#F9E6AE'], [1, '#EFCF7E']]) +
         rg(u + '-mir', SUN[0], SUN[1] - 60, 420, [[0, '#FFF1C1', 0.35], [0.35, '#b07a1c', 0.08], [0.75, '#5a3405', 0.32], [1, '#3a2003', 0.55]]) +
-        rg(u + '-sheen', 500, 330, 300, [[0, '#ffffff', 0.35], [1, '#ffffff', 0]]);
+        rg(u + '-sheen', 500, 330, 300, [[0, '#ffffff', 0.35], [1, '#ffffff', 0]]) +
+        lg(u + '-shx', 340, 0, 680, 0, [[0, '#7a4a0a', 0.55], [0.18, '#a8741c', 0.15], [0.45, '#ffffff', 0.12], [0.75, '#a8741c', 0.2], [1, '#6b3f08', 0.6]]) +
+        lg(u + '-shy', 0, 540, 0, 840, [[0, '#ffffff', 0], [0.6, '#8a5a12', 0.1], [1, '#5a3405', 0.45]]) +
+        rg(u + '-hl', 470, 300, 120, [[0, '#ffffff', 0.7], [1, '#ffffff', 0]]) +
+        lg(u + '-nsh', 0, 470, 0, 560, [[0, '#6b3f08', 0.55], [1, '#6b3f08', 0]]) +
+        '<radialGradient id="' + u + '-gl"><stop offset="0" stop-color="#ffffff" stop-opacity=".9"/><stop offset=".35" stop-color="#c9d8ff" stop-opacity=".35"/><stop offset="1" stop-color="#c9d8ff" stop-opacity="0"/></radialGradient>';
       var out = '<defs>' + defs + '</defs>';
       out += '<rect x="140" y="140" width="720" height="720" fill="url(#' + u + '-mir)"/>';
       out += path(RAYS.wedges, 'fill="#FFF1C1" fill-opacity=".16"');
@@ -716,11 +729,14 @@
       var sh = '';
       [WL, WR].forEach(function (W) { W.cells.forEach(function (c) { if (c.row === 0) sh += 'M' + P(lerp(c.B[0], c.T[0], 0.5), lerp(c.B[1], c.T[1], 0.5)) + 'L' + P(lerp(c.B[0], c.T[0], 0.9), lerp(c.B[1], c.T[1], 0.9)); }); });
       out += path(sh, 'stroke="#d9e2ff" stroke-opacity=".55" stroke-width="1.5" fill="none"');
-      out += '<rect x="140" y="140" width="720" height="720" fill="url(#' + u + '-sheen)"/>';
-      out += path(BODY, 'fill="url(#' + u + '-frost)"') + path(HAIR, 'fill="url(#' + u + '-frost)"') + path(ARMOUR, 'fill="url(#' + u + '-frost)"');
-      var eng = HELM_LINES + HAIR_LINES + FACE_LINES + CHEST_LINES + SCALES + HW.lines + GORGET_FAN;
-      out += path(eng, 'stroke="#7a4f0e" stroke-width="1.8" fill="none" stroke-linecap="round"');
-      out += path(BODY + HAIR + ARMOUR, 'stroke="#5e3a08" stroke-width="2.6" fill="none" stroke-linejoin="round"');
+      out += '<rect x="140" y="140" width="720" height="720" fill="url(#' + u + '-sheen)" opacity=".6"/>';
+      out += GLINTS.map(function (g) { return '<circle cx="' + n(g[0]) + '" cy="' + n(g[1]) + '" r="' + n(g[2] * 0.9) + '" fill="url(#' + u + '-gl)"/>' + path(star4(g[0], g[1], g[2], 0.12, 0), 'fill="#FFFBEA"'); }).join('');
+      var F = 'fill="url(#' + u + '-frost)"', O = 'fill="none" stroke="#5e3a08" stroke-width="2.6" stroke-linejoin="round"', E = 'stroke="#7a4f0e" stroke-width="1.8" fill="none" stroke-linecap="round"';
+      out += path(BODY_BACK, F) + path(TORSO, 'fill="url(#' + u + '-shx)"') + path(TORSO, 'fill="url(#' + u + '-shy)"') + path(NECK, 'fill="url(#' + u + '-nsh)"') +
+        path(CHEST_LINES + SCALES, E) + path(BODY_BACK, O);
+      out += path(ARMOUR, F) + path(GORGET_FAN, E) + path(ARMOUR, O);
+      out += path(HAIR, F) + path(HAIR_LINES, E) + path(HAIR, O);
+      out += path(BODY_FRONT, F) + path(HELM, 'fill="url(#' + u + '-hl)"') + path(HELM_LINES + FACE_LINES + HW.lines, E) + path(BODY_FRONT, O);
       out += path(EYE, 'fill="#5e3a08"');
       out += HELM_RIVETS.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="2.4" fill="#7a4f0e"/>'; }).join('');
       return out;
@@ -728,10 +744,12 @@
     function inkMask(u) {
       var m = '<rect x="0" y="0" width="1000" height="1000" fill="#fff" fill-opacity=".85"/>';
       m += wingMask(WR) + wingMask(WL);
-      m += GLINTS.map(function (g) { return path(star4(g[0], g[1], g[2], 0.13, 0), 'fill="#000"'); }).join('');
-      m += path(BODY + HAIR + ARMOUR, 'fill="#7a7a7a"');
-      m += path(HELM_LINES + HAIR_LINES + FACE_LINES + CHEST_LINES + SCALES + HW.lines + GORGET_FAN, 'stroke="#fff" stroke-width="2.2" fill="none"');
-      m += path(BODY + HAIR + ARMOUR, 'stroke="#fff" stroke-width="3" fill="none"');
+      m += GLINTS.map(function (g) { return '<circle cx="' + n(g[0]) + '" cy="' + n(g[1]) + '" r="' + n(g[2] * 0.9) + '" fill="#fff"/>'; }).join('');
+      var G = 'fill="#9a9a9a"', W = 'fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"', Wl = 'stroke="#fff" stroke-width="2.2" fill="none"';
+      m += path(BODY_BACK, G) + path(CHEST_LINES + SCALES, Wl) + path(BODY_BACK, W);
+      m += path(ARMOUR, G) + path(GORGET_FAN, Wl) + path(ARMOUR, W);
+      m += path(HAIR, G) + path(HAIR_LINES, Wl) + path(HAIR, W);
+      m += path(BODY_FRONT, G) + path(HELM_LINES + FACE_LINES + HW.lines, Wl) + path(BODY_FRONT, W);
       m += path(EYE, 'fill="#fff"');
       return m;
     }
@@ -742,6 +760,383 @@
       return reliefWrap(u, inner, 2.4);
     }
     return { metal: 'au', field: field, inkMask: inkMask, relief: relief };
+  })();
+
+  /* ================================================================= HEIMDALL
+     Legendary gold (the hero). Heimdall at Asgard's gate sounding the
+     Gjallarhorn; a full-colour enamel aurora bridge sweeps rim to rim with a
+     violet and a mint dot at its feet (the Bifrost mark); deep mirror-proof sky
+     with a micro starfield; Art Deco gate architecture; god-rays. */
+  var HEIMDALL = (function () {
+    var BR = { cx: 500, cy: 628, rx: 282, ry: 372, w: 58 }; // bridge half-ellipse (logo proportions)
+    var DOOR = { x0: 414, x1: 586, top: 404, sill: 772 };
+    function arcPath(rx, ry) {
+      return 'M' + P(BR.cx - rx, BR.cy) + 'A' + n(rx) + ' ' + n(ry) + ' 0 0 1 ' + P(BR.cx + rx, BR.cy);
+    }
+    // gate architecture -----------------------------------------------------
+    function stepTower(x0, x1, top, steps) {
+      // ziggurat-topped pylon from x0..x1, top y, down to the sill
+      var pts = [[x0, DOOR.sill]], st = steps || 3, inset = (x1 - x0) * 0.14;
+      for (var i = 0; i < st; i++) {
+        var y = top + (st - 1 - i) * 0; // placeholder
+      }
+      var w = x1 - x0, d = 'M' + P(x0, DOOR.sill);
+      d += 'L' + P(x0, top + 54) + 'L' + P(x0 + inset, top + 54) + 'L' + P(x0 + inset, top + 26) + 'L' + P(x0 + inset * 2, top + 26) + 'L' + P(x0 + inset * 2, top) +
+        'L' + P(x1 - inset * 2, top) + 'L' + P(x1 - inset * 2, top + 26) + 'L' + P(x1 - inset, top + 26) + 'L' + P(x1 - inset, top + 54) + 'L' + P(x1, top + 54) + 'L' + P(x1, DOOR.sill) + 'Z';
+      return d;
+    }
+    var PYL_L = stepTower(326, 414, 352), PYL_R = stepTower(586, 674, 352);
+    // central gate block with a tall stepped arch opening
+    var GATE = 'M404,' + DOOR.sill + 'L404,384L432,384L432,362L458,362L458,340L542,340L542,362L568,362L568,384L596,384L596,' + DOOR.sill + 'Z';
+    var OPEN = 'M' + DOOR.x0 + ',' + DOOR.sill + 'L' + DOOR.x0 + ',476L432,476L432,452L452,452L452,430L472,430L472,412L528,412L528,430L548,430L548,452L568,452L568,476L' + DOOR.x1 + ',476L' + DOOR.x1 + ',' + DOOR.sill + 'Z';
+    var WALLS = 'M246,' + DOOR.sill + 'L246,560L262,560L262,546L282,546L282,560L298,560L298,546L318,546L318,560L326,560L326,' + DOOR.sill + 'Z' +
+      'M674,' + DOOR.sill + 'L674,560L682,560L682,546L702,546L702,560L718,560L718,546L738,546L738,560L754,560L754,' + DOOR.sill + 'Z';
+    var STEPS = 'M196,' + DOOR.sill + 'H804V860H196Z';
+    var ARCH_LINES = (function () {
+      var d = '';
+      // fluting on the pylons
+      [[326, 414], [586, 674]].forEach(function (p) { for (var k = 1; k < 5; k++) { var x = lerp(p[0] + 12, p[1] - 12, k / 5); d += 'M' + n(x) + ',420V' + (DOOR.sill - 14); } d += 'M' + p[0] + ',406H' + p[1] + 'M' + p[0] + ',' + (DOOR.sill - 14) + 'H' + p[1]; });
+      // keystone fan above the opening
+      for (var i = 0; i <= 8; i++) { var a = lerp(200, 340, i / 8) * D, p0 = pol(500, 404, 14, a), p1 = pol(500, 404, 52, a); d += 'M' + P(p0[0], p0[1]) + 'L' + P(p1[0], p1[1]); }
+      // steps
+      for (var s = 1; s < 5; s++) { var y = DOOR.sill + s * 16; d += 'M196,' + y + 'H804'; }
+      // masonry on walls
+      for (var r = 0; r < 12; r++) { var y2 = 576 + r * 16; d += 'M246,' + y2 + 'H326M674,' + y2 + 'H754'; }
+      return d;
+    })();
+    // Heimdall ------------------------------------------------------------
+    var HORN_SP = (function () { var a = []; for (var i = 0; i <= 16; i++) { var t = i / 16; a.push([lerp(516, 676, t) - Math.sin(t * PI) * 10, lerp(526, 376, t) + Math.sin(t * PI) * 34 - t * t * 8]); } return a; })();
+    var HORN_RB = ribbonPts(HORN_SP, function (t) { return lerp(7, 34, Math.pow(t, 1.6)); });
+    var HORN = smooth(HORN_RB.L.concat(HORN_RB.R.slice().reverse()), true, 0.8);
+    var BELL = (function () { var e = HORN_SP[16], p = HORN_SP[15], a = Math.atan2(e[1] - p[1], e[0] - p[0]); var q = pol(e[0], e[1], 4, a); return { x: q[0], y: q[1], a: a }; })();
+    var HORN_BANDS = (function () { var d = ''; [0.3, 0.55, 0.78, 0.93].forEach(function (t) { var i = Math.round(t * 16); d += 'M' + P(HORN_RB.L[i][0], HORN_RB.L[i][1]) + 'L' + P(HORN_RB.R[i][0], HORN_RB.R[i][1]); }); return d; })();
+    var CAPE = 'M502,552C476,558 452,584 436,630C420,676 400,722 366,766L384,774L398,764L414,776L430,764L446,774L460,762C458,716 466,662 484,616C490,598 496,580 506,566Z';
+    var CAPE_LINES = 'M482,580C462,620 444,680 410,766M494,592C478,640 466,700 446,770M470,600C454,650 432,710 392,768';
+    var TORSO_H = 'M498,536L514,536L516,550C524,552 530,558 530,568L526,606C524,622 524,634 524,644L490,644C490,632 488,618 486,604L484,572C484,560 490,552 498,550Z';
+    var SKIRT = 'M490,642L524,642L540,706C520,714 494,714 474,706Z';
+    var HEAD = 'M496,520C494,508 502,500 512,501C520,502 524,508 524,514L528,520C528,523 525,524 523,524L524,530L516,538C506,540 498,534 496,524Z';
+    var BEARD = 'M506,532C510,540 512,548 508,558C516,554 522,546 524,536L522,528Z';
+    var HELMH = 'M494,516C492,500 502,490 514,490C524,490 530,498 530,510L524,512C520,506 512,504 504,506L500,520Z';
+    var CREST = 'M506,492C496,474 476,466 456,470C470,474 482,482 490,494Z' + 'M512,490L516,474L520,490Z';
+    // limbs as rounded strokes: [path, width]
+    var LIMBS = [
+      ['M494,566L512,594L530,524', 13],          // far arm up to the horn
+      ['M522,566L552,574L552,516', 13],          // near arm up to the horn
+      ['M500,700L486,736L470,768', 18],          // back leg
+      ['M516,700L536,732L546,768', 18]           // front leg
+    ];
+    var BOOTS = 'M458,762L482,762L486,776L452,776Z' + 'M536,762L560,762L566,776L532,776Z';
+    var HANDS = [[530, 520, 8], [552, 512, 8]];
+    var BELT = 'M488,640L526,640L526,650L488,650Z';
+    var FIG = CAPE + TORSO_H + SKIRT + HEAD + BEARD + HELMH + CREST + BOOTS;
+    var FIG_LINES = CAPE_LINES + 'M480,676L532,676M478,692L536,692M496,560L500,600M506,512L510,512';
+    function limbs(stroke, w0) {
+      return LIMBS.map(function (l) { return '<path d="' + l[0] + '" fill="none" stroke="' + stroke + '" stroke-width="' + (l[1] + w0) + '" stroke-linecap="round" stroke-linejoin="round"/>'; }).join('');
+    }
+    function hands(fill, r0) { return HANDS.map(function (h) { return '<circle cx="' + h[0] + '" cy="' + h[1] + '" r="' + (h[2] + r0) + '" fill="' + fill + '"/>'; }).join(''); }
+    // sky -------------------------------------------------------------------
+    var STARS = (function () {
+      var r = rng(25), out = [];
+      for (var i = 0; i < 900; i++) {
+        var x = 170 + r() * 660, y = 172 + r() * 640, rr = Math.hypot(x - 500, y - 500);
+        if (rr > 324) continue;
+        var inDoor = x > DOOR.x0 + 4 && x < DOOR.x1 - 4 && y > 480 && y < 700;
+        if (!inDoor && y > 336 && x > 320 && x < 680) continue; // behind the gate
+        var e = Math.hypot((x - BR.cx) / BR.rx, (y - BR.cy) / BR.ry); if (Math.abs(e - 1) < 0.135 && y < BR.cy + 30) continue; // on the bridge
+        if (y > 540 && (x < 340 || x > 660) && !inDoor) continue;
+        if (inDoor && Math.abs(x - 510) < 70 && y > 470) continue; // keep the figure clean
+        var big = Math.pow(r(), 9);
+        out.push([x, y, 0.7 + big * 10 + r() * 0.8]);
+      }
+      return out;
+    })();
+    var SPARKS = (function () { // glints riding the bridge
+      var r = rng(707), out = [];
+      for (var i = 0; i < 9; i++) {
+        var t = lerp(0.08, 0.92, (i + r() * 0.6) / 9) * PI, k = (r() - 0.5) * 0.7;
+        out.push([BR.cx - Math.cos(t) * (BR.rx + k * BR.w), BR.cy - Math.sin(t) * (BR.ry + k * BR.w), 6 + r() * 9]);
+      }
+      return out;
+    })();
+    var RAYS = (function () {
+      var d = '';
+      for (var i = 0; i < 26; i++) {
+        var a0 = lerp(-172, -8, i / 25) * D, a1 = a0 + 2.2 * D, o = [500, 640];
+        var p1 = pol(o[0], o[1], 520, a0), p2 = pol(o[0], o[1], 520, a1);
+        d += poly([o, p1, p2]);
+      }
+      return d;
+    })();
+    var FEET = [[BR.cx - BR.rx, BR.cy, '#7C5CFF'], [BR.cx + BR.rx, BR.cy, '#46E6A6']];
+    var FIG_TF = 'translate(510,776) scale(1.14) translate(-510,-776)';
+    // enamel inlays on the pylons (aurora colours) + capitals
+    var INLAYS = [[370, 380, '#7C5CFF'], [630, 380, '#46E6A6']];
+    function inlay(x, y) { return 'M' + P(x, y - 13) + 'L' + P(x + 10, y) + 'L' + P(x, y + 13) + 'L' + P(x - 10, y) + 'Z'; }
+
+    function field(u) {
+      var defs = rg(u + '-sky', 500, 690, 520, [[0, '#3a2408', 0.25], [0.35, '#1a0f05', 0.72], [0.7, '#0d0703', 0.86], [1, '#070402', 0.92]]) +
+        rg(u + '-aur', 500, 640, 420, [[0, '#7C5CFF', 0], [0.6, '#4D8DFF', 0.0], [0.82, '#7C5CFF', 0.22], [1, '#19D3FF', 0]]) +
+        lg(u + '-br', BR.cx - BR.rx - 30, 0, BR.cx + BR.rx + 30, 0, [[0, '#7C5CFF'], [0.36, '#4D8DFF'], [0.66, '#19D3FF'], [1, '#46E6A6']]) +
+        lg(u + '-door', 0, DOOR.top, 0, DOOR.sill, [[0, '#120a3a'], [0.45, '#2a1e8a'], [0.75, '#2f7dff'], [1, '#9ff7ff']]) +
+        rg(u + '-doorglow', 500, DOOR.sill, 190, [[0, '#ffffff', 0.95], [0.25, '#b9fbff', 0.7], [0.6, '#46E6A6', 0.25], [1, '#19D3FF', 0]]) +
+        lg(u + '-frost', 0, 330, 0, 860, [[0, '#FFF8E2'], [0.5, '#F7E3A8'], [1, '#E2BA62']]) +
+        lg(u + '-horn', 516, 526, 676, 376, [[0, '#E8D9B5'], [0.6, '#F3E2B3'], [1, '#FFF6DC']]) +
+        rg(u + '-rays', 500, 640, 480, [[0, '#FFE7A8', 0.55], [0.6, '#F2C66D', 0.22], [1, '#F2C66D', 0]]) +
+        blurF(u + '-b8', 8) + blurF(u + '-b3', 3);
+      var out = '<defs>' + defs + '</defs>';
+      // deep mirror sky + god-rays
+      out += '<rect x="140" y="140" width="720" height="720" fill="url(#' + u + '-sky)"/>';
+      out += '<rect x="140" y="140" width="720" height="720" fill="url(#' + u + '-aur)"/>';
+      out += path(RAYS, 'fill="url(#' + u + '-rays)"');
+      // micro starfield (bright ink so it still sparkles if the mask is ignored)
+      out += '<g fill="#FFF4DC">' + STARS.map(function (s) { return s[2] > 4.2 ? path(star4(s[0], s[1], s[2], 0.13, 0)) : '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="' + n(s[2] * 0.55) + '"/>'; }).join('') + '</g>';
+      // aurora bridge: halo, enamel band, lane wires, shimmer
+      var bw = BR.w;
+      out += '<path d="' + arcPath(BR.rx, BR.ry) + '" fill="none" stroke="url(#' + u + '-br)" stroke-width="' + (bw + 46) + '" stroke-opacity=".45" filter="url(#' + u + '-b8)"/>';
+      out += '<path d="' + arcPath(BR.rx, BR.ry) + '" fill="none" stroke="url(#' + u + '-br)" stroke-width="' + bw + '"/>';
+      var lanes = '';
+      [[-0.375, '#7C5CFF', 0.35], [-0.125, '#ffffff', 0.1], [0.125, '#ffffff', 0.22], [0.375, '#ffffff', 0.32]].forEach(function (k) { lanes += '<path d="' + arcPath(BR.rx + k[0] * bw, BR.ry + k[0] * bw) + '" fill="none" stroke="' + k[1] + '" stroke-opacity="' + k[2] + '" stroke-width="' + (bw * 0.25) + '"/>'; });
+      out += lanes;
+      out += '<path d="' + arcPath(BR.rx - bw * 0.38, BR.ry - bw * 0.38) + '" fill="none" stroke="#ffffff" stroke-opacity=".55" stroke-width="2" stroke-dasharray="1 9" stroke-linecap="round"/>';
+      out += SPARKS.map(function (g) { return '<circle cx="' + n(g[0]) + '" cy="' + n(g[1]) + '" r="' + n(g[2] * 1.2) + '" fill="#ffffff" fill-opacity=".35" filter="url(#' + u + '-b3)"/>' + path(star4(g[0], g[1], g[2], 0.12, 0), 'fill="#ffffff"'); }).join('');
+      // gate
+      out += path(WALLS + PYL_L + PYL_R + GATE + STEPS, 'fill="url(#' + u + '-frost)"');
+      out += path(OPEN, 'fill="url(#' + u + '-door)"');
+      out += '<g clip-path="url(#' + u + '-oc)"></g>';
+      out += '<ellipse cx="500" cy="' + DOOR.sill + '" rx="150" ry="120" fill="url(#' + u + '-doorglow)"/>';
+      out += path(ARCH_LINES, 'stroke="#7a4f0e" stroke-width="1.8" fill="none"');
+      out += INLAYS.map(function (q) { return '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="20" fill="' + q[2] + '" fill-opacity=".5" filter="url(#' + u + '-b3)"/>' + path(inlay(q[0], q[1]), 'fill="' + q[2] + '"'); }).join('');
+      out += path(WALLS + PYL_L + PYL_R + GATE + OPEN, 'fill="none" stroke="#5e3a08" stroke-width="2.4"');
+      // bridge feet: violet + mint enamel discs on gold pedestals
+      FEET.forEach(function (f) {
+        out += '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="40" fill="' + f[2] + '" fill-opacity=".45" filter="url(#' + u + '-b8)"/>' +
+          '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="27" fill="' + f[2] + '"/><circle cx="' + (f[0] - 8) + '" cy="' + (f[1] - 9) + '" r="8" fill="#ffffff" fill-opacity=".45"/>';
+      });
+      // Heimdall
+      var FR = 'url(#' + u + '-frost)', OL = '#4a2c05';
+      out += '<g transform="' + FIG_TF + '">';
+      out += path(CAPE, 'fill="' + FR + '" stroke="' + OL + '" stroke-width="2.4"') + path(CAPE_LINES, 'stroke="#7a4f0e" stroke-width="1.6" fill="none"');
+      out += limbs(OL, 5) + limbs(FR, 0);
+      out += path(TORSO_H + SKIRT + HEAD + BEARD + HELMH + CREST + BOOTS, 'fill="' + FR + '" stroke="' + OL + '" stroke-width="2.4" stroke-linejoin="round"');
+      out += path(BELT, 'fill="#c8952e" stroke="' + OL + '" stroke-width="2"') + path('M480,676L532,676M478,692L536,692M498,560L502,600', 'stroke="#7a4f0e" stroke-width="1.6" fill="none"');
+      out += path(HORN, 'fill="url(#' + u + '-horn)" stroke="#5e3a08" stroke-width="2.4"') + path(HORN_BANDS, 'stroke="#8a5a12" stroke-width="2.6"');
+      out += hands(OL, 2.5) + hands(FR, 0);
+      out += '<g fill="none" stroke-linecap="round">' + [30, 50, 72].map(function (r, i) { var a0 = BELL.a - 0.55, a1 = BELL.a + 0.55, p0 = pol(BELL.x, BELL.y, r, a0), p1 = pol(BELL.x, BELL.y, r, a1); return '<path d="M' + P(p0[0], p0[1]) + 'A' + r + ' ' + r + ' 0 0 1 ' + P(p1[0], p1[1]) + '" stroke="#FFF4DC" stroke-opacity="' + (0.8 - i * 0.22) + '" stroke-width="' + (2.6 - i * 0.6) + '"/>'; }).join('') + '</g>';
+      out += '</g>';
+      return out;
+    }
+    function inkMask(u) {
+      var m = FULL;
+      // micro-engraved stars: bare polished gold
+      m += '<g fill="#000">' + STARS.map(function (s) { return s[2] > 4.2 ? path(star4(s[0], s[1], s[2], 0.13, 0)) : '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="' + n(s[2] * 0.55) + '"/>'; }).join('') + '</g>';
+      // bridge enamel fully printed, with bare-gold cloisonne lane wires + edges
+      var bw = BR.w;
+      m += '<path d="' + arcPath(BR.rx, BR.ry) + '" fill="none" stroke="#fff" stroke-width="' + bw + '"/>';
+      [-0.5, -0.25, 0, 0.25, 0.5].forEach(function (k) { m += '<path d="' + arcPath(BR.rx + k * bw, BR.ry + k * bw) + '" fill="none" stroke="#000" stroke-width="' + (Math.abs(k) === 0.5 ? 3.2 : 2) + '"/>'; });
+      // gate: frosted gold (partial ink) with engraved lines; opening fully printed
+      m += path(WALLS + PYL_L + PYL_R + GATE + STEPS, 'fill="#8c8c8c"');
+      m += path(OPEN, 'fill="#fff"');
+      m += path(ARCH_LINES, 'stroke="#fff" stroke-width="2.2" fill="none"');
+      m += path(WALLS + PYL_L + PYL_R + GATE + OPEN, 'fill="none" stroke="#fff" stroke-width="2.8"');
+      m += INLAYS.map(function (q) { return path(inlay(q[0], q[1]), 'fill="#fff" stroke="#000" stroke-width="3"'); }).join('');
+      // feet discs: enamel with a bare-gold ring
+      FEET.forEach(function (f) { m += '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="27" fill="#fff" stroke="#000" stroke-width="5"/>'; });
+      // figure: frosted gold
+      m += '<g transform="' + FIG_TF + '">';
+      m += path(CAPE, 'fill="#9a9a9a" stroke="#fff" stroke-width="2.8"') + path(CAPE_LINES, 'stroke="#fff" stroke-width="2" fill="none"');
+      m += limbs('#fff', 5.5) + limbs('#9a9a9a', 0);
+      m += path(TORSO_H + SKIRT + HEAD + BEARD + HELMH + CREST + BOOTS, 'fill="#9a9a9a" stroke="#fff" stroke-width="2.8"');
+      m += path(BELT, 'fill="#fff"') + path('M480,676L532,676M478,692L536,692M498,560L502,600', 'stroke="#fff" stroke-width="2" fill="none"');
+      m += path(HORN, 'fill="#e6e6e6" stroke="#fff" stroke-width="2.8"') + path(HORN_BANDS, 'stroke="#fff" stroke-width="3"');
+      m += hands('#fff', 3) + hands('#9a9a9a', 0);
+      m += '</g>';
+      return m;
+    }
+    function relief(u) {
+      var inner = '<path d="' + arcPath(BR.rx, BR.ry) + '" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="' + BR.w + '"/>' +
+        path(WALLS + PYL_L + PYL_R + GATE, 'fill-opacity=".55"') + path(STEPS, 'fill-opacity=".35"') +
+        path(FIG, 'fill-opacity="1"') + path(HORN, 'fill-opacity="1"') + '<g fill="none" stroke="#fff">' + LIMBS.map(function (l) { return '<path d="' + l[0] + '" stroke-width="' + l[1] + '" stroke-linecap="round"/>'; }).join('') + '</g>' +
+        FEET.map(function (f) { return '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="27" fill-opacity=".8"/>'; }).join('');
+      return reliefWrap(u, inner, 2.4);
+    }
+    return { metal: 'au', field: field, inkMask: inkMask, relief: relief };
+  })();
+
+  /* ============================================================== JORMUNGANDR
+     The world serpent in emerald -> cyan cloisonne enamel coiled around the
+     field biting its own tail; dorsal spines push out to the rim; deep-blue
+     enamel waves over a mirror-silver ocean with Thor's longship. */
+  var JORMUNGANDR = (function () {
+    var R0 = 262, T0 = -88, T1 = 264; // body from tail tip (deg) clockwise to the neck
+    function rad(th) { return R0 + 7 * Math.sin(th * D * 5 + 0.6); }
+    function bodyW(s) { return 12 + 54 * (1 - Math.pow(1 - s, 2.6)); }
+    function spineAt(s) { var th = lerp(T0, T1, s); var r = rad(th); return [500 + r * Math.cos(th * D), 500 + r * Math.sin(th * D), th]; }
+    var NS = 170;
+    var SPINE = []; for (var i = 0; i <= NS; i++) SPINE.push(spineAt(i / NS));
+    var RB = ribbonPts(SPINE.map(function (p) { return [p[0], p[1]]; }), bodyW);
+    // travelling clockwise, RB.L is the inner edge and RB.R the outer edge
+    var BODY = smooth(RB.L.concat(RB.R.slice().reverse()), true, 0.6);
+    // body segments (for the colour ramp) and scales
+    function segs() {
+      var out = [];
+      for (var i = 0; i < NS; i++) out.push({ d: poly([RB.L[i], RB.L[i + 1], RB.R[i + 1], RB.R[i]]), s: i / NS });
+      return out;
+    }
+    var SEGS = segs();
+    function scales() {
+      var d = '';
+      var rows = 4;
+      for (var i = 2; i < NS - 1; i += 2) {
+        var s = i / NS, w = bodyW(s);
+        if (w < 16) continue;
+        for (var k = 0; k < rows; k++) {
+          var f0 = (k + 0.15) / rows, f1 = (k + 0.85) / rows, fm = (k + 0.5) / rows;
+          var off = (i / 2) % 2 ? 0.5 / rows : 0;
+          if (k === rows - 1 && off) continue;
+          var a = [lerp(RB.L[i][0], RB.R[i][0], f0 + off), lerp(RB.L[i][1], RB.R[i][1], f0 + off)];
+          var b = [lerp(RB.L[i][0], RB.R[i][0], f1 + off), lerp(RB.L[i][1], RB.R[i][1], f1 + off)];
+          var j = Math.min(i + 3, NS);
+          var c = [lerp(RB.L[j][0], RB.R[j][0], fm + off), lerp(RB.L[j][1], RB.R[j][1], fm + off)];
+          d += 'M' + P(a[0], a[1]) + 'Q' + P(c[0], c[1]) + ' ' + P(b[0], b[1]);
+        }
+      }
+      return d;
+    }
+    var SCALES = scales();
+    // ventral plates along the inner edge
+    function belly() {
+      var band = [], d = '';
+      for (var i = 0; i <= NS; i++) { band.push([lerp(RB.L[i][0], RB.R[i][0], 0.22), lerp(RB.L[i][1], RB.R[i][1], 0.22)]); }
+      var poly1 = RB.L.slice(4).concat(band.slice(4).reverse());
+      for (var k = 6; k < NS; k += 3) d += 'M' + P(RB.L[k][0], RB.L[k][1]) + 'L' + P(band[k][0], band[k][1]);
+      return { band: poly(poly1), lines: d };
+    }
+    var BELLY = belly();
+    // dorsal spines on the outer edge
+    function spines() {
+      var d = '';
+      for (var i = 8; i < NS - 4; i += 6) {
+        var s = i / NS, h = 10 + bodyW(s) * 0.42;
+        var p0 = RB.R[i], p1 = RB.R[i + 4], pm = RB.R[i];
+        var th = SPINE[i][2] * D;
+        var tip = [pm[0] + Math.cos(th) * h + Math.sin(th) * h * 0.55, pm[1] + Math.sin(th) * h - Math.cos(th) * h * 0.55];
+        d += 'M' + P(p0[0], p0[1]) + 'Q' + P(lerp(p0[0], tip[0], 0.6) + 2, lerp(p0[1], tip[1], 0.6)) + ' ' + P(tip[0], tip[1]) + 'Q' + P(lerp(p1[0], tip[0], 0.4), lerp(p1[1], tip[1], 0.4)) + ' ' + P(p1[0], p1[1]) + 'Z';
+      }
+      return d;
+    }
+    var SPINES = spines();
+    // head (local coords: facing +x, neck at x=-50) placed at the top
+    var HEAD_TF = (function () { var p = spineAt(1); var th = p[2] + 90; return 'translate(' + P(p[0], p[1]) + ') rotate(' + n(th) + ')'; })();
+    var HEAD = 'M-52,-30C-30,-34 -6,-36 14,-30C32,-25 52,-20 70,-14C80,-11 84,-6 80,-2L44,-4L16,4L46,16C60,20 66,26 60,30C40,34 14,34 -8,32C-28,30 -44,30 -56,28Z';
+    var HEAD_HORNS = 'M-20,-31C-38,-48 -62,-56 -84,-54C-66,-48 -50,-40 -38,-28Z M2,-34C-8,-52 -24,-64 -44,-70C-30,-58 -20,-46 -12,-33Z';
+    var HEAD_LINES = 'M-40,-22C-20,-24 0,-22 18,-18M-36,22C-16,24 6,24 28,22M-8,-8C-4,-2 -4,6 -8,12';
+    var FANGS = 'M50,-4L54,6L58,-3ZM64,-3L67,5L70,-2ZM34,-4L37,4L40,-4ZM44,16L47,8L50,17ZM56,21L58,13L61,22Z';
+    var EYE = { x: 14, y: -18 };
+    // ocean: rows of curling waves inside the ring
+    function waveRow(y0, x0, x1, W, H, depth, seed) {
+      var body = '', lines = '', foam = '', top = '', r = rng(seed || 1);
+      for (var x = x0; x < x1; x += W) {
+        var h = H * (0.85 + r() * 0.3);
+        var crest = 'M' + P(x, y0) + 'C' + P(x + W * 0.25, y0 - h * 0.15) + ' ' + P(x + W * 0.45, y0 - h * 0.75) + ' ' + P(x + W * 0.72, y0 - h) +
+          'C' + P(x + W * 0.9, y0 - h * 1.06) + ' ' + P(x + W * 1.02, y0 - h * 0.82) + ' ' + P(x + W * 0.96, y0 - h * 0.62) +
+          'C' + P(x + W * 0.92, y0 - h * 0.48) + ' ' + P(x + W * 0.8, y0 - h * 0.5) + ' ' + P(x + W * 0.8, y0 - h * 0.64) +
+          'C' + P(x + W * 0.86, y0 - h * 0.42) + ' ' + P(x + W * 0.92, y0 - h * 0.18) + ' ' + P(x + W, y0);
+        body += crest + 'L' + P(x + W, y0 + depth) + 'L' + P(x, y0 + depth) + 'Z';
+        top += crest;
+        for (var k = 1; k <= 3; k++) {
+          var f = k * 0.2;
+          lines += 'M' + P(x + W * (0.05 + f * 0.5), y0 + h * f * 0.3) + 'C' + P(x + W * (0.3 + f * 0.3), y0 - h * (0.2 - f * 0.1)) + ' ' + P(x + W * (0.48 + f * 0.2), y0 - h * (0.78 - f * 0.9)) + ' ' + P(x + W * (0.7 + f * 0.05), y0 - h * (0.96 - f * 1.1));
+        }
+        foam += 'M' + P(x + W * 0.72, y0 - h) + 'C' + P(x + W * 0.9, y0 - h * 1.06) + ' ' + P(x + W * 1.02, y0 - h * 0.82) + ' ' + P(x + W * 0.96, y0 - h * 0.62) +
+          'C' + P(x + W * 0.92, y0 - h * 0.48) + ' ' + P(x + W * 0.8, y0 - h * 0.5) + ' ' + P(x + W * 0.8, y0 - h * 0.64);
+      }
+      return { body: body, lines: lines, foam: foam, top: top };
+    }
+    var ROWS = [waveRow(522, 196, 820, 62, 30, 60, 3), waveRow(590, 150, 860, 88, 46, 80, 5), waveRow(684, 110, 900, 122, 72, 200, 7)];
+    // longship riding the middle swell
+    var SHIP = { x: 500, y: 512 };
+    function ship() {
+      var x = SHIP.x, y = SHIP.y;
+      var hull = 'M' + P(x - 86, y - 30) + 'C' + P(x - 80, y - 8) + ' ' + P(x - 60, y + 10) + ' ' + P(x - 20, y + 12) + 'L' + P(x + 22, y + 12) +
+        'C' + P(x + 60, y + 10) + ' ' + P(x + 82, y - 8) + ' ' + P(x + 88, y - 32) +
+        'C' + P(x + 98, y - 40) + ' ' + P(x + 104, y - 54) + ' ' + P(x + 96, y - 62) + 'C' + P(x + 90, y - 58) + ' ' + P(x + 92, y - 50) + ' ' + P(x + 84, y - 42) +
+        'C' + P(x + 70, y - 14) + ' ' + P(x + 40, y - 6) + ' ' + P(x, y - 6) + 'C' + P(x - 40, y - 6) + ' ' + P(x - 70, y - 14) + ' ' + P(x - 80, y - 40) +
+        'C' + P(x - 88, y - 48) + ' ' + P(x - 86, y - 56) + ' ' + P(x - 94, y - 60) + 'C' + P(x - 100, y - 50) + ' ' + P(x - 94, y - 40) + ' ' + P(x - 86, y - 30) + 'Z';
+      var mast = 'M' + P(x - 2, y - 6) + 'V' + n(y - 124) + 'H' + n(x + 2) + 'V' + n(y - 6) + 'Z';
+      var sail = 'M' + P(x - 44, y - 112) + 'H' + n(x + 44) + 'C' + P(x + 48, y - 80) + ' ' + P(x + 46, y - 50) + ' ' + P(x + 40, y - 30) + 'H' + n(x - 40) + 'C' + P(x - 46, y - 50) + ' ' + P(x - 48, y - 80) + ' ' + P(x - 44, y - 112) + 'Z';
+      var stripes = [];
+      for (var k = 0; k < 5; k++) stripes.push('M' + P(x - 44 + k * 17.6 + (k ? 0 : 0), y - 112) + 'h17.6V' + n(y - 30) + 'h-17.6Z');
+      var shields = []; for (var s = 0; s < 7; s++) shields.push([x - 54 + s * 18, y - 4]);
+      var yard = 'M' + P(x - 50, y - 116) + 'H' + n(x + 50) + 'V' + n(y - 111) + 'H' + n(x - 50) + 'Z';
+      return { hull: hull, mast: mast + yard, sail: sail, stripes: stripes, shields: shields };
+    }
+    var SHIPD = ship();
+    var STARS = (function () { var r = rng(3131), o = []; for (var i = 0; i < 40; i++) { var x = 250 + r() * 500, y = 260 + r() * 200; if (Math.hypot(x - 500, y - 500) > 215) continue; if (Math.abs(x - SHIP.x) < 60 && y > 380) continue; o.push([x, y, 1 + Math.pow(r(), 4) * 7]); } return o; })();
+
+    function field(u) {
+      var RR = R0 + 40;
+      var defs = rg(u + '-xs', 500, 500, RR, [[0, '#000', 0], [(R0 - 36) / RR, '#00283a', 0.5], [(R0 - 16) / RR, '#ffffff', 0.0], [(R0 - 2) / RR, '#ffffff', 0.32], [(R0 + 10) / RR, '#ffffff', 0.0], [(R0 + 26) / RR, '#002a30', 0.4], [1, '#001a20', 0.7]]) +
+        lg(u + '-sea', 0, 470, 0, 840, [[0, '#2a6cf0'], [0.4, '#163ba8'], [1, '#0a1a5c']]) +
+        lg(u + '-sea2', 0, 470, 0, 840, [[0, '#4D8DFF'], [1, '#1d47c0']]) +
+        lg(u + '-sky', 0, 230, 0, 520, [[0, '#0d1a4a', 0.55], [1, '#1d47c0', 0.0]]) +
+        rg(u + '-eye', 0, 0, 10, [[0, '#ffffff'], [0.4, '#7ff6ff'], [1, '#19D3FF']]) +
+        blurF(u + '-b4', 4);
+      var out = '<defs>' + defs + '</defs>';
+      // sky inside the ring: a light navy wash fading into the silver
+      out += '<rect x="140" y="140" width="720" height="400" fill="url(#' + u + '-sky)"/>';
+      var hl = ''; for (var y = 232; y < 520; y += 9) hl += 'M180,' + y + 'H820';
+      out += path(hl, 'stroke="#0a1a5c" stroke-opacity=".2" stroke-width="1.2" fill="none"');
+      out += STARS.map(function (s) { return s[2] > 3.5 ? path(star4(s[0], s[1], s[2], 0.14, 0), 'fill="#ffffff"') : ''; }).join('');
+      // waves + ship
+      var r0 = ROWS[0], r1 = ROWS[1], r2 = ROWS[2];
+      out += path(r0.body, 'fill="url(#' + u + '-sea2)"') + path(r0.lines, 'stroke="#bfe0ff" stroke-opacity=".5" stroke-width="1.6" fill="none"');
+      out += path(SHIPD.sail, 'fill="#0b1d5c"');
+      out += SHIPD.stripes.map(function (d, k) { return path(d, 'fill="' + (k % 2 ? '#46E6A6' : '#19D3FF') + '"'); }).join('');
+      out += path(SHIPD.mast, 'fill="#08123a"') + path(SHIPD.hull, 'fill="#08123a"');
+      out += SHIPD.shields.map(function (s, k) { return '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="6.5" fill="' + (k % 2 ? '#46E6A6' : '#19D3FF') + '"/>'; }).join('');
+      out += path(r1.body, 'fill="url(#' + u + '-sea)"') + path(r1.lines, 'stroke="#bfe0ff" stroke-opacity=".45" stroke-width="1.8" fill="none"');
+      out += path(r2.body, 'fill="url(#' + u + '-sea)"') + path(r2.lines, 'stroke="#bfe0ff" stroke-opacity=".4" stroke-width="2.2" fill="none"');
+      // serpent: spines, body ramp, cross shading, scales
+      out += path(SPINES, 'fill="#0a8a6a"');
+      var SR = [[0, '#19D3FF'], [0.45, '#18c9b4'], [1, '#2bd88f']];
+      out += SEGS.map(function (g) { var c = ramp(SR, g.s); return '<path d="' + g.d + '" fill="' + c + '" stroke="' + c + '" stroke-width=".8"/>'; }).join('');
+      out += path(BODY, 'fill="url(#' + u + '-xs)"');
+      out += path(BELLY.band, 'fill="#d9fff4" fill-opacity=".5"');
+      // head
+      out += '<g transform="' + HEAD_TF + '">' + path(HEAD_HORNS, 'fill="#0c8f72"') + path(HEAD, 'fill="#46E6A6"') +
+        path('M-52,-30C-30,-34 -6,-36 14,-30C32,-25 52,-20 70,-14C80,-11 84,-6 80,-2L44,-4L16,4L-56,4Z', 'fill="#ffffff" fill-opacity=".12"') +
+        '<circle cx="' + (EYE.x) + '" cy="' + EYE.y + '" r="14" fill="#19D3FF" fill-opacity=".5" filter="url(#' + u + '-b4)"/>' +
+        '<ellipse cx="' + EYE.x + '" cy="' + EYE.y + '" rx="8" ry="6" fill="url(#' + u + '-eye)"/><ellipse cx="' + (EYE.x + 1) + '" cy="' + EYE.y + '" rx="1.6" ry="5" fill="#04202a"/></g>';
+      return out;
+    }
+    function inkMask(u) {
+      var m = FULL;
+      // the sky is bare mirror silver except the faint wash; stars bare
+      m += '<rect x="140" y="140" width="720" height="400" fill="#000" fill-opacity=".35"/>';
+      // waves: enamel bodies; crest foam curls and wave lines in bare silver
+      ROWS.forEach(function (r, k) {
+        m += path(r.body, 'fill="#fff"') + path(r.lines, 'stroke="#000" stroke-width="' + (1.6 + k * 0.3) + '" fill="none" stroke-linecap="round"') +
+          path(r.foam, 'stroke="#000" stroke-width="' + (3 + k) + '" fill="none" stroke-linecap="round"') + path(r.top, 'fill="none" stroke="#000" stroke-width="2.4"');
+        if (k === 0) m += path(SHIPD.sail + SHIPD.mast + SHIPD.hull, 'fill="#fff"') + SHIPD.shields.map(function (s) { return '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="6.5" fill="#fff" stroke="#000" stroke-width="1.6"/>'; }).join('') +
+          path(SHIPD.stripes.join(''), 'fill="none" stroke="#000" stroke-width="1.4"') + path(SHIPD.hull, 'fill="none" stroke="#000" stroke-width="1.6"');
+      });
+      m += STARS.map(function (s) { return s[2] > 3.5 ? path(star4(s[0], s[1], s[2], 0.14, 0), 'fill="#000"') : '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="' + n(s[2] * 0.5) + '" fill="#000"/>'; }).join('');
+      // serpent: enamel, with bare-silver scale wires, belly plates and outline
+      m += path(SPINES, 'fill="#fff" stroke="#000" stroke-width="2"');
+      m += path(BODY, 'fill="#fff"');
+      m += path(SCALES, 'stroke="#000" stroke-width="1.7" fill="none" stroke-linecap="round"');
+      m += path(BELLY.lines, 'stroke="#000" stroke-width="1.6" fill="none"');
+      m += path(BODY, 'fill="none" stroke="#000" stroke-width="2.6"');
+      m += '<g transform="' + HEAD_TF + '">' + path(HEAD_HORNS + HEAD, 'fill="#fff" stroke="#000" stroke-width="2.4"') + path(HEAD_LINES, 'stroke="#000" stroke-width="1.8" fill="none"') +
+        path(FANGS, 'fill="#000"') + '<ellipse cx="' + EYE.x + '" cy="' + EYE.y + '" rx="10" ry="8" fill="#fff" stroke="#000" stroke-width="2"/></g>';
+      return m;
+    }
+    function relief(u) {
+      var inner = path(BODY, 'fill-opacity=".9"') + path(SPINES, 'fill-opacity=".6"') + '<g transform="' + HEAD_TF + '">' + path(HEAD + HEAD_HORNS, 'fill-opacity="1"') + '</g>' +
+        ROWS.map(function (r, k) { return path(r.body, 'fill-opacity="' + (0.25 + k * 0.1) + '"'); }).join('') + path(SHIPD.hull + SHIPD.sail, 'fill-opacity=".6"');
+      return reliefWrap(u, inner, 2.4);
+    }
+    return { metal: 'ag', field: field, inkMask: inkMask, relief: relief };
   })();
 
   /* ------------------------------------------------------------ placeholders */
@@ -758,8 +1153,8 @@
     huginn: HUGINN,
     fjord: FJORD,
     valkyrie: VALKYRIE,
-    heimdall: placeholder('au', '#7C5CFF', '#46E6A6'),
-    jormungandr: placeholder('ag', '#46E6A6', '#19D3FF'),
+    heimdall: HEIMDALL,
+    jormungandr: JORMUNGANDR,
     koi: placeholder('au', '#FF7A6B', '#19D3FF')
   };
 })();

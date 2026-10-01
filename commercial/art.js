@@ -90,6 +90,8 @@
   const st = (stops) => stops.map((s) => '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"' + (s[2] != null ? ' stop-opacity="' + s[2] + '"' : '') + '/>').join('');
   const lg = (id, x1, y1, x2, y2, stops, extra) => '<linearGradient id="' + id + '" gradientUnits="userSpaceOnUse" x1="' + n(x1) + '" y1="' + n(y1) + '" x2="' + n(x2) + '" y2="' + n(y2) + '"' + (extra || '') + '>' + st(stops) + '</linearGradient>';
   const rg = (id, cx, cy, r, stops, extra) => '<radialGradient id="' + id + '" gradientUnits="userSpaceOnUse" cx="' + n(cx) + '" cy="' + n(cy) + '" r="' + n(r) + '"' + (extra || '') + '>' + st(stops) + '</radialGradient>';
+  const rgo = (id, stops, cx, cy, r) => '<radialGradient id="' + id + '" cx="' + cx + '" cy="' + cy + '" r="' + r + '">' + st(stops) + '</radialGradient>';
+  const lgo = (id, x1, y1, x2, y2, stops) => '<linearGradient id="' + id + '" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '">' + st(stops) + '</linearGradient>';
   // point on circle, angle a in degrees from top, clockwise
   const pc = (cx, cy, r, a) => [cx + r * Math.sin(a * DEG), cy - r * Math.cos(a * DEG)];
   const P = (p) => n(p[0]) + ',' + n(p[1]);
@@ -121,7 +123,7 @@
     }
     return s + 'Z';
   }
-  const blurF = (id, sd, pad) => '<filter id="' + id + '" x="-' + (pad || 20) + '%" y="-' + (pad || 20) + '%" width="' + (100 + 2 * (pad || 20)) + '%" height="' + (100 + 2 * (pad || 20)) + '%"><feGaussianBlur stdDeviation="' + sd + '"/></filter>';
+  const blurF = (id, sd, pad) => '<filter id="' + id + '" x="-' + (pad || 20) + '%" y="-' + (pad || 20) + '%" width="' + (100 + 2 * (pad || 20)) + '%" height="' + (100 + 2 * (pad || 20)) + '%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="' + sd + '"/></filter>';
   const wrapSVG = (w, h, vbW, vbH, body) => '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + n(w) + '" height="' + n(h) + '" viewBox="0 0 ' + vbW + ' ' + vbH + '">' + body + '</svg>';
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
@@ -183,7 +185,7 @@
       rim: [[0, '#262C33'], [0.2, '#4C5660'], [0.42, '#8D98A4'], [0.62, '#C3CBD4'], [0.8, '#E9EEF3'], [1, '#FFFFFF']],
       field: [[0, '#FFFFFF'], [0.32, '#E9EEF3'], [0.66, '#B3BDC8'], [1, '#717C89']],
       mirror: [[0, '#B9C3CE'], [0.35, '#6D7884'], [0.75, '#2C333B'], [1, '#1A1F25']],
-      frost: ['#EEF2F6', '#D3DAE2', '#B2BCC7'],
+      frost: ['#F6F8FB', '#E1E6EC', '#C2CAD3'],
       frostRelief: '#F2F5F8',
       letter: ['#55606C', '#252B32'],
       hl: '#FFFFFF', light: '#FFFFFF',
@@ -195,10 +197,10 @@
       rim: [[0, '#3A2404'], [0.2, '#7A4E0E'], [0.4, '#B47E25'], [0.6, '#DDA94A'], [0.76, '#F2C66D'], [0.9, '#FFE5A0'], [1, '#FFF7DC']],
       field: [[0, '#FFF7DA'], [0.3, '#FBE3A2'], [0.64, '#E2B455'], [1, '#9C6A1A']],
       mirror: [[0, '#F5D98C'], [0.35, '#C79533'], [0.75, '#6E4610'], [1, '#3E2706']],
-      frost: ['#FBE6B0', '#EDCB7C', '#D3A64E'],
+      frost: ['#FFE6A0', '#F3CA6C', '#D9A443'],
       frostRelief: '#FFF0C8',
       letter: ['#8A5A12', '#4A2E07'],
-      hl: '#FFF8E2', light: '#FFF4DC',
+      hl: '#FFF1C8', light: '#FFF4DC',
       edge: ['#6B440C', '#D9A441', '#FFE7A6'],
       flat: '#F2C66D'
     }
@@ -260,12 +262,13 @@
 
   function rimColor(M, a, phase) {
     const d = (a - LIGHT + (phase || 0)) * DEG;
-    const b = 0.5 + 0.3 * Math.cos(2 * d) + 0.17 * Math.cos(d) + 0.05 * Math.cos(5 * d + 1.3);
+    const lobe = Math.pow(0.5 + 0.5 * Math.cos(2 * d), 2.2);
+    const b = 0.3 + 0.56 * lobe + 0.13 * Math.cos(d) + 0.05 * Math.cos(5 * d + 1.3);
     return ramp(M.rim, b);
   }
   function edgeColor(M, a) {
     const d = (a - LIGHT) * DEG;
-    return ramp(M.rim, 0.42 + 0.36 * Math.cos(d) + 0.1 * Math.cos(2 * d + 0.6));
+    return ramp(M.rim, 0.36 + 0.4 * Math.pow(0.5 + 0.5 * Math.cos(d), 1.6) + 0.12 * Math.cos(2 * d + 0.6));
   }
 
   // shared metal frame: edge + reeding + rim + band base. Returns markup (no text).
@@ -296,11 +299,13 @@
   function frameDefs(u, M) {
     return lg(u + '-crest', 150, 150, 850, 850, [[0, '#fff', 0.85], [0.35, '#fff', 0.15], [0.5, '#fff', 0.05], [0.68, '#fff', 0.22], [1, '#fff', 0.7]]) +
       rg(u + '-rimshade', 500, 500, G.reed, [[0, '#000', 0], [(G.rimIn) / G.reed, '#000', 0.28], [(G.rimIn + 9) / G.reed, '#000', 0], [(G.reed - 9) / G.reed, '#000', 0], [1, '#000', 0.32]]) +
-      lg(u + '-wall', 180, 160, 820, 840, [[0, '#000', 0.55], [0.45, '#000', 0.25], [0.62, M.hl, 0.25], [1, M.hl, 0.85]]) +
-      blurF(u + '-b2', 2) + blurF(u + '-b6', 6) + blurF(u + '-b14', 14) + grainF(u + '-grain', 11);
+      lg(u + '-wall', 180, 160, 820, 840, [[0, '#000', 0.55], [0.45, '#000', 0.25], [0.62, ramp(M.rim, 1), 0.15], [1, ramp(M.rim, M.key === 'au' ? 0.84 : 0.97), 0.75]]) +
+      blurF(u + '-b2', 2) + blurF(u + '-b6', 6) + blurF(u + '-b14', 14) + grainF(u + '-grain', 11) +
+      '<filter id="' + u + '-spark" x="0" y="0" width="1000" height="1000" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="1" seed="5" result="t"/>' +
+      '<feColorMatrix in="t" type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0" result="w"/><feComponentTransfer in="t" result="a"><feFuncA type="table" tableValues="0 0 0 0 0 0 0 0 0 0 0 .35 1"/></feComponentTransfer><feComposite in="w" in2="a" operator="in"/></filter>';
   }
   function grainF(id, seed) {
-    return '<filter id="' + id + '" x="0" y="0" width="1000" height="1000" filterUnits="userSpaceOnUse"><feTurbulence type="fractalNoise" baseFrequency=".95" numOctaves="2" seed="' + seed + '" stitchTiles="stitch"/><feColorMatrix type="matrix" values=".33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 1"/><feComponentTransfer><feFuncR type="linear" slope="1.7" intercept="-.35"/><feFuncG type="linear" slope="1.7" intercept="-.35"/><feFuncB type="linear" slope="1.7" intercept="-.35"/></feComponentTransfer></filter>';
+    return '<filter id="' + id + '" x="0" y="0" width="1000" height="1000" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".95" numOctaves="2" seed="' + seed + '" stitchTiles="stitch"/><feColorMatrix type="matrix" values=".33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 0 1"/><feComponentTransfer><feFuncR type="linear" slope="1.7" intercept="-.35"/><feFuncG type="linear" slope="1.7" intercept="-.35"/><feFuncB type="linear" slope="1.7" intercept="-.35"/></feComponentTransfer></filter>';
   }
 
   // frosted legend band with struck legends
@@ -309,7 +314,10 @@
     let s = '';
     s += '<path d="' + ringPath(500, 500, G.bandIn, G.bevel) + '" fill-rule="evenodd" fill="url(#' + u + '-band)"/>';
     s += '<path d="' + ringPath(500, 500, G.bandIn, G.bevel) + '" fill-rule="evenodd" fill="url(#' + u + '-bandsheen)"/>';
-    s += '<g clip-path="url(#' + u + '-bandclip)"><rect x="0" y="0" width="1000" height="1000" filter="url(#' + u + '-grain)" opacity=".5" style="mix-blend-mode:overlay"/>' +
+    // blend layers carry the clip themselves (a clipped <g> would isolate them from the band underneath)
+    s += '<rect x="0" y="0" width="1000" height="1000" clip-path="url(#' + u + '-bandclip)" filter="url(#' + u + '-grain)" opacity=".5" style="mix-blend-mode:overlay"/>' +
+      '<rect x="0" y="0" width="1000" height="1000" clip-path="url(#' + u + '-bandclip)" filter="url(#' + u + '-spark)" opacity=".5" style="mix-blend-mode:screen"/>' +
+      '<g clip-path="url(#' + u + '-bandclip)">' +
       // shadow cast by the rim onto the band (light from top-left)
       '<circle cx="' + (500 + 4) + '" cy="' + (500 + 5) + '" r="' + (G.bevel + 6) + '" fill="none" stroke="#000" stroke-opacity=".42" stroke-width="16" filter="url(#' + u + '-b6)"/>' +
       '<circle cx="500" cy="500" r="' + (G.bandIn - 6) + '" fill="none" stroke="#000" stroke-opacity=".18" stroke-width="12" filter="url(#' + u + '-b6)"/></g>';
@@ -334,7 +342,7 @@
     if (opt.mint) {
       // mint mark: lozenge with 'LI'
       const c = pc(500, 500, 396, rightMid);
-      txt += '<g transform="translate(' + P(c) + ') rotate(' + rightMid + ')">' +
+      txt += '<g transform="translate(' + P(c) + ')">' +
         '<path d="M0,-22L17,0L0,22L-17,0Z" fill="none" stroke="currentColor" stroke-width="2.6"/>' +
         textSVG('LI', { x: 0, y: 7, size: 19, font: 'sg7', anchor: 'middle', tracking: 0.02 }) + '</g>';
       orn += star4.apply(null, pc(500, 500, 396, (topHalf + rightMid - 22 / 3.9) / 2 + 1).concat([7, 0.2, 90]));
@@ -350,8 +358,8 @@
     return s;
   }
   function bandDefs(u, M) {
-    return rg(u + '-band', 430, 410, 640, [[0, M.frost[0]], [0.55, M.frost[1]], [1, M.frost[2]]]) +
-      lg(u + '-bandsheen', 140, 120, 860, 880, [[0, '#fff', 0.28], [0.3, '#fff', 0], [0.6, '#000', 0.05], [1, '#000', 0.22]]) +
+    return rg(u + '-band', 400, 380, 680, [[0, M.frost[0]], [0.45, M.frost[0]], [0.7, M.frost[1]], [1, M.frost[2]]]) +
+      lg(u + '-bandsheen', 140, 120, 860, 880, [[0, M.hl, M.key === 'au' ? 0.2 : 0.3], [0.3, M.hl, 0], [0.6, '#000', 0.06], [1, '#000', 0.26]]) +
       lg(u + '-letter', 200, 160, 800, 860, [[0, M.letter[0]], [0.55, M.letter[1]], [1, M.letter[0]]]) +
       '<clipPath id="' + u + '-bandclip"><path d="' + ringPath(500, 500, G.bandIn, G.bevel) + '" clip-rule="evenodd"/></clipPath>';
   }
@@ -389,9 +397,9 @@
       : [[0, '#fff', 0.25], [0.28, '#fff', 0.0], [0.5, '#000', 0.10], [0.72, '#000', 0.16], [0.86, '#fff', 0.12], [1, '#000', 0.1]]);
     d += rg(u + '-gloss', 380, 330, 300, [[0, '#fff', 0.85], [0.45, '#fff', 0.25], [1, '#fff', 0]], ' gradientTransform="rotate(-38 380 330) translate(380 330) scale(1 .55) translate(-380 -330)"');
     d += lg(u + '-glossarc', 170, 170, 600, 600, [[0, '#fff', 0.9], [1, '#fff', 0]]);
-    d += '<filter id="' + u + '-inv" x="0" y="0" width="1000" height="1000" filterUnits="userSpaceOnUse"><feColorMatrix type="matrix" values="-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0"/></filter>';
+    d += '<filter id="' + u + '-inv" x="0" y="0" width="1000" height="1000" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0"/></filter>';
     const fr = hex2rgb(M.frostRelief).map((v) => (v / 255).toFixed(3));
-    d += '<filter id="' + u + '-tint" x="0" y="0" width="1000" height="1000" filterUnits="userSpaceOnUse"><feColorMatrix type="matrix" values="0 0 0 0 ' + fr[0] + ' 0 0 0 0 ' + fr[1] + ' 0 0 0 0 ' + fr[2] + ' 0 0 0 1 0"/></filter>';
+    d += '<filter id="' + u + '-tint" x="0" y="0" width="1000" height="1000" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 ' + fr[0] + ' 0 0 0 0 ' + fr[1] + ' 0 0 0 0 ' + fr[2] + ' 0 0 0 1 0"/></filter>';
     const el = 48;
     d += '<filter id="' + u + '-emb" x="0" y="0" width="1000" height="1000" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="2.2" result="b"/>' +
       '<feDiffuseLighting in="b" surfaceScale="' + (mirror ? 7 : 6) + '" diffuseConstant="' + (0.5 / Math.sin(el * DEG)).toFixed(4) + '" lighting-color="#fff"><feDistantLight azimuth="225" elevation="' + el + '"/></feDiffuseLighting></filter>';
@@ -410,8 +418,9 @@
     s += '<rect x="150" y="150" width="700" height="700" fill="url(#' + u + '-refl)"/>';
     // 2. frosted relief on bare metal (proof cameo)
     if (rel) {
-      s += '<g mask="url(#' + u + '-bare)"><use href="#' + u + '-rel" filter="url(#' + u + '-tint)" opacity="' + (mirror ? 0.96 : 0.62) + '"/>' +
-        '<g mask="url(#' + u + '-relm)"><rect x="150" y="150" width="700" height="700" filter="url(#' + u + '-grain)" opacity="' + (mirror ? 0.55 : 0.4) + '" style="mix-blend-mode:overlay"/></g></g>';
+      // frost = solid frost colour + grain, cut to the relief shapes (relm) on bare metal only (bare)
+      s += '<g mask="url(#' + u + '-bare)"><g mask="url(#' + u + '-relm)" opacity="' + (mirror ? 0.96 : 0.62) + '"><rect x="150" y="150" width="700" height="700" fill="' + M.frostRelief + '"/>' +
+        '<rect x="150" y="150" width="700" height="700" filter="url(#' + u + '-grain)" opacity="' + (mirror ? 0.4 : 0.45) + '" style="mix-blend-mode:overlay"/></g></g>';
     }
     // 3. colour ink (enamel / print) over the metal, masked so bare metal shows through
     if (art) {
@@ -437,9 +446,10 @@
 
   // global specular highlight across the face + subtle vignette
   function specMarkup(u, M) {
-    return '<defs>' + rg(u + '-sp', 330, 285, 420, [[0, '#fff', 0.42], [0.35, '#fff', 0.12], [1, '#fff', 0]], ' gradientTransform="rotate(-40 330 285) translate(330 285) scale(1 .6) translate(-330 -285)"') +
-      lg(u + '-spband', 120, 260, 880, 740, [[0, '#fff', 0], [0.42, '#fff', 0], [0.5, '#fff', 0.13], [0.58, '#fff', 0], [1, '#fff', 0]]) +
-      rg(u + '-vig', 430, 410, 640, [[0, '#000', 0], [0.75, '#000', 0], [1, '#000', 0.22]]) + '</defs>' +
+    const hl = M.key === 'au' ? '#FFF1C8' : '#FFFFFF';
+    return '<defs>' + rg(u + '-sp', 330, 285, 420, [[0, hl, M.key === 'au' ? 0.3 : 0.38], [0.35, hl, 0.1], [1, hl, 0]], ' gradientTransform="rotate(-40 330 285) translate(330 285) scale(1 .6) translate(-330 -285)"') +
+      lg(u + '-spband', 120, 260, 880, 740, [[0, hl, 0], [0.42, hl, 0], [0.5, hl, 0.12], [0.58, hl, 0], [1, hl, 0]]) +
+      rg(u + '-vig', 430, 410, 640, [[0, '#000', 0], [0.8, '#000', 0], [1, '#000', 0.16]]) + '</defs>' +
       '<g style="mix-blend-mode:screen"><circle cx="500" cy="500" r="' + (G.edge - 1) + '" fill="url(#' + u + '-sp)"/><circle cx="500" cy="500" r="' + (G.edge - 1) + '" fill="url(#' + u + '-spband)"/></g>' +
       '<circle cx="500" cy="500" r="' + (G.edge - 1) + '" fill="url(#' + u + '-vig)"/>';
   }
@@ -473,34 +483,66 @@
     }
     return d;
   }
+  // woven guilloche net between radii r0..r1
+  function rosette(cx, cy, r0, r1, lines, petals, amp) {
+    let s = '';
+    for (let j = 0; j < lines; j++) {
+      const rr = r0 + (r1 - r0) * j / Math.max(1, lines - 1);
+      const ph = j * TAU / lines * 2;
+      let d = '';
+      for (let i = 0; i <= 720; i++) {
+        const t = i * TAU / 720;
+        const r = rr + amp * Math.sin(petals * t + ph);
+        d += (i ? 'L' : 'M') + n(cx + r * Math.cos(t)) + ',' + n(cy + r * Math.sin(t));
+      }
+      s += '<path d="' + d + 'Z"/>';
+    }
+    return s;
+  }
+  function starDots(seed, cx, cy, rMin, rMax, count, filter) {
+    const R = rng(seed);
+    let s = '';
+    for (let i = 0; i < count; i++) {
+      const a = R() * 360, r = rMin + Math.sqrt(R()) * (rMax - rMin);
+      const p = pc(cx, cy, r, a);
+      if (filter && !filter(p)) continue;
+      const big = R() < 0.12;
+      s += big ? '<path d="' + star4(p[0], p[1], 4 + R() * 3, 0.14, 0) + '"/>' : '<circle cx="' + n(p[0]) + '" cy="' + n(p[1]) + '" r="' + n(0.7 + R() * 0.9) + '"/>';
+    }
+    return s;
+  }
+  const REV = { cx: 500, cy: 478, w: 404, h: 200 };
   function reverseField(c, M, opt) {
-    const metalWord = M.key === 'ag' ? 'SILVER' : 'GOLD';
     const serial = (opt && opt.serial) || (c ? c.serial : 'BV-S01');
+    const arc = arcMarkD(REV.cx, REV.cy, REV.w, REV.h);
+    const fx = REV.cx - REV.w / 2, fx2 = REV.cx + REV.w / 2;
     return {
       field: function (u) {
-        // enamel feet dots (violet + mint) as domed cabochons
-        return '<defs>' + rg(u + '-dv', 0, 0, 1, [[0, '#B9A6FF'], [0.45, '#7C5CFF'], [1, '#3A22B0']], ' gradientUnits="objectBoundingBox" cx=".38" cy=".34" r=".7"') +
-          rg(u + '-dm', 0, 0, 1, [[0, '#B4FFE0'], [0.45, '#46E6A6'], [1, '#12805A']], ' gradientUnits="objectBoundingBox" cx=".38" cy=".34" r=".7"') +
-          lg(u + '-au', 290, 0, 710, 0, auroraStops(1)) + '</defs>' +
-          '<path d="' + arcMarkD(500, 470, 400, 196) + '" fill="none" stroke="url(#' + u + '-au)" stroke-width="14" stroke-linecap="round"/>' +
-          '<circle cx="300" cy="470" r="27" fill="url(#' + u + '-dv)"/><circle cx="700" cy="470" r="27" fill="url(#' + u + '-dm)"/>';
+        // enamel: aurora inlay in the bridge + violet / mint domed cabochons at its feet
+        return '<defs>' + rgo(u + '-dv', [[0, '#C9BBFF'], [0.42, '#7C5CFF'], [1, '#33209E']], 0.36, 0.32, 0.72) +
+          rgo(u + '-dm', [[0, '#C2FFE6'], [0.42, '#46E6A6'], [1, '#0F7550']], 0.36, 0.32, 0.72) +
+          lg(u + '-au', fx, 0, fx2, 0, auroraStops(1)) + '</defs>' +
+          '<path d="' + arc + '" fill="none" stroke="url(#' + u + '-au)" stroke-width="26" stroke-linecap="round"/>' +
+          '<circle cx="' + fx + '" cy="' + REV.cy + '" r="25" fill="url(#' + u + '-dv)"/><circle cx="' + fx2 + '" cy="' + REV.cy + '" r="25" fill="url(#' + u + '-dm)"/>';
       },
-      inkMask: function (u) {
-        return '<path d="' + arcMarkD(500, 470, 400, 196) + '" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="14" stroke-linecap="round"/>' +
-          '<circle cx="300" cy="470" r="27" fill="#fff"/><circle cx="700" cy="470" r="27" fill="#fff"/>';
+      inkMask: function () {
+        return '<path d="' + arc + '" fill="none" stroke="#fff" stroke-width="26" stroke-linecap="round"/>' +
+          '<circle cx="' + fx + '" cy="' + REV.cy + '" r="25" fill="#fff"/><circle cx="' + fx2 + '" cy="' + REV.cy + '" r="25" fill="#fff"/>';
       },
       relief: function (u) {
-        return '<defs>' + blurF(u + '-rb', 1.2) + '</defs><g filter="url(#' + u + '-rb)" fill="#fff">' +
-          // guilloche rosette (fine engraved lathe work)
-          '<g fill="none" stroke="#fff" stroke-width="1.3" stroke-opacity=".38">' + guilloche(500, 500, 316, 18, 9, 14) + '</g>' +
-          // the bridge arc in frosted relief
-          '<path d="' + arcMarkD(500, 470, 400, 196) + '" fill="none" stroke="#fff" stroke-width="46" stroke-linecap="round"/>' +
-          '<circle cx="300" cy="470" r="31"/><circle cx="700" cy="470" r="31"/>' +
-          textSVG('BIFROST VAULT', { x: 500, y: 568, size: 50, font: 'sg7', anchor: 'middle', tracking: 0.16 }) +
-          '<path d="' + nfcGlyph(500, 640, 70) + '" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>' +
-          '<circle cx="' + n(500 - 70 * 0.32) + '" cy="640" r="6"/>' +
-          arcText(serial, { r: 304, size: 17, font: 'mono', tracking: 0.12, side: 'bottom' }).svg +
-          textSVG('ART ON ' + metalWord, { x: 500, y: 403, size: 18, font: 'mono', anchor: 'middle', tracking: 0.3, attrs: 'fill-opacity=".9"' }) +
+        return '<defs>' + blurF(u + '-rb', 1.1) + '</defs><g filter="url(#' + u + '-rb)" fill="#fff">' +
+          // guilloche net (engraved lathe work) around the field
+          '<g fill="none" stroke="#fff" stroke-width="1.1" stroke-opacity=".42">' + rosette(500, 500, 262, 322, 10, 36, 9) + '</g>' +
+          '<circle cx="500" cy="500" r="252" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2"/>' +
+          // micro-engraved starfield under the bridge
+          '<g fill-opacity=".55">' + starDots(77, REV.cx, REV.cy - 40, 0, 150, 46, (p) => p[1] < REV.cy - 30) + '</g>' +
+          // bridge arc + feet in frosted relief (the enamel sits inside)
+          '<path d="' + arc + '" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round"/>' +
+          '<circle cx="' + fx + '" cy="' + REV.cy + '" r="34"/><circle cx="' + fx2 + '" cy="' + REV.cy + '" r="34"/>' +
+          textSVG('BIFROST VAULT', { x: 500 + 0.16 * 48 / 2, y: 574, size: 48, font: 'sg7', anchor: 'middle', tracking: 0.16 }) +
+          '<path d="' + nfcGlyph(500, 640, 64) + '" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round"/>' +
+          '<circle cx="' + n(500 - 64 * 0.32) + '" cy="640" r="5.5"/>' +
+          arcText(serial, { r: 300, size: 16, font: 'mono', tracking: 0.14, side: 'bottom' }).svg +
           '</g>';
       }
     };
@@ -510,7 +552,7 @@
       field: null, inkMask: null,
       relief: function (u) {
         return '<defs>' + blurF(u + '-rb', 1.2) + '</defs><g filter="url(#' + u + '-rb)" fill="#fff">' +
-          '<g fill="none" stroke="#fff" stroke-width="1.4" stroke-opacity=".45">' + guilloche(500, 500, 318, 24, 12, 16) + '</g>' +
+          '<g fill="none" stroke="#fff" stroke-width="1.1" stroke-opacity=".42">' + rosette(500, 500, 250, 322, 12, 30, 10) + '</g>' +
           '<path d="' + arcMarkD(500, 540, 300, 150) + '" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round"/>' +
           '<circle cx="350" cy="540" r="22"/><circle cx="650" cy="540" r="22"/>' + '</g>';
       }
@@ -846,11 +888,11 @@
     d += lg(u + '-crimpV', 0, 0, 0, crimp, [[0, '#000', 0.25], [0.5, '#fff', 0.12], [1, '#000', 0.45]]);
     d += '<pattern id="' + u + '-crimpP" width="7" height="10" patternUnits="userSpaceOnUse"><rect width="7" height="10" fill="#fff" opacity="0"/><rect width="2.2" height="10" fill="#000" opacity=".28"/><rect x="2.2" width="1.2" height="10" fill="#fff" opacity=".35"/></pattern>';
     d += '<pattern id="' + u + '-grate" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-24)"><rect width="6" height="2" fill="#fff" opacity=".07"/></pattern>';
-    d += '<filter id="' + u + '-glit" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="' + seed + '" result="t"/>' +
+    d += '<filter id="' + u + '-glit" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="' + seed + '" result="t"/>' +
       '<feColorMatrix in="t" type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0" result="w"/>' +
       '<feComponentTransfer in="t" result="a"><feFuncA type="table" tableValues="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 1"/></feComponentTransfer>' +
       '<feComposite in="w" in2="a" operator="in"/></filter>';
-    d += '<filter id="' + u + '-glit2" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse"><feTurbulence type="fractalNoise" baseFrequency=".55" numOctaves="2" seed="' + (seed + 5) + '"/>' +
+    d += '<filter id="' + u + '-glit2" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".55" numOctaves="2" seed="' + (seed + 5) + '"/>' +
       '<feColorMatrix type="hueRotate" values="40"/><feColorMatrix type="saturate" values="3"/></filter>';
     d += blurF(u + '-b3', 3) + blurF(u + '-b10', 10) + blurF(u + '-b24', 24, 40);
     // embossed lighting for print elements
@@ -862,7 +904,7 @@
       '<feBlend in="dfa" in2="SourceGraphic" mode="multiply" result="sh"/>' +
       '<feComposite in="sh" in2="SourceAlpha" operator="in" result="sh2"/>' +
       '<feComposite in="sp" in2="sh2" operator="arithmetic" k2="1" k3="1"/></filter>';
-    d += '<filter id="' + u + '-drop" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceAlpha" stdDeviation="4"/><feOffset dx="3" dy="5"/><feComponentTransfer><feFuncA type="linear" slope=".55"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+    d += '<filter id="' + u + '-drop" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="4"/><feOffset dx="3" dy="5"/><feComponentTransfer><feFuncA type="linear" slope=".55"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
     d += lg(u + '-au', 0, 0, W, 0, auroraStops(1));
     d += lg(u + '-silverT', 0, 640, 0, 720, [[0, '#FFFFFF'], [0.45, '#E4E9EF'], [0.55, '#9AA5B1'], [1, '#DDE3EA']]);
 
@@ -942,8 +984,8 @@
       { k: 'silver', l: 'SILVER', m: 'AG', metal: 'ag' }
     ];
     let defs = '<linearGradient id="' + u + '-lgf" x1="0" y1="0" x2="1" y2="1">' + st([[0, '#FFF1C1'], [0.4, '#F2C66D'], [0.75, '#D9A441'], [1, '#B8862B']]) + '</linearGradient>';
-    defs += rg(u + '-cag', 0, 0, 1, [[0, '#FFFFFF'], [0.5, '#C9D1D9'], [1, '#5B6670']], ' gradientUnits="objectBoundingBox" cx=".35" cy=".3" r=".8"');
-    defs += rg(u + '-cau', 0, 0, 1, [[0, '#FFF1C1'], [0.5, '#F2C66D'], [1, '#8A5A12']], ' gradientUnits="objectBoundingBox" cx=".35" cy=".3" r=".8"');
+    defs += rgo(u + '-cag', [[0, '#FFFFFF'], [0.5, '#C9D1D9'], [1, '#5B6670']], .35, .3, .8);
+    defs += rgo(u + '-cau', [[0, '#FFF1C1'], [0.5, '#F2C66D'], [1, '#8A5A12']], .35, .3, .8);
     s += '<defs>' + defs + '</defs>';
     const x0 = 110, cw = W - 220, ch = 104, gap = 22, y0 = 360;
     s += '<line x1="' + (x0 - 34) + '" y1="' + (y0 + 20) + '" x2="' + (x0 - 34) + '" y2="' + (y0 + 4 * ch + 3 * gap - 20) + '" stroke="url(#' + u + '-au)" stroke-width="4" stroke-linecap="round" opacity=".8"/>';
@@ -1093,7 +1135,7 @@
       lg(u + '-fill', 0, 0, W, H, [[0, '#2A1F6B'], [0.4, '#132A5E'], [0.72, '#0B3A4A'], [1, '#0E3B32']]) +
       rg(u + '-glow', cx, 200, 360, [[0, '#7C5CFF', 0.5], [1, '#7C5CFF', 0]]) +
       lg(u + '-sheen', 0, 0, W, H, [[0, '#fff', 0.16], [0.35, '#fff', 0], [0.7, '#fff', 0], [1, '#fff', 0.06]]) +
-      rg(u + '-cm', 0, 0, 1, M.field, ' gradientUnits="objectBoundingBox" cx=".38" cy=".32" r=".75"') +
+      rgo(u + '-cm', M.field, .38, .32, .75) +
       blurF(u + '-b8', 8) +
       '<clipPath id="' + u + '-tc"><circle cx="' + cx + '" cy="190" r="86"/></clipPath>';
     let s = '<defs>' + d + '</defs>';
@@ -1147,7 +1189,7 @@
     const u = nid('s');
     const size = o.size || 240;
     let s = '<defs><clipPath id="' + u + '-c"><circle cx="120" cy="120" r="116"/></clipPath>' + lg(u + '-sh', 0, 0, 240, 240, [[0, '#fff', 0.55], [0.4, '#fff', 0], [0.6, '#fff', 0.2], [1, '#fff', 0]]) +
-      '<filter id="' + u + '-e" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur in="SourceAlpha" stdDeviation="1.6" result="b"/><feSpecularLighting in="b" surfaceScale="3" specularConstant="1" specularExponent="18" result="s"><feDistantLight azimuth="225" elevation="40"/></feSpecularLighting><feComposite in="s" in2="SourceAlpha" operator="in" result="s2"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="s2"/></feMerge></filter></defs>';
+      '<filter id="' + u + '-e" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="1.6" result="b"/><feSpecularLighting in="b" surfaceScale="3" specularConstant="1" specularExponent="18" result="s"><feDistantLight azimuth="225" elevation="40"/></feSpecularLighting><feComposite in="s" in2="SourceAlpha" operator="in" result="s2"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="s2"/></feMerge></filter></defs>';
     s += '<g clip-path="url(#' + u + '-c)">' + foilWedges(120, 120, 200, 72, 20, 1) + '<circle cx="120" cy="120" r="120" fill="#fff" opacity=".18"/>' +
       '<g fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="1">' + guilloche(120, 120, 100, 14, 5, 6) + '</g></g>';
     s += '<circle cx="120" cy="120" r="115" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="3"/>';
@@ -1213,8 +1255,8 @@
       lg(u + '-r', 0, 0, 0, H, [[0, '#121722'], [1, '#05070D']]) +
       lg(u + '-t', 100, 100, 700, 400, [[0, '#2A3142'], [1, '#141925']]) +
       lg(u + '-au', 100, 0, 700, 0, auroraStops(1)) +
-      lg(u + '-tape', 0, 0, 1, 0, [[0, '#C9D1D9', 0.35], [0.5, '#F4F7FA', 0.55], [1, '#C9D1D9', 0.35]], '') +
-      '<filter id="' + u + '-m" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="4"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".1"/></feComponentTransfer></filter>' +
+      lgo(u + '-tape', 0, 0, 1, 0, [[0, '#C9D1D9', 0.35], [0.5, '#F4F7FA', 0.55], [1, '#C9D1D9', 0.35]]) +
+      '<filter id="' + u + '-m" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="4"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".1"/></feComponentTransfer></filter>' +
       blurF(u + '-b20', 20, 40) + blurF(u + '-b6', 6);
     let s = '<defs>' + d + '</defs>';
     // floor shadow
@@ -1343,8 +1385,8 @@
   }
   function wheelDefs(u) {
     return lg(u + '-spoke', 0, 0, 1000, 1000, [[0, '#F4F7FA'], [0.35, '#9AA5B1'], [0.6, '#5B6670'], [1, '#C9D1D9']]) +
-      rg(u + '-knob', 0, 0, 1, [[0, '#FFFFFF'], [0.45, '#C9D1D9'], [1, '#3E4650']], ' gradientUnits="objectBoundingBox" cx=".35" cy=".3" r=".8"') +
-      rg(u + '-hub', 0, 0, 1, [[0, '#E4E9EF'], [0.6, '#7B8692'], [1, '#2B323A']], ' gradientUnits="objectBoundingBox" cx=".38" cy=".32" r=".8"');
+      rgo(u + '-knob', [[0, '#FFFFFF'], [0.45, '#C9D1D9'], [1, '#3E4650']], .35, .3, .8) +
+      rgo(u + '-hub', [[0, '#E4E9EF'], [0.6, '#7B8692'], [1, '#2B323A']], .38, .32, .8);
   }
   function vaultDoorSVG(o) {
     o = o || {};
@@ -1356,7 +1398,7 @@
       lg(u + '-au', 0, 0, 1000, 1000, auroraStops(1)) +
       rg(u + '-door', 420, 380, 560, [[0, '#E9EEF3'], [0.4, '#A9B3BE'], [0.8, '#5B6670'], [1, '#3A424B']]) +
       rg(u + '-frame', 500, 500, 500, [[0.8, '#2B323A'], [0.9, '#6B7480'], [0.95, '#3A424B'], [1, '#151A20']]) +
-      lg(u + '-bolt', 0, 0, 0, 1, [[0, '#F4F7FA'], [0.5, '#9AA5B1'], [1, '#4C5660']], '') +
+      lgo(u + '-bolt', 0, 0, 1, 0, [[0, '#F4F7FA'], [0.5, '#9AA5B1'], [1, '#4C5660']]) +
       wheelDefs(u);
     let s = '<defs>' + d + '</defs>';
     // aurora light leaking around the seam

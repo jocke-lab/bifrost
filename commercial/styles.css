@@ -38,18 +38,13 @@ button{font:inherit;color:inherit}
 a{color:inherit}
 
 .bvp-ambient{
-  position:fixed;inset:-25%;z-index:-1;pointer-events:none;
+  /* static, filter-free gradients: free to composite while the film plays */
+  position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(38% 32% at 32% 42%,rgba(124,92,255,.20),transparent 70%),
-    radial-gradient(34% 30% at 68% 52%,rgba(25,211,255,.13),transparent 70%),
-    radial-gradient(30% 26% at 52% 72%,rgba(70,230,166,.08),transparent 70%),
-    radial-gradient(60% 50% at 50% 50%,rgba(77,141,255,.06),transparent 75%);
-  filter:blur(30px);
-  animation:bvp-drift 26s ease-in-out infinite alternate;
-}
-@keyframes bvp-drift{
-  0%{transform:translate3d(-2%,-1%,0) scale(1)}
-  100%{transform:translate3d(2%,1.5%,0) scale(1.06)}
+    radial-gradient(42% 38% at 30% 42%,rgba(124,92,255,.15),rgba(124,92,255,.05) 45%,transparent 72%),
+    radial-gradient(38% 34% at 70% 54%,rgba(25,211,255,.11),rgba(25,211,255,.035) 45%,transparent 72%),
+    radial-gradient(34% 30% at 52% 76%,rgba(70,230,166,.07),transparent 72%),
+    radial-gradient(70% 60% at 50% 50%,rgba(77,141,255,.05),transparent 78%);
 }
 
 /* ── 3. HEADER ─────────────────────────────────────────────────────────────── */
@@ -89,10 +84,13 @@ a{color:inherit}
   width:min(100%, calc((100svh - var(--chrome)) * 9 / 16));
   min-width:min(100%, 260px);
 }
-/* aurora glow behind the stage */
+/* aurora glow behind the stage (gradients only — no filter, so it costs nothing per frame) */
 .bvp-player::before{
-  content:"";position:absolute;inset:4% -3% -2%;z-index:-1;border-radius:48px;
-  background:var(--aurora);filter:blur(64px);opacity:.30;pointer-events:none;
+  content:"";position:absolute;inset:-14% -12%;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(34% 46% at 18% 52%,rgba(124,92,255,.34),rgba(124,92,255,.10) 50%,transparent 74%),
+    radial-gradient(34% 46% at 50% 44%,rgba(77,141,255,.26),rgba(77,141,255,.07) 50%,transparent 74%),
+    radial-gradient(34% 46% at 82% 54%,rgba(25,211,255,.26),rgba(70,230,166,.08) 50%,transparent 74%);
 }
 .bvp-screen{
   position:relative;width:100%;aspect-ratio:16/9;
@@ -314,7 +312,7 @@ a{color:inherit}
   .bvp-word b{font-size:18px}
   .bvp-main{padding:8px 16px 20px;gap:12px;justify-content:flex-start}
   .bvp-screen{border-radius:14px}
-  .bvp-player::before{filter:blur(40px);opacity:.24}
+  .bvp-player::before{opacity:.8}
   /* controls sit under the stage and never hide */
   .bvp-controls{position:static;padding:12px 0 0;background:none;border-radius:0}
   .bvp-player.is-idle .bvp-controls{opacity:1;pointer-events:auto}
@@ -323,7 +321,7 @@ a{color:inherit}
 
 /* ── 11. MOTION PREFERENCES ────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce){
-  .bvp-ambient,.bvp-bigplay-ring::after,.bvp-cta::after{animation:none}
+  .bvp-bigplay-ring::after,.bvp-cta::after{animation:none}
   .bvp-cta::after{display:none}
 }
 

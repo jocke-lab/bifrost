@@ -34,6 +34,8 @@
 
   let engaged = false;        // the viewer has interacted (unlocks auto-epilogue at the end)
   let ended = false;
+  let startToken = 0;         // cancels a pending "play with sound" start if the viewer acts first
+  let lastPointer = 'mouse';
 
   /* ── Static copy from config ─────────────────────────────────────────────── */
   const brand = cfg.brand || {};
@@ -105,15 +107,17 @@
   function hideEnd() { if (endcard) endcard.hidden = true; ended = false; }
 
   function engage() { engaged = true; hideBig(); }
+  // Any direct transport action supersedes a pending "play with sound" start.
+  function cancelPendingStart() { startToken++; if (big) big.classList.remove('is-busy'); }
 
   function togglePlay() {
-    engage();
+    engage(); cancelPendingStart();
     if (BV.playing) BV.pause();
     else { if (BV.t >= BV.duration - 0.05) BV.seek(0); hideEnd(); BV.play(); }
   }
 
   function replay() {
-    engage(); hideEnd();
+    engage(); cancelPendingStart(); hideEnd();
     BV.seek(0);
     BV.play();
   }
@@ -121,8 +125,13 @@
   // The first-load overlay: restart from the top, with sound when available.
   function playWithSound() {
     engage();
+    const token = ++startToken;
     if (big) big.classList.add('is-busy');
-    const start = () => { if (big) big.classList.remove('is-busy'); hideEnd(); BV.seek(0); BV.play(); };
+    const start = () => {
+      if (token !== startToken) return;                     // viewer already took over
+      if (big) big.classList.remove('is-busy');
+      hideEnd(); BV.seek(0); BV.play();
+    };
     if (audio() && !soundOn) {
       BV.pause();
       // Wait (briefly) for the soundtrack so the first beat lands on frame 0.
@@ -131,7 +140,7 @@
   }
 
   function seekBy(dt) {
-    engage();
+    engage(); cancelPendingStart();
     BV.seek(clamp(BV.t + dt, 0, BV.duration));
     if (BV.t < BV.duration) hideEnd();
   }
@@ -186,8 +195,13 @@
       }, 2600);
     }
   }
-  player.addEventListener('pointermove', wake);
-  player.addEventListener('pointerdown', wake);
+  player.addEventListener('pointermove', e => { if (e.pointerType !== 'touch') wake(); });
+  let idleAtDown = false;
+  player.addEventListener('pointerdown', e => {
+    lastPointer = e.pointerType || 'mouse';
+    idleAtDown = player.classList.contains('is-idle');
+  }, true);
+  player.addEventListener('pointerup', wake);
   player.addEventListener('pointerleave', () => { if (BV.playing) { clearTimeout(idleTimer); idleTimer = setTimeout(() => player.classList.add('is-idle'), 900); } });
 
   /* ── Scrubber ────────────────────────────────────────────────────────────── */
@@ -223,7 +237,7 @@
     let resume = false;
     scrub.addEventListener('pointerdown', e => {
       if (e.button != null && e.button !== 0) return;
-      engage();
+      engage(); cancelPendingStart();
       dragging = true; resume = BV.playing;
       scrub.classList.add('is-drag');
       try { scrub.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
@@ -268,6 +282,7 @@
     engage();
     const f = b.dataset.format === 'portrait' ? 'portrait' : 'landscape';
     if (f === BV.format) return;
+    cancelPendingStart();
     setFormatUI(f);
     BV.setFormat(f);
     try {
@@ -280,6 +295,8 @@
   // Click the picture to play/pause, double-click for fullscreen.
   screen.addEventListener('click', e => {
     if (e.target.closest && e.target.closest('button, a, .bvp-controls')) return;
+    // A tap on a touch screen while the controls are hidden only brings them back.
+    if (lastPointer === 'touch' && idleAtDown) { wake(); return; }
     togglePlay();
   });
   screen.addEventListener('dblclick', e => {

@@ -31,7 +31,8 @@
      chroma: true|px (violet/cyan ghost layers that converge as text lands),
      glow: CSS colour, shadow: bool, upper: bool, letterSpacing, lineHeight,
      font, fit: px (shrinks font-size so the line never exceeds fit px), seed.
-     Default size per cls is scaled ~0.72x automatically in portrait if size omitted.
+     If size is omitted, the cls default is used, scaled in portrait (hero 0.72x, num 0.75x,
+     sub 0.92x, mono 0.95x, tag 1x). Defaults: hero 150, num 130, sub 48, mono 30, tag 24.
      x/y accept numbers (px) or CSS strings ('50%'); default centre of parent.
    - animText extra opts: outStyle ('rise'|'blur'|'scale'|'slam'|'fade'|'drop'|'wipe'|'type'),
      outDur, order ('ltr'|'rtl'|'center'|'edges'|'random'), chroma (px, overrides),
@@ -249,11 +250,12 @@
 
   /* ── 7. Kinetic typography ───────────────────────────────────────────────── */
   const CLS = {
-    hero: { size: 150, weight: 700, font: FONT.display, ls: '-0.03em', lh: 0.95 },
-    sub:  { size: 48,  weight: 500, font: FONT.body,    ls: '-0.01em', lh: 1.18 },
-    tag:  { size: 22,  weight: 600, font: FONT.mono,    ls: '0.32em',  lh: 1.2, upper: true, color: '#8AA4BC' },
-    mono: { size: 30,  weight: 500, font: FONT.mono,    ls: '0',       lh: 1.3 },
-    num:  { size: 130, weight: 700, font: FONT.display, ls: '-0.035em', lh: 1, tnum: true }
+    // pk = default-size factor in portrait (big type shrinks ~0.7x; small type stays legible on phones)
+    hero: { size: 150, pk: 0.72, weight: 700, font: FONT.display, ls: '-0.03em', lh: 0.95 },
+    sub:  { size: 48,  pk: 0.92, weight: 500, font: FONT.body,    ls: '-0.01em', lh: 1.18 },
+    tag:  { size: 24,  pk: 1,    weight: 600, font: FONT.mono,    ls: '0.32em',  lh: 1.2, upper: true, color: '#8AA4BC' },
+    mono: { size: 30,  pk: 0.95, weight: 500, font: FONT.mono,    ls: '0',       lh: 1.3 },
+    num:  { size: 130, pk: 0.75, weight: 700, font: FONT.display, ls: '-0.035em', lh: 1, tnum: true }
   };
 
   // Gradient fills for text (background-clip:text). Each returns layer config.
@@ -267,7 +269,7 @@
   function superText(parent, text, o = {}) {
     const cls = CLS[o.cls] ? o.cls : 'hero';
     const c = CLS[cls];
-    const portraitK = (window.BV && window.BV.portrait) ? 0.72 : 1;
+    const portraitK = (window.BV && window.BV.portrait) ? c.pk : 1;
     const size = o.size != null ? o.size : Math.round(c.size * portraitK);
     const align = o.align || 'center';
     const valign = o.valign || 'middle';
