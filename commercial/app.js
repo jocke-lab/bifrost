@@ -289,7 +289,7 @@
     BV.setFormat(f);
     try {
       const u = new URL(location.href);
-      if (f === 'portrait') u.searchParams.set('format', 'portrait'); else u.searchParams.delete('format');
+      if (f !== (BV.defaultFormat || 'landscape')) u.searchParams.set('format', f); else u.searchParams.delete('format');
       history.replaceState(null, '', u.toString());
     } catch (e) { /* file:// or sandboxed — ignore */ }
   }));

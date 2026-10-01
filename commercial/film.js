@@ -36,6 +36,8 @@
      BV.toggle()       play/pause.
      BV.off(evt, fn)   remove a listener (BV.on also returns an unsubscribe fn).
      BV.format         'landscape' | 'portrait'.  BV.frame  current frame index (t*fps).
+     BV.defaultFormat  format used when the URL has no ?format= ('portrait' on phone-shaped
+                       viewports <=720px wide, else 'landscape'; render mode: 'landscape').
      BV.world          #bv-world element.  BV.scale  current fit scale.  BV.params  URLSearchParams.
      BV.scenes         registered scene defs (read-only use, e.g. audio cue timing).
      BV.clock          optional fn () => seconds; when set (e.g. by audio) the play loop
@@ -97,7 +99,10 @@
     BV.W = DIMS[BV.format][0];
     BV.H = DIMS[BV.format][1];
   }
-  setDims(params.get('format'));
+  // Default format: 9:16 on phone-shaped viewports (a 16:9 film is tiny on a portrait phone),
+  // 16:9 everywhere else. ?format= always wins; render mode always uses ?format (default landscape).
+  BV.defaultFormat = (!RENDER && window.innerWidth <= 720 && window.innerHeight > window.innerWidth * 1.2) ? 'portrait' : 'landscape';
+  setDims(params.get('format') || BV.defaultFormat);
 
   /* ── Events ──────────────────────────────────────────────────────────────── */
   function on(evt, fn) {
@@ -252,8 +257,9 @@
     fxEl.barT = layer('height:12.5%;background:#000;transform:translate3d(0,-100%,0);');
     fxEl.barB = layer('top:auto;bottom:0;height:12.5%;background:#000;transform:translate3d(0,100%,0);');
     fxEl.grain = document.createElement('div');
-    fxEl.grain.style.cssText = 'position:absolute;left:0;top:0;opacity:.085;mix-blend-mode:overlay;background-repeat:repeat;will-change:transform;';
+    fxEl.grain.style.cssText = 'position:absolute;left:0;top:0;opacity:' + GRAIN_OPACITY + ';mix-blend-mode:overlay;background-repeat:repeat;will-change:transform;';
     fxEl.grain.style.backgroundImage = 'url(' + grainTexture() + ')';
+    fxEl.grain.style.backgroundSize = (GRAIN * GRAIN_SCALE) + 'px';
     fxRoot.appendChild(fxEl.grain);
 
     stage.appendChild(world);
@@ -270,8 +276,14 @@
     }
   }
 
-  // Deterministic grain tile (256px, fixed seed).
+  // Deterministic grain tile (256px, fixed seed). Grain is the most expensive thing in the
+  // encoded MP4: fine 1px noise re-rolled every frame multiplied the x264 bitrate ~7x (61 vs
+  // 8 Mbps at crf 18). It is drawn 2x (softer, filmic, ~3.5x cheaper) and re-rolled every
+  // GRAIN_STEP frames (15 fps at 30 fps). Tuning knobs for tests: ?grainop= &grainstep= &grainscale=
   const GRAIN = 256;
+  const GRAIN_OPACITY = +(params.get('grainop') || 0.07);
+  const GRAIN_STEP = Math.max(1, +(params.get('grainstep') || 2));
+  const GRAIN_SCALE = Math.max(1, +(params.get('grainscale') || 2));
   function grainTexture() {
     const c = document.createElement('canvas');
     c.width = c.height = GRAIN;
@@ -293,8 +305,8 @@
   function sizeStage() {
     stage.style.width = BV.W + 'px';
     stage.style.height = BV.H + 'px';
-    fxEl.grain.style.width = (BV.W + GRAIN) + 'px';
-    fxEl.grain.style.height = (BV.H + GRAIN) + 'px';
+    fxEl.grain.style.width = (BV.W + GRAIN * GRAIN_SCALE) + 'px';
+    fxEl.grain.style.height = (BV.H + GRAIN * GRAIN_SCALE) + 'px';
     if (RENDER) {
       viewport.style.cssText += ';position:fixed;left:0;top:0;width:' + BV.W + 'px;height:' + BV.H + 'px;background:#000;';
     }
@@ -317,8 +329,11 @@
   const fx = { flash: 0, flashColor: 'white', vignette: 0, grain: true, bars: 0 };
   const FLASH_BG = {
     white: '#fff',
-    aurora: 'linear-gradient(120deg,#7C5CFF,#4D8DFF 40%,#19D3FF 72%,#46E6A6)',
-    gold: 'radial-gradient(ellipse at 50% 50%,#FFF8DD,#F2C66D 55%,#D9A441)'
+    // Coloured flashes bloom from the centre (bright core, tinted falloff) so they read as
+    // light, not as a flat colour wash over the frame.
+    aurora: 'radial-gradient(ellipse 60% 60% at 50% 50%,rgba(255,255,255,.95) 0%,rgba(255,255,255,0) 60%),' +
+            'linear-gradient(120deg,rgba(124,92,255,.85),rgba(77,141,255,.7) 40%,rgba(25,211,255,.7) 72%,rgba(70,230,166,.85))',
+    gold: 'radial-gradient(ellipse 70% 70% at 50% 50%,#FFF8DD 0%,rgba(242,198,109,.9) 38%,rgba(217,164,65,.45) 75%,rgba(138,90,18,.25) 100%)'
   };
   BV.fx = {
     flash(i, color) { i = clamp(+i || 0, 0, 1); if (i >= fx.flash && i > 0) { fx.flash = i; fx.flashColor = color || 'white'; } },
@@ -364,7 +379,8 @@
     // grain: offset the tile by a hashed amount per frame
     if (fx.grain !== last.grain) { fxEl.grain.style.display = fx.grain ? '' : 'none'; last.grain = fx.grain; }
     if (fx.grain) {
-      const gx = Math.floor(hash(BV.frame, 11) * GRAIN), gy = Math.floor(hash(BV.frame, 23) * GRAIN);
+      const gf = Math.floor(BV.frame / GRAIN_STEP);
+      const gx = Math.floor(hash(gf, 11) * GRAIN) * GRAIN_SCALE, gy = Math.floor(hash(gf, 23) * GRAIN) * GRAIN_SCALE;
       if (gx !== last.gx || gy !== last.gy) {
         fxEl.grain.style.transform = 'translate3d(' + (-gx) + 'px,' + (-gy) + 'px,0)';
         last.gx = gx; last.gy = gy;

@@ -628,8 +628,12 @@
 
   function aurora(parent, o = {}) {
     const W = o.W || stageW(), H = o.H || stageH();
+    // Canvas: one canvas px per curtain strip horizontally (the browser's bilinear upscale
+    // blends neighbouring strips into silky rays instead of hard-edged bars), res vertically.
     const res = o.res || 0.5;
-    const cw = Math.max(2, Math.round(W * res)), chh = Math.max(2, Math.round(H * res));
+    const N = Math.max(16, Math.round(o.strips || W / 7));
+    const rx = N / W, ry = res;
+    const cw = N, chh = Math.max(2, Math.round(H * res));
     const canvas = el('canvas', { class: 'bvk-aurora', parent });
     canvas.width = cw; canvas.height = chh;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
@@ -685,7 +689,7 @@
         lean: (R() - 0.5) * 0.28
       });
     }
-    const N = o.strips || 150, sw = W / N;
+    const sw = W / N;
 
     function draw(t, intensity = 1, hueShift = 0) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -703,7 +707,7 @@
           const hi = Math.floor(fract(rb.hue + hueShift + (bx / W) * rb.hueSpan + t * rb.hueSpeed) * K) % K;
           ctx.globalAlpha = Math.min(1, 0.11 * intensity * rb.alpha);
           ctx.fillStyle = blob[hi];
-          ctx.setTransform(rb.height * 1.9 * res, 0, 0, rb.height * 1.05 * res, bx * res, by * res);
+          ctx.setTransform(rb.height * 1.9 * rx, 0, 0, rb.height * 1.05 * ry, bx * rx, by * ry);
           ctx.fillRect(-1, -1, 2, 2);
         }
         // Curtain: vertical strips with a hemmed baseline and drifting rays.
@@ -721,7 +725,7 @@
           const hi = Math.floor(fract(rb.hue + hueShift + xr * rb.hueSpan + t * rb.hueSpeed) * K) % K;
           ctx.globalAlpha = a > 1 ? 1 : a;
           ctx.fillStyle = strip[hi];
-          ctx.setTransform(sw * res, 0, rb.lean * hgt * res, hgt * res, (x - sw / 2) * res, y * res);
+          ctx.setTransform(sw * rx, 0, rb.lean * hgt * rx, hgt * ry, (x - sw / 2) * rx, y * ry);
           ctx.fillRect(0, -1, 1, 1.14);
         }
       }
@@ -730,7 +734,7 @@
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    return { canvas, ctx, draw, W, H, res };
+    return { canvas, ctx, draw, W, H, res, strips: N };
   }
 
   /* ── 11. Particles (analytic; position = f(p0, v, g, drag, age)) ─────────── */
@@ -786,12 +790,19 @@
       if (L > maxL) { dx *= maxL / L; dy *= maxL / L; }
       const w = sz * (1 - 0.55 * u);
       if (L < sz * 0.8) { drawSprite(ctx, col, x, y, w * 2.4, a); return; }
+      // Tapered streak: hot head fading to a transparent tail (no hard pill ends), plus a glow head.
       ctx.globalCompositeOperation = cfg.blend || 'lighter';
-      ctx.lineCap = 'round';
-      ctx.globalAlpha = a * 0.3; ctx.strokeStyle = col; ctx.lineWidth = w * 3;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - dx, y - dy); ctx.stroke();
-      ctx.globalAlpha = a; ctx.strokeStyle = cfg.cores[p.col]; ctx.lineWidth = w;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - dx * 0.85, y - dy * 0.85); ctx.stroke();
+      ctx.lineCap = 'butt';
+      const tx = x - dx, ty = y - dy;
+      const gHalo = ctx.createLinearGradient(x, y, tx, ty);
+      gHalo.addColorStop(0, cfg.tints[p.col][0]); gHalo.addColorStop(1, cfg.tints[p.col][2]);
+      ctx.globalAlpha = a; ctx.strokeStyle = gHalo; ctx.lineWidth = w * 2.6;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke();
+      const gCore = ctx.createLinearGradient(x, y, tx, ty);
+      gCore.addColorStop(0, cfg.cores[p.col]); gCore.addColorStop(0.35, cfg.tints[p.col][1]); gCore.addColorStop(1, cfg.tints[p.col][2]);
+      ctx.strokeStyle = gCore; ctx.lineWidth = w * 0.9;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.stroke();
+      drawSprite(ctx, col, x, y, w * 2.2, a);
     } else if (p.shape === 'dot') {
       drawSprite(ctx, col, x, y, sz * (1 - 0.45 * u) * 2.2, a);
     } else if (p.shape === 'star') {
@@ -834,7 +845,7 @@
       alpha: o.alpha != null ? o.alpha : 1, fadeIn: o.fadeIn != null ? o.fadeIn : 0.04,
       fadePow: o.fadePow != null ? o.fadePow : 1.4, twinkle: o.twinkle || 0,
       sway: o.sway || null, turb: o.turb || 0, blend: o.blend || null,
-      colors, cores: colors.map(lighten)
+      colors, cores: colors.map(lighten), tints: colors.map(c => [rgba(c, 0.38), rgba(c, 0.85), rgba(c, 0)])
     };
   }
 

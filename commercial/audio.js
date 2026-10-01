@@ -4,9 +4,12 @@
 
    - BVAudio.render()  -> Promise<AudioBuffer>  (OfflineAudioContext, 48 kHz stereo, cached)
    - BVAudio.wav()     -> Promise<ArrayBuffer>  (16-bit PCM stereo WAV of render())
-   - BVAudio.enable()  -> Promise               (user gesture: AudioContext + live playback synced to BV)
+   - BVAudio.enable()  -> Promise               (user gesture: AudioContext + live playback synced to BV;
+                                                  while sound runs BV.clock follows the audible audio position,
+                                                  so picture and sound stay locked; starts/stops/seeks are faded)
    - BVAudio.muted / BVAudio.setMuted(bool)
-   - BVAudio.CUES      -> the cue sheet below (mirrors the scene timings of the script)
+   - BVAudio.CUES      -> the active cue sheet (CUES30 for the v2 30 s cut, CUES60 for the 60 s arc;
+                          chosen from BV.duration || BV_CONFIG.film.duration). Both scores live in this file.
 
    Deterministic: every noise buffer / random choice comes from mulberry32(2026).
    No external libraries; no Math.random; no casino sounds (no reel spins, no
@@ -58,7 +61,8 @@
     buybackTags: [47.7, 48.1, 48.5, 48.9],
     callbacks: [50.0, 50.5, 51.0, 51.5], finalImpact: 52.0, logoArc: [52.4, 52.8],
     violetDot: 52.8, mintDotRing: 52.92, glint: 58.5, tailEnd: 59.8,
-    silences: [[2.7, 3.0], [11.5, 12.0], [21.93, 22.0], [45.5, 46.0]]
+    silences: [[2.7, 3.0], [11.5, 12.0], [21.93, 22.0], [45.5, 46.0]],
+    dips: [[51.93, 52.0, 0.3]]   // pre-hit 'suck' (gain) so the final impact reads as a peak
   };
   // v2 30 s app-first cut (ARCH.md v2 / SCRIPT_V2.md; mirrors BVShared.CUES)
   const CUES30 = {
@@ -74,7 +78,8 @@
     heartbeats: [10.0, 10.8], silence: [11.4, 11.5], legendary: 11.5, oneOf25: 12.3, majorLift: 12.3, engrave: 12.6, backIntoPhone: 13.4,
     decide: [14.0, 16.0, 18.0, 20.0], ringMeter: [18.3, 18.9], confirmChord: 18.9, vaultClunk: 20.6, vaultLine: 20.8,
     proof: 22.0, nfcTap: 22.5, mintLog: 23.2, endCard: 24.5, logo: 25.3, glint: 28.8, tailEnd: 29.8,
-    silences: [[11.4, 11.5]]
+    silences: [[11.4, 11.5]],
+    dips: [[24.43, 24.5, 0.3]]   // pre-hit 'suck' under the reverse cymbal into the final impact
   };
   const cuesFor = (d) => (d < 45 ? CUES30 : CUES60);
 
@@ -121,6 +126,8 @@
     else if (p > 1 - dt) { const x = (p - 1) / dt; v -= x * x + x + x + 1; }
     return v;
   }
+  // band-limited square (difference of two polyBLEP saws): +1 for p < 0.5, -1 after
+  const blepSq = (p, dt) => blepSaw((p + 0.5) % 1, dt) - blepSaw(p, dt);
   // biquad with re-computable coefficients (state kept across updates): 'lp' | 'hp' | 'bp'
   function jsBiquadState(prev, type, f, q) {
     const st = prev || { x1: 0, x2: 0, y1: 0, y2: 0 };
@@ -136,6 +143,22 @@
     return st;
   }
   const TAU = 2 * Math.PI;
+
+  // Cooperative yielding: the synthesis is long, so it hands the main thread back to the page
+  // about every 30 ms (the film keeps animating while the soundtrack renders on enable()).
+  // MessageChannel tasks are not throttled in background tabs, unlike setTimeout.
+  const yieldTask = (function () {
+    if (typeof MessageChannel === 'undefined') return () => new Promise((r) => setTimeout(r, 0));
+    const ch = new MessageChannel(), q = [];
+    ch.port1.onmessage = () => { const r = q.shift(); if (r) r(); };
+    return () => new Promise((r) => { q.push(r); ch.port2.postMessage(0); });
+  })();
+  const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let sliceT = 0;
+  function slice() {
+    if (nowMs() - sliceT < 30) return Promise.resolve();
+    return yieldTask().then(() => { sliceT = nowMs(); });
+  }
   const FX_SR = 24000; // reverbs + delay run in a half-rate FX context (their returns are dark anyway)
 
   // =====================================================================
@@ -146,7 +169,7 @@
   //  an OfflineAudioContext. This keeps the live node count tiny, so the whole
   //  minute renders in a few seconds.
   // =====================================================================
-  function build(opts) {
+  async function build(opts) {
     opts = opts || {};
     const dur = getDuration();
     const END = dur;
@@ -205,13 +228,18 @@
       setPan(panDyn ? pan[0] : pan);
       const rv = o.rev || 0, hg = o.huge || 0, dl = o.dly || 0, anySend = rv || hg || dl;
       const L = S.L, R = S.R;
+      // de-click: every source ends with a short raised-cosine fade, so a buffer that is cut
+      // (o.len / `stop`, stem end) or whose tail has not fully decayed never ends on a step.
+      // Cuts get 4 ms, natural ends 1.5 ms (inaudible on decayed tails).
+      const cut = n < sL.length, fN = Math.min(n >> 1, cut ? 192 : 72), f0 = n - fN;
       for (let i = 0; i < n; i++) {
         const j = st + i; if (j < 0) continue;
         if (panDyn && (i & 63) === 0) {
           const u = clamp((t + i / SR - pan[2]) / Math.max(1e-6, pan[3] - pan[2]), 0, 1);
           setPan(pan[0] + (pan[1] - pan[0]) * u);
         }
-        const a = sL[i] * g, b = sR[i] * g;
+        const fg = i < f0 ? g : g * (0.5 + 0.5 * Math.cos(Math.PI * (i - f0 + 1) / fN));
+        const a = sL[i] * fg, b = sR[i] * fg;
         if (R) { L[j] += a * gl + b * xl; R[j] += b * gr + a * xr; }
         else L[j] += stereoSrc ? (a + b) * 0.5 : a;
         if (anySend) {
@@ -238,8 +266,9 @@
     const noise = mk(6, 2, (d) => { for (let i = 0; i < d.length; i++) d[i] = rnd() * 2 - 1; });
     const NL = noise[0].length;
     const clickB = mk(0.008, 1, (d) => {
-      const hp = jsBiquad('hp', 3000, 0.7);
-      for (let i = 0; i < d.length; i++) d[i] = hp((i < 2 ? 1 : 0) + (rnd() * 2 - 1) * Math.exp(-i / (0.0008 * SR)) * 0.7);
+      // beater / UI click: 3 kHz HP + 9 kHz LP (a knock, not a full-band digital spike)
+      const hp = jsBiquad('hp', 3000, 0.7), lp = jsBiquad('lp', 9000, 0.7);
+      for (let i = 0; i < d.length; i++) d[i] = 1.25 * lp(hp((i < 2 ? 1 : 0) + (rnd() * 2 - 1) * Math.exp(-i / (0.0008 * SR)) * 0.7));
     });
     function hatBuf(decay) {
       return mk(decay * 1.6, 1, (d) => {
@@ -264,6 +293,7 @@
         d[i] = bp(n) * e * 2.2 + hp(n) * Math.exp(-t / 0.03) * 0.35 + Math.sin(TAU * 185 * t) * Math.exp(-t / 0.045) * 0.55;
       }
     });
+    await slice();
     const crashB = mk(2.8, 2, (d) => {
       const fr = [], ph = [], am = [];
       for (let k = 0; k < 12; k++) { fr.push(rr(3200, 13500)); ph.push(rnd() * TAU); am.push(rr(0.3, 1)); }
@@ -285,6 +315,7 @@
       });
     })();
     // Chiptune segment (0..2.95 s): 4-bit, 8 kHz sample-and-hold, D minor
+    await slice();
     const chipB = mk(2.95, 1, (d) => {
       const LEAD = [74, 77, 81, 86, 81, 77, 74, 81, 72, 76, 79, 84, 81, 79, 77, 76];
       const STAB = [62, 65, 69, 74];
@@ -329,6 +360,7 @@
     }
     const crinkleSweep = crinkleBuf(0.7, (u) => Math.sin(Math.PI * u) * 0.9, false);
     const crinkleRise = crinkleBuf(1.55, (u) => 0.25 + 1.6 * u * u, true);
+    await slice();
     const tearB = mk(0.42, 2, () => {});
     (function () { // tear crackle: 40 ms grains rising 2 -> 9 kHz + rip texture
       for (let c = 0; c < 2; c++) {
@@ -349,6 +381,7 @@
         }
       }
     })();
+    await slice();
     const engraveB = mk(0.62, 1, (d) => {
       const hp = jsBiquad('hp', 4200, 0.7), bp = jsBiquad('bp', 6800, 6); let e = 0;
       for (let i = 0; i < d.length; i++) {
@@ -389,6 +422,7 @@
         }
       });
     }
+    await slice();
     const shep1 = shepardBuf(1.5, 0.9), shep2 = shepardBuf(1.93, 1.0);
 
     // ---------------------------------------------------------- main bus graph
@@ -407,8 +441,10 @@
     const mix = G(0.3);
     // master tilt EQ: tame the sub, open the top ("expensive" air)
     const eqLo = F('lowshelf', 110, 0.7), eqMid = F('peaking', 2600, 0.9), eqHi = F('highshelf', 6500, 0.7);
-    eqLo.gain.value = -3.5; eqMid.gain.value = 2; eqHi.gain.value = 3.5;
-    mix.connect(eqLo); eqLo.connect(eqMid); eqMid.connect(eqHi); eqHi.connect(glue); glue.connect(lim); lim.connect(out);
+    // presence lift at 6.5 kHz, but take the 12 kHz+ sizzle back down (hats/crash/noise stack up there)
+    const eqAir = F('highshelf', 12000, 0.7);
+    eqLo.gain.value = -3.5; eqMid.gain.value = 1.2; eqHi.gain.value = 2.2; eqAir.gain.value = -2.5;
+    mix.connect(eqLo); eqLo.connect(eqMid); eqMid.connect(eqHi); eqHi.connect(eqAir); eqAir.connect(glue); glue.connect(lim); lim.connect(out);
     const sfx = G(1, mix);
     const subBus = G(0.5); subBus.connect(shaper(1.4, sfx));
     const musicOut = G(1, mix);
@@ -511,7 +547,7 @@
           const tt = i / SR;
           if ((i & 31) === 0) flt = jsBiquadState(flt, 'lp', pw(cutA, cutB, tt / dec), 2.2);
           p1 = (p1 + f / SR) % 1; p2 = (p2 + f2 / SR) % 1;
-          const x = (type === 'square' ? (p1 < 0.5 ? 1 : -1) : blepSaw(p1, f / SR)) + (p2 < 0.5 ? 1 : -1);
+          const x = (type === 'square' ? blepSq(p1, f / SR) : blepSaw(p1, f / SR)) + blepSq(p2, f2 / SR);
           d[i] = flt.run(x) * env1(tt, 0.003, tau) * 0.5;
         }
       });
@@ -684,7 +720,7 @@
         for (let i = 0; i < dd.length; i++) {
           const tt = i / SR;
           ph += (f1 ? pw(f, f1, tt / d) : f) / SR; const p = ph % 1;
-          const w = type === 'square' ? (p < 0.5 ? 1 : -1) : type === 'triangle' ? 1 - 4 * Math.abs(p - 0.5) : Math.sin(TAU * p);
+          const w = type === 'square' ? blepSq(p, Math.min(0.5, (f1 ? pw(f, f1, tt / d) : f) / SR)) : type === 'triangle' ? 1 - 4 * Math.abs(p - 0.5) : Math.sin(TAU * p);
           dd[i] = w * env1(tt, a, tau);
         }
       });
@@ -762,13 +798,14 @@
     function forSteps(t0, t1, fn) {
       for (let s = Math.ceil(t0 / 0.125 - 1e-6); s * 0.125 < t1 - 1e-6; s++) fn(s * 0.125, ((s % 16) + 16) % 16, s);
     }
-    function runSections(SECTIONS) {
-      SECTIONS.forEach((S) => {
+    async function runSections(SECTIONS) {
+      for (const S of SECTIONS) {
+        await slice();
         const ch = CH[S.ch], st = STY[S.st];
         padLPset('setValueAtTime', S.lp, S.t0);
         if (S.lpTo) padLPset('exponentialRampToValueAtTime', S.lpTo[0], S.lpTo[1]);
         pad(S.t0, S.t1, ch.pad, S.pad, { a: S.a, r: S.r });
-        if (!st) return;
+        if (!st) continue;
         const drop = S.st === 'drop' || S.st === 'drop4';
         forSteps(S.t0, S.t1, (t, i, s) => {
           const lv = st.lv || 1;
@@ -803,14 +840,14 @@
             ch.pad.forEach((m, j) => bell(t + j * 0.012, mtof(m + 12), 0.035, -0.4 + j * 0.27, 1.1, { dest: 'arp', ratio: 1, index: 1.3, rev: 0.25 }));
           }
         });
-      });
+      }
     }
     musicLP.frequency.setValueAtTime(20000, 0);
     drumLP.frequency.setValueAtTime(20000, 0);
     padLPset('setValueAtTime', 2200, 0);
 
     // =========================================================== 60 s score (FINAL_SCRIPT.json arc)
-    function score60() {
+    async function score60() {
       const SECTIONS = [
         { t0: 4.0, t1: 6.0, ch: 'Dm', st: 'ambient', pad: 0.045, lp: 900, a: 0.6, r: 0.25 },
         { t0: 6.0, t1: 8.0, ch: 'Dm', st: 'intro', pad: 0.05, lp: 1400, lpTo: [2400, 10.0], glideIn: true },
@@ -840,7 +877,7 @@
         { t0: 51.0, t1: 52.0, ch: 'A', st: 'callback', pad: 0.055, lp: 4000 },
         { t0: 52.0, t1: 55.2, ch: 'D', st: 'end', pad: 0.055, lp: 2600, a: 0.02, r: 2.0 }
       ];
-      runSections(SECTIONS);
+      await runSections(SECTIONS);
       // whole-music-bus filter sweeps & snaps
       const mlp = musicLP.frequency;
       mlp.setValueAtTime(20000, 12.25); mlp.exponentialRampToValueAtTime(800, 12.5); mlp.setValueAtTime(800, 13.4); mlp.exponentialRampToValueAtTime(20000, 13.5);
@@ -852,6 +889,7 @@
 
       // ================================================================ SFX / CUES
       // (1) 0-2 NFT era: bitcrushed chiptune, gated stabs + vinyl scratch per word; tape-stop at 2.0
+      await slice();
       {
         const tape = varispeed(chipB, 2.75, (tt) => (tt < 2.0 ? 1 : Math.max(0.03, 1 - (tt - 2.0) / 0.6 * 0.97)));
         let flt = null;
@@ -869,6 +907,7 @@
         [2.3, 2.6].forEach((t) => { tick(t, 2000, 0.14, 0, 0.06, 'square', { a: 0.002 }); tick(t, 2000, 0.12, 0, 0.06, 'sine'); });
       }
       // (2/3) 3.0-4.0 reverse whoosh + pixel gather + hydraulic hiss; 4.0 THE STRIKE; 4.8 THE GOLD RING
+      await slice();
       {
         whoosh(3.0, 0.62, 500, 6000, 0.42, -0.6, 0.2, { peak: 0.95, rev: 0.3 });
         for (let i = 0; i < 26; i++) {
@@ -904,6 +943,7 @@
         drone(4.0, 5.9, [50], 'tri', 0.024, 0.5, 0.1);
       }
       // (4) 6-10 intro groove sfx
+      await slice();
       {
         whoosh(5.95, 0.4, 600, 4000, 0.32, -0.7, 0.4, { peak: 0.25, rev: 0.25 });
         subDrop(6.0, 80, 36, 0.3, 0.55, 0.9);
@@ -923,6 +963,7 @@
         whoosh(9.35, 0.32, 900, 5000, 0.22, -0.6, 0.6, { peak: 0.6 });
       }
       // (5) 10-11.5 crinkle intensifies + Shepard riser (drums out); 11.5-12 TOTAL SILENCE
+      await slice();
       {
         tick(10.0, 2600, 0.05, 0.5, 0.02, 'sine', { rev: 0.1 });
         play(crinkleRise, 9.95, 0.32, { pan: 0.35, rev: 0.2, stop: 11.5 });
@@ -932,6 +973,7 @@
         drone(10.0, 11.47, [33], 'saw', 0.06, 1.2, 0.02, { lp: 300, q: 1 });
       }
       // (6) 12.0 DROP 1 — THE TEAR; (7) 12.25-13.5 slow-mo; 13.5 THE BIFROST CHORD
+      await slice();
       {
         const t = 12.0;
         noiseBurst(t, 0.9, 2000, 9000, 0.35, { type: 'bandpass', q: 1.4, sweep: 0.25, rev: 0.25, huge: 0.2 });
@@ -953,6 +995,7 @@
         sparkle(13.55, 14, 0.5, 0.035, 0, 2, 3);
       }
       // (8) 14-20 tier escalation (each louder and brighter)
+      await slice();
       {
         [[13.4, 0.3], [14.9, 0.34], [16.4, 0.4]].forEach(([t, v]) => whoosh(t, 0.6, 700, 3800, v, -0.75, 0.05, { peak: 0.85, rev: 0.2 }));
         // SILVER 14.0: D5 ping + silver ring
@@ -987,6 +1030,7 @@
         whoosh(18.5, 1.2, 500, 2200, 0.16, -0.75, 0.0, { peak: 0.75, rev: 0.3 }); // 4th coin rides slowly
       }
       // (9) 20.0 hard cut: heartbeat under a Shepard riser; 21.93-22.0 silence
+      await slice();
       {
         CUES60.heartbeats.forEach((t, i) => {
           heartbeat(t, 0.8 + 0.07 * i, [0.17, 0.16, 0.14, 0.1][i]);
@@ -998,6 +1042,7 @@
         whoosh(20.9, 1.03, 300, 6000, 0.18, 0, 0, { peak: 0.99, q: 1.5, rev: 0.1 });
       }
       // (10) 22.0 DROP 2 — LEGENDARY; 23.0 D MAJOR lift
+      await slice();
       {
         const t = 22.0;
         subDrop(t, 62, 40, 0.15, 1.0, 2.4);
@@ -1022,6 +1067,7 @@
         whoosh(24.7, 1.0, 3000, 9000, 0.05, -0.5, 0.5, { type: 'highpass', peak: 0.5, rev: 0.4 });
       }
       // (11) 26-30 data groove: hash blips, mint ticks, NFC two-tone, verified chime
+      await slice();
       {
         whoosh(25.85, 0.26, 900, 6000, 0.38, 0.8, -0.8, { peak: 0.6 });
         for (let i = 0; i < 6; i++) tick(26.02 + i * 0.05, 3000 + i * 300, 0.03, 0.5, 0.02, 'sine', { rev: 0.15 });
@@ -1038,6 +1084,7 @@
         [86, 90, 93, 98].forEach((m, i) => bell(28.86 + i * 0.05, mtof(m), 0.07, -0.2 + i * 0.15, 1.0, { ratio: 3, index: 1.0, rev: 0.4, dly: 0.15 }));
       }
       // (12) 30-34 half-time: four stamp thuds a step higher each, vault-door clunk at 32.9
+      await slice();
       {
         whoosh(29.6, 0.42, 5000, 600, 0.2, 0, 0, { peak: 0.95, rev: 0.3 });
         whoosh(30.0, 0.6, 2000, 8000, 0.06, -0.8, 0.8, { type: 'highpass', peak: 0.5, rev: 0.4 });
@@ -1060,6 +1107,7 @@
         sparkle(33.05, 8, 0.8, 0.03, 0, 2, 4);
       }
       // (13) 34-38 warm: offer tink, swipe, capsule snap, seal slap, flaps, tape zip, label printer, door chime
+      await slice();
       {
         whoosh(33.85, 0.26, 6000, 700, 0.32, 0, 0, { peak: 0.5 });
         [[3520, 0.1], [8180, 0.035]].forEach(([f, v]) => tick(34.1, f, v, 0.2, 0.28, 'sine', { rev: 0.35, dly: 0.1 }));
@@ -1079,6 +1127,7 @@
         tick(37.8, 1760, 0.05, 0.1, 0.05, 'sine'); tick(37.86, 2349, 0.05, 0.1, 0.07, 'sine');
       }
       // (14) 38.0 DROP 3 — brightest: horn countermelody, bids, escrow, release, royalties, confirmations
+      await slice();
       {
         whoosh(37.78, 0.24, 700, 8000, 0.4, -0.6, 0.6, { peak: 0.85 });
         impact(38.0, 0.7, { crashV: 0.6, subDec: 1.2 });
@@ -1110,6 +1159,7 @@
       // (15) 45.0 whip to centre, filtered half-bar, silence 45.5-46.0
       whoosh(44.86, 0.22, 6000, 900, 0.3, 0.5, 0, { peak: 0.5 });
       // (16) 46.0 DROP 4 on '80%': 808 + crash + cascade of 8 silver rings; meter sweep -> confirm chord; INSTANT
+      await slice();
       {
         const t = 46.0;
         impact(t, 1.0, { crashV: 0.75, huge: 0.3 });
@@ -1123,6 +1173,7 @@
         CUES60.buybackTags.forEach((tt, i) => glassTick(tt, mtof([86, 88, 90, 93][i]), 0.08, -0.6 + i * 0.4, { dec: 0.35 }));
       }
       // (17) 50-52 double-time callback: tear / gold ring / offer tink / bid tick
+      await slice();
       {
         noiseBurst(50.0, 0.65, 2000, 9000, 0.3, { type: 'bandpass', q: 1.4, sweep: 0.25, rev: 0.25 });
         play(tearB, 50.0, 0.6, { rev: 0.2 });
@@ -1137,6 +1188,7 @@
         revCymbal(52.0, 0.9, 0.4);
       }
       // (18) 52.0 final impact + THE BIFROST CHORD in D major panned L -> R + silver ring on the mint dot
+      await slice();
       {
         const t = 52.0;
         impact(t, 1.05, { crashV: 0.8, huge: 0.0, subDec: 2.4 });
@@ -1152,9 +1204,9 @@
     }
 
     // =========================================================== v2: 30 s "app-first" cut
-    function score30() {
+    async function score30() {
       const C = CUES30;
-      runSections([
+      await runSections([
         { t0: 1.0, t1: 2.0, ch: 'Dm', st: 'ambient', pad: 0.04, lp: 900, a: 0.4, r: 0.1 },
         { t0: 2.0, t1: 4.0, ch: 'Dm', st: 'intro', pad: 0.05, lp: 1200, lpTo: [2600, 3.95], glideIn: true },
         { t0: 4.0, t1: 4.6, ch: 'Asus', st: 'riser', pad: 0.05, lp: 1200, a: 0.3, r: 0.02 },
@@ -1182,6 +1234,7 @@
       const toast = (t, m) => { glassTick(t, mtof(m), 0.08, 0.2, { dec: 0.35 }); glassTick(t + 0.07, mtof(m + 5), 0.07, 0.2, { dec: 0.45 }); };
 
       // 01 HOOK 0.0-2.2: bitcrushed stab on '0.00 g'; 1.0 STRIKE + THE SILVER RING; 1.7 spin/whip into the phone
+      await slice();
       {
         const tape = varispeed(chipB, 1.0, (tt) => (tt < 0.62 ? 1 : Math.max(0.03, 1 - (tt - 0.62) / 0.3 * 0.97)));
         let flt = null;
@@ -1214,19 +1267,22 @@
         drone(1.0, 1.95, [38], 'sine', 0.07, 0.3, 0.05);
       }
       // 02 APP · PACK 2.0-4.2: groove opens, Gjallarhorn on EVERY PACK HITS, UI tap on 'Rip pack'
+      await slice();
       {
         whoosh(1.98, 0.32, 600, 3000, 0.22, 0.5, 0, { peak: 0.3, rev: 0.2 }); // phone settles (spring)
         subDrop(2.0, 80, 36, 0.3, 0.55, 0.9);
         crash(2.0, 0.22);
         play(crinkleSweep, 2.2, 0.2, { pan: [-0.8, 0.8, 2.2, 2.9], rev: 0.2 }); // foil specular sweep
-        horn(C.everyPackHits, [38, 45, 50, 53, 57], 0.95, 0.05, { a: 0.22, cut: 1300, rev: 0.35, huge: 0.3, rel: 0.25 });
+        horn(C.everyPackHits, [38, 45, 50, 53, 57], 0.95, 0.05, { a: 0.1, cut: 1300, rev: 0.35, huge: 0.3, rel: 0.25 });
         subDrop(C.everyPackHits, 60, 37, 0.2, 0.5, 1.0);
+        thud(C.everyPackHits, 58, 0.38, { slap: 0.55, rev: 0.2 }); // super slam under the blast
         crash(C.everyPackHits, 0.16, { huge: 0.2 });
         thud(C.silverOrGold, 62, 0.45, { slap: 0.5, rev: 0.2 });
         sparkle(C.silverOrGold, 6, 0.4, 0.03, 0.3, 2, 3);
         uiTap(C.tapRip, 0); tick(C.tapRip + 0.02, 180, 0.15, 0, 0.06, 'sine'); // press-in + haptic
       }
       // 03 RIP 4.0-6.2: crinkle + riser, 4.6 DROP 1 tear, slow-mo choir, reverse cymbal into the 5.4 whip
+      await slice();
       {
         play(crinkleRise, 3.98, 0.32, { pan: 0.35, rev: 0.2, stop: 4.6 });
         play(shep1, 4.0, 0.42, { rev: 0.2, stop: 4.6 });
@@ -1250,6 +1306,7 @@
         [5.55, 5.65, 5.75, 5.85].forEach((tt, i) => thud(tt, 140 + i * 10, 0.12, { slap: 0.25, dec: 0.1, pan: -0.3 + i * 0.2 })); // 4 coins drop in
       }
       // 04 REVEAL 6.0-10.2: SILVER / RARE / GOLD, each louder and brighter
+      await slice();
       {
         const [p1, p2, p3] = [6.0, 7.3, 8.6];
         whoosh(5.7, 0.3, 700, 3800, 0.22, -0.5, 0, { peak: 0.85, rev: 0.2 });
@@ -1279,6 +1336,7 @@
         whoosh(9.3, 0.7, 500, 2000, 0.1, -0.3, 0.2, { peak: 0.75, rev: 0.3 }); // last card arrives while the groove filters down
       }
       // 05 LEGENDARY 10.0-14.2: heartbeat + Shepard riser, 11.4-11.5 black, 11.5 DROP 2, 12.3 D MAJOR lift
+      await slice();
       {
         C.heartbeats.forEach((t, i) => { heartbeat(t, 0.85 + 0.08 * i, 0.16); whoosh(t, 0.5, 4000, 9000, 0.035 + 0.015 * i, 0, 0, { type: 'highpass', peak: 0.15, rev: 0.4 }); });
         heartbeat(11.2, 0.95, 0.1);
@@ -1304,6 +1362,7 @@
         thud(13.72, 120, 0.25, { slap: 0.35, dec: 0.15 }); // lands in 'Your pulls'
       }
       // 06 DECIDE 14.0-22.2: tap row -> sheet swish -> button tap -> confirm -> toast, per choice; stamp a step higher each
+      await slice();
       {
         CHOICES30.forEach((t, i) => {
           if (i) whoosh(t - 0.12, 0.2, 5000, 900, 0.14, 0.4, -0.2, { peak: 0.4 });
@@ -1333,6 +1392,7 @@
         [[15.35, 55], [17.05, 61.7], [19.05, 69.3], [20.75, 73.4]].forEach(([t, f], k) => thud(t, f, 0.5 + 0.05 * k, { slap: 0.6, rev: 0.2, pan: 0.15 }));
       }
       // 07 PROOF 22.0-24.7: NFC two-tone + verified chime, hash blips
+      await slice();
       {
         whoosh(21.85, 0.24, 900, 6000, 0.36, 0.8, -0.8, { peak: 0.6 });
         thud(22.0, 90, 0.3, { slap: 0.3, dec: 0.2 });
@@ -1348,6 +1408,7 @@
         revCymbal(C.endCard, 0.8, 0.4);
       }
       // 08 END CARD 24.5-30.0: final impact, coins fan up, BIFROST CHORD in D major L -> R, silver ring on the mint dot
+      await slice();
       {
         const t = C.endCard;
         impact(t, 1.05, { crashV: 0.8, huge: 0.0, subDec: 2.2 });
@@ -1365,7 +1426,8 @@
     }
 
     const CHOICES30 = CUES30.decide;
-    if (dur < 45) score30(); else score60();
+    if (dur < 45) await score30(); else await score60();
+    await slice();
 
     // ---------------------------------------------------- FX pass (24 kHz): hall + huge reverbs, ping-pong delay
     const fxN = Math.ceil(N / 2);
@@ -1497,11 +1559,12 @@
     }
     return tp;
   }
-  function limit(L, R, gain, ceil) {
+  async function limit(L, R, gain, ceil) {
     const n = L.length, oL = new Float32Array(n), oR = new Float32Array(n);
     for (let i = 0; i < n; i++) { oL[i] = L[i] * gain; oR[i] = R[i] * gain; }
     const thr = ceil * 0.55;
-    const tl = tpTrack(oL, thr), tr = tpTrack(oR, thr);
+    const tl = tpTrack(oL, thr); await slice();
+    const tr = tpTrack(oR, thr); await slice();
     const req = new Float32Array(n);
     for (let i = 0; i < n; i++) { const p = Math.max(tl[i], tr[i]); req[i] = p > ceil ? ceil / p : 1; }
     const LA = 96; // 2 ms lookahead
@@ -1543,23 +1606,35 @@
   function gates(L, R) {
     const ramp = (a, b, g0, g1) => { const i0 = Math.round(a * SR), i1 = Math.round(b * SR); for (let i = Math.max(0, i0); i < Math.min(L.length, i1); i++) { const g = g0 + (g1 - g0) * (i - i0) / (i1 - i0); L[i] *= g; R[i] *= g; } };
     const zero = (a, b) => { for (let i = Math.max(0, Math.round(a * SR)); i < Math.min(L.length, Math.round(b * SR)); i++) { L[i] = 0; R[i] = 0; } };
-    cuesFor(L.length / SR).silences.forEach(([a, b]) => { ramp(a - 0.006, a, 1, 0); zero(a, b - 0.0015); ramp(b - 0.0015, b, 0, 1); });
+    const cs = cuesFor(L.length / SR);
+    cs.silences.forEach(([a, b]) => { ramp(a - 0.006, a, 1, 0); zero(a, b - 0.0015); ramp(b - 0.0015, b, 0, 1); });
+    (cs.dips || []).forEach(([a, b, g]) => { ramp(a - 0.025, a, 1, g); ramp(a, b - 0.0015, g, g); ramp(b - 0.0015, b, g, 1); });
     const end = L.length / SR;
     ramp(end - 1.0, end - 0.2, 1, 0); zero(end - 0.2, end);
   }
-  function master(buffer, latency) {
+  // DC blocker + 4th-order Butterworth high-pass at 28 Hz: removes infrasonic rumble that no
+  // speaker reproduces but that eats limiter headroom (the 808 fundamental at D1 = 36.7 Hz stays)
+  function subHP(d) {
+    const h1 = jsBiquad('hp', 28, 0.5412), h2 = jsBiquad('hp', 28, 1.3066);
+    for (let i = 0; i < d.length; i++) d[i] = h2(h1(d[i]));
+  }
+  async function master(buffer, latency) {
     const L = buffer.getChannelData(0), R = buffer.getChannelData(1);
     if (latency > 0) for (const d of [L, R]) { d.copyWithin(0, latency); d.fill(0, d.length - latency); }
+    subHP(L); subHP(R);
     gates(L, R);
+    await slice();
     const ceil = Math.pow(10, CEIL_DBTP / 20);
     const l0 = integratedLUFS(L, R);
     let gain = Math.pow(10, (TARGET_LUFS - l0) / 20);
-    let res = limit(L, R, gain, ceil);
+    await slice();
+    let res = await limit(L, R, gain, ceil);
     for (let it = 0; it < 2; it++) {
+      await slice();
       const l1 = integratedLUFS(res[0], res[1]);
-      if (Math.abs(l1 - TARGET_LUFS) < 0.05) break;
+      await slice();
       gain *= Math.pow(10, (TARGET_LUFS - l1) / 20);
-      res = limit(L, R, gain, ceil);
+      res = await limit(L, R, gain, ceil);
     }
     // final safety: hard ceiling on samples (never clip), and silence after 59.8 s
     const end = Math.round((L.length / SR - 0.2) * SR);
@@ -1605,51 +1680,121 @@
   function wav() { return render().then(toWav); }
 
   // ---------------------------------------------------- live playback synced to BV
-  const live = { ctx: null, gain: null, src: null, startCtx: 0, offset: 0, wired: false, enabled: false, buffer: null };
+  // Each run of the soundtrack is one AudioBufferSource through its own gain ("voice"), so every
+  // start / stop / seek is a short fade (no clicks) and stopped voices disconnect themselves.
+  // While a voice is audible, BV.clock follows the *audible* audio position (output latency
+  // included), so picture and sound cannot drift apart; when audio is not running the clock
+  // returns NaN and the film falls back to its own timer.
+  const FADE_IN = 0.008, FADE_OUT = 0.006 /* setTarget time-constant (~30 ms to silence) */;
+  const RESYNC_FREE = 0.25, RESYNC_LOCKED = 0.08;
+  const live = { ctx: null, gain: null, voice: null, alive: 0, starts: 0, wired: false, enabled: false, buffer: null, pending: null, lastClock: -1 };
   let muted = false;
-  function srcPos() { return live.offset + (live.ctx.currentTime - live.startCtx); }
-  function stopSrc() {
-    if (live.src) { try { live.src.onended = null; live.src.stop(); } catch (e) { /* already stopped */ } try { live.src.disconnect(); } catch (e) { /* noop */ } live.src = null; }
+
+  // audible film position of the running voice (seconds), or NaN when nothing is audible
+  function heardPos() {
+    const v = live.voice, c = live.ctx;
+    if (!v || !c || c.state !== 'running') return NaN;
+    let x = NaN;
+    if (typeof c.getOutputTimestamp === 'function' && typeof performance !== 'undefined') {
+      const ts = c.getOutputTimestamp();
+      if (ts && ts.performanceTime > 0 && ts.contextTime > 0) x = ts.contextTime + clamp((performance.now() - ts.performanceTime) / 1000, 0, 0.25);
+    }
+    if (!(x === x)) x = c.currentTime - (c.outputLatency || c.baseLatency || 0);
+    return clamp(v.offset + (x - v.startCtx), v.offset, live.buffer.duration);
   }
+  // BV.clock: monotonic within a run
+  function clock() {
+    const p = heardPos();
+    if (!(p === p)) return NaN;
+    if (p < live.lastClock) return live.lastClock;
+    live.lastClock = p;
+    return p;
+  }
+  function stopVoice(v) {
+    if (!v) return;
+    const c = live.ctx, t0 = Math.max(c.currentTime, v.fadeEnd);
+    try { v.g.gain.setTargetAtTime(0, t0, FADE_OUT); v.src.stop(t0 + FADE_OUT * 6); } catch (e) { /* already stopped */ }
+  }
+  function stop() { const v = live.voice; live.voice = null; live.lastClock = -1; stopVoice(v); }
   function startAt(t) {
-    stopSrc();
-    if (!live.ctx || !live.buffer) return;
-    t = Math.max(0, t || 0);
-    if (t >= live.buffer.duration - 0.01) return;
-    if (live.ctx.state === 'suspended') live.ctx.resume();
-    const s = live.ctx.createBufferSource(); s.buffer = live.buffer; s.connect(live.gain);
-    s.start(0, t); live.src = s; live.startCtx = live.ctx.currentTime; live.offset = t;
-    s.onended = () => { if (live.src === s) live.src = null; };
+    const c = live.ctx, b = live.buffer;
+    stop();
+    if (!c || !b) return;
+    t = Math.max(0, +t || 0);
+    if (t >= b.duration - 0.05) return;
+    if (c.state !== 'running') c.resume().catch(() => {});
+    const src = c.createBufferSource(), g = c.createGain(), when = c.currentTime;
+    src.buffer = b; src.connect(g); g.connect(live.gain);
+    const fi = t < 0.001 ? 0.002 : FADE_IN;
+    g.gain.setValueAtTime(0, when); g.gain.linearRampToValueAtTime(1, when + fi);
+    src.start(when, t);
+    const v = { src: src, g: g, startCtx: when, offset: t, fadeEnd: when + fi };
+    live.alive++; live.starts++;
+    src.onended = () => {
+      if (v.ended) return; v.ended = true;
+      live.alive--;
+      try { src.disconnect(); g.disconnect(); } catch (e) { /* noop */ }
+      if (live.voice === v) live.voice = null;
+    };
+    live.voice = v;
+  }
+  // bring audio in line with the film time t (only restarts when it really is out of sync)
+  function sync(t) {
+    const BV = window.BV;
+    if (!live.enabled || !BV) return;
+    if (!BV.playing) { if (live.voice) stop(); return; }
+    t = typeof t === 'number' && t === t ? t : BV.t;
+    if (!live.voice) { startAt(t); return; }
+    const locked = BV.clock === clock;
+    // a frame that simply applied the value our clock returned is not a seek, however long the
+    // frame took to draw (heavy frames / re-layouts on slow devices must not restart the audio)
+    if (locked && t === live.lastClock) return;
+    const p = heardPos();
+    if (!(p === p)) return;               // context not running yet (resume pending): statechange re-syncs
+    if (Math.abs(p - t) > (locked ? RESYNC_LOCKED : RESYNC_FREE)) startAt(t);
   }
   function wire() {
     const BV = window.BV;
     if (live.wired || !BV || typeof BV.on !== 'function') return;
     live.wired = true;
     BV.on('play', () => { if (live.enabled) startAt(BV.t); });
-    BV.on('pause', stopSrc);
-    BV.on('end', stopSrc);
-    BV.on('time', (tt) => {
-      if (!live.enabled) return;
-      const t = typeof tt === 'number' ? tt : BV.t;
-      if (!BV.playing) { if (live.src) stopSrc(); return; }
-      if (!live.src) { startAt(t); return; }
-      if (Math.abs(srcPos() - t) > 0.25) startAt(t);
-    });
-    BV.on('format', () => { if (live.enabled && BV.playing) startAt(BV.t); else stopSrc(); });
+    BV.on('pause', stop);
+    BV.on('end', stop);
+    BV.on('time', sync);
+    BV.on('format', () => sync(BV.t)); // a re-layout is not a seek: keep the voice running
+  }
+  // the film follows the audio clock while sound is enabled (never clobber someone else's clock)
+  function lockClock() {
+    const BV = window.BV;
+    if (BV && live.enabled && (BV.clock == null || BV.clock === clock)) BV.clock = clock;
+  }
+  // inside a user gesture: resume + play one silent frame (unlocks iOS / Safari output)
+  function unlock() {
+    const c = live.ctx;
+    if (!c) return;
+    if (c.state !== 'running') c.resume().catch(() => {});
+    try { const s = c.createBufferSource(); s.buffer = c.createBuffer(1, 1, c.sampleRate); s.connect(c.destination); s.start(0); s.onended = () => { try { s.disconnect(); } catch (e) { /* noop */ } }; } catch (e) { /* noop */ }
   }
   function enable() {
     if (!live.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return Promise.reject(new Error('WebAudio unavailable'));
-      live.ctx = new AC({ latencyHint: 'playback' });
+      try { live.ctx = new AC({ latencyHint: 'playback' }); } catch (e) { live.ctx = new AC(); }
       live.gain = live.ctx.createGain(); live.gain.gain.value = muted ? 0 : 1; live.gain.connect(live.ctx.destination);
+      // suspended / interrupted (autoplay policy, iOS call, BT switch): resume on the next gesture,
+      // and re-sync once the context runs again (a voice does not advance while suspended)
+      const kick = () => { if (live.ctx.state !== 'running') unlock(); };
+      ['pointerdown', 'keydown', 'touchend'].forEach((e) => window.addEventListener(e, kick, { capture: true, passive: true }));
+      live.ctx.onstatechange = () => { if (live.ctx.state === 'running' && live.enabled && window.BV && window.BV.playing) startAt(window.BV.t); };
     }
-    const resumed = live.ctx.state === 'suspended' ? live.ctx.resume().catch(() => {}) : Promise.resolve();
-    return Promise.all([render(), resumed]).then(([b]) => {
-      live.buffer = b; live.enabled = true; wire();
-      const BV = window.BV;
-      if (BV && BV.playing) startAt(BV.t);
-    });
+    unlock();
+    if (!live.pending) {
+      live.pending = render().then((b) => {
+        live.buffer = b; live.enabled = true;
+        wire(); lockClock(); sync();
+      }).catch((e) => { live.pending = null; throw e; });
+    } else if (live.enabled) { wire(); lockClock(); sync(); }
+    return live.pending;
   }
   function setMuted(b) {
     muted = !!b;
@@ -1667,7 +1812,10 @@
     get muted() { return muted; },
     set muted(b) { setMuted(b); },
     get enabled() { return live.enabled; },
-    _state: function () { return { playing: !!live.src, pos: live.src ? srcPos() : null, ctx: live.ctx ? live.ctx.state : null }; },
+    _state: function () {
+      const p = heardPos();
+      return { playing: !!live.voice, pos: p === p ? p : null, ctx: live.ctx ? live.ctx.state : null, voices: live.alive, starts: live.starts, clockLocked: !!(window.BV && window.BV.clock === clock) };
+    },
     // internal (analysis / stems): uncached render with options { only: 'music'|'sfx'|'dry' }
     _renderRaw: function (o) { return build(o); },
     _toWav: toWav,
