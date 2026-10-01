@@ -456,7 +456,6 @@
           os.detune.value = det + rr(-3, 3);
         });
       });
-      if (o.rev) { /* pads reach the hall through the arp/pad send below */ }
     }
     const padSend = G(0.22, revIn); padLP.connect(padSend);
     const arpSend = G(0.18, revIn); arpBus.connect(arpSend);
@@ -1052,7 +1051,6 @@
     {
       const t = 46.0;
       impact(t, 1.0, { crashV: 0.75, huge: 0.3 });
-      b808(t, 26, 1.2, 0.0, {}); // (808 boom handled in the groove; keep sub layer on sfx)
       subDrop(t, 75, 37, 0.35, 0.6, 1.4);
       for (let i = 0; i < 8; i++) silverRing(t + 0.02 + i * 0.065, 0.42 * (1 - i * 0.05), (i % 2 ? 1 : -1) * (0.2 + 0.09 * i), { rev: 0.25, dly: 0.03 });
       // ring meter fill: rising sine resolving into a confirm chord at 46.5

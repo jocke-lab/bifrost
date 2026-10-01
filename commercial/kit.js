@@ -418,7 +418,7 @@
     rise:  { stagger: 0.028, dur: 0.62 },
     blur:  { stagger: 0.022, dur: 0.8 },
     scale: { stagger: 0.02,  dur: 0.6 },
-    slam:  { stagger: 0.035, dur: 0.6 },
+    slam:  { stagger: 0,     dur: 0.6 },
     type:  { stagger: 0.045, dur: 0 },
     wipe:  { stagger: 0,     dur: 0.75 }
   };
@@ -441,12 +441,18 @@
     const maxRank = n > 1 ? Math.max.apply(null, ranks) : 0;
     const m = measure(h);
 
-    // Style switch: reset per-part caches and kit decorations.
-    if (h._style !== style) {
-      h._style = style;
-      h.parts.forEach(p => {
+    // Style switch: reset per-part caches and kit decorations. Parts that land
+    // together (stagger 0) scale about the block centre so they move as one unit.
+    const unit = stagger === 0 && (style === 'slam' || style === 'scale' || style === 'blur');
+    const okey = style + (unit ? ':u' : '') + (m ? ':m' : '');
+    if (h._style !== okey) {
+      h._style = okey;
+      h.parts.forEach((p, i) => {
         p._tr = p._op = p._fl = null;
-        p.style.transformOrigin = style === 'rise' ? '50% 90%' : '50% 55%';
+        if (unit && m) {
+          const q = m.pos[i];
+          p.style.transformOrigin = (m.W / 2 - q.x).toFixed(1) + 'px ' + (m.H / 2 - q.y).toFixed(1) + 'px';
+        } else p.style.transformOrigin = style === 'rise' ? '50% 90%' : '50% 55%';
       });
       h.inner.style.clipPath = ''; h._clip = '';
       if (h._edge) h._edge.style.opacity = 0;
@@ -502,7 +508,7 @@
       } else if (style === 'slam') {
         if (p < SLAM_HIT) {
           const u = p / SLAM_HIT;
-          s = 3 - 2 * ease.inQuad(u); op = clamp(u * 2.5); blur = (1 - u) * Math.min(10, size * 0.05); ca = 1;
+          s = 3 - 2 * ease.inQuad(u); op = clamp(u * 2.5); ca = 1;   // no blur: filters raster at 1x under scale
         } else {
           const u = (p - SLAM_HIT) / (1 - SLAM_HIT);
           s = 1 - 0.14 * Math.exp(-3 * u) * Math.sin(3 * PI * u);   // squash + settle, exactly 1 at u=1
@@ -525,7 +531,7 @@
           if (q > 0) {
             if (outStyle === 'blur') { blur += q * Math.min(28, size * 0.14); s *= 1 + 0.08 * q; op *= 1 - q; }
             else if (outStyle === 'scale') { s *= 1 - 0.18 * q; blur += q * 4; op *= 1 - q; }
-            else if (outStyle === 'slam') { s *= 1 + 0.6 * q; blur += q * Math.min(14, size * 0.06); op *= 1 - q; ca = Math.max(ca, q); }
+            else if (outStyle === 'slam') { s *= 1 + 0.6 * q; op *= 1 - q; ca = Math.max(ca, q); }
             else if (outStyle === 'fade') { op *= 1 - q; }
             else if (outStyle === 'drop') { ty += q * 0.5; op *= 1 - q; blur += q * 3; }
             else { ty -= q * 0.42; blur += q * Math.min(12, size * 0.06); op *= 1 - q; ca = Math.max(ca, q * 0.6); }
@@ -539,7 +545,7 @@
       if (tx || ty) tr += 'translate3d(' + tx.toFixed(4) + 'em,' + ty.toFixed(4) + 'em,0) ';
       if (rx) tr += 'perspective(' + (size * 5).toFixed(0) + 'px) rotateX(' + rx.toFixed(2) + 'deg) ';
       if (s !== 1) tr += 'scale(' + s.toFixed(4) + ')';
-      writePart(part, tr || 'none', op <= 0.001 ? '0' : op >= 0.999 ? '1' : op.toFixed(3), blur > 0.15 ? 'blur(' + blur.toFixed(2) + 'px)' : 'none');
+      writePart(part, tr || 'none', op <= 0.001 ? '0' : op >= 0.999 ? '1' : op.toFixed(3), blur > 0.6 ? 'blur(' + blur.toFixed(2) + 'px)' : 'none');
 
       if (h.chroma) {
         const dpx = ca * caPx, g = h.ghosts[i];

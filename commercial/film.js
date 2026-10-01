@@ -474,10 +474,12 @@
   async function fontsReady() {
     if (!document.fonts) return;
     const link = document.querySelector('link[href*="fonts.googleapis"]');
-    if (link && !link.sheet && !link.dataset.done) {
+    // Wait for the font stylesheet to settle (window 'load' also implies it has).
+    if (link && !link.sheet && !link.dataset.done && document.readyState !== 'complete') {
       await Promise.race([new Promise(r => {
         link.addEventListener('load', r, { once: true });
         link.addEventListener('error', r, { once: true });
+        window.addEventListener('load', r, { once: true });
       }), delay(4000)]);
     }
     const specs = [];

@@ -3,3 +3,4 @@ deploy.bat
 .git
 .gitignore
 .vercelignore
+tools
