@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Bifrost Vault — Rip packs. Own silver. Trade on-chain.</title>
+  <meta name="description" content="Real art on real silver. Rip a Vault Pack, reveal your coins and their on-chain certificates, then ship them home, trade on-chain or keep them in the vault." />
+  <meta name="theme-color" content="#05070D" />
+  <meta name="color-scheme" content="dark" />
+
+  <!-- Sharing -->
+  <meta property="og:type" content="video.other" />
+  <meta property="og:site_name" content="Bifrost Vault" />
+  <meta property="og:title" content="Bifrost Vault — Rip packs. Own silver. Trade on-chain." />
+  <meta property="og:description" content="Real art on real silver. Rip a Vault Pack, reveal your coins and their on-chain certificates, then ship them home, trade on-chain or keep them in the vault." />
+  <meta property="og:url" content="https://bifrostvault.io/commercial" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Bifrost Vault — Rip packs. Own silver. Trade on-chain." />
+  <meta name="twitter:description" content="Real art on real silver. Rip a Vault Pack, reveal your coins and their on-chain certificates." />
+
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+  <link rel="apple-touch-icon" href="../favicon.svg" />
+
+  <!-- Render mode flag before first paint (?render=1: no UI, black page, stage at 0,0) -->
+  <script>if (/[?&]render(=(?!0|false)|&|$)/.test(location.search)) document.documentElement.classList.add('bv-render');</script>
+
+  <!-- Fonts (the only external resource) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" onload="this.dataset.done='1'" onerror="this.dataset.done='1'" />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bvp">
+
+  <!-- Ambient aurora glow behind the stage -->
+  <div class="bvp-ambient" aria-hidden="true"></div>
+
+  <!-- ── HEADER ───────────────────────────────────────────────────────── -->
+  <header class="bvp-head bvp-ui">
+    <a class="bvp-brand" href="https://bifrostvault.io" data-brand-link aria-label="Bifrost Vault home">
+      <svg class="bvp-mark" viewBox="0 0 120 110" aria-hidden="true">
+        <defs>
+          <linearGradient id="bvpAurora" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#7C5CFF"/>
+            <stop offset=".4" stop-color="#4D8DFF"/>
+            <stop offset=".72" stop-color="#19D3FF"/>
+            <stop offset="1" stop-color="#46E6A6"/>
+          </linearGradient>
+        </defs>
+        <path d="M14 94 A46 60 0 0 1 106 94" stroke="url(#bvpAurora)" stroke-width="12" stroke-linecap="round" fill="none"/>
+        <circle cx="14" cy="94" r="9" fill="#7C5CFF"/>
+        <circle cx="106" cy="94" r="9" fill="#46E6A6"/>
+      </svg>
+      <span class="bvp-word"><b>bifrost</b><span>VAULT</span></span>
+    </a>
+    <span class="bvp-head-tag">The film</span>
+    <a class="bvp-head-link" href="https://bifrostvault.io" data-brand-link data-brand-domain>bifrostvault.io</a>
+  </header>
+
+  <!-- ── PLAYER ───────────────────────────────────────────────────────── -->
+  <main class="bvp-main">
+    <section class="bvp-player" id="bvp-player" aria-label="Bifrost Vault commercial">
+      <div class="bvp-screen" id="bvp-screen">
+        <!-- film.js mounts #bv-stage in here -->
+        <div id="bv-viewport"></div>
+
+        <!-- First-load overlay: the film autoplays muted behind it -->
+        <button class="bvp-bigplay bvp-ui" id="bvp-bigplay" type="button" hidden>
+          <span class="bvp-bigplay-ring" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5.6v12.8a.9.9 0 0 0 1.38.76l10.06-6.4a.9.9 0 0 0 0-1.52L9.88 4.84A.9.9 0 0 0 8.5 5.6z"/></svg>
+          </span>
+          <span class="bvp-bigplay-label" id="bvp-bigplay-label">Play with sound</span>
+        </button>
+
+        <!-- End card (shown when the film ends) -->
+        <div class="bvp-endcard bvp-ui" id="bvp-endcard" hidden>
+          <div class="bvp-endcard-inner">
+            <button class="bvp-btn bvp-btn--wide" id="bvp-end-replay" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7.5 6.5 12 11V7.5a5.5 5.5 0 1 1-5.5 5.5H4a8 8 0 1 0 8-8z"/></svg>
+              <span>Replay</span>
+            </button>
+            <button class="bvp-cta" id="bvp-end-cta" type="button"><span>Rip a pack</span></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="bvp-controls bvp-ui" id="bvp-controls">
+        <button class="bvp-btn" id="bvp-play" type="button" aria-label="Play" title="Play / pause (Space)">
+          <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5.6v12.8a.9.9 0 0 0 1.38.76l10.06-6.4a.9.9 0 0 0 0-1.52L9.88 4.84A.9.9 0 0 0 8.5 5.6z"/></svg>
+          <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></svg>
+        </button>
+        <button class="bvp-btn" id="bvp-replay" type="button" aria-label="Replay" title="Replay">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7.5 6.5 12 11V7.5a5.5 5.5 0 1 1-5.5 5.5H4a8 8 0 1 0 8-8z"/></svg>
+        </button>
+        <span class="bvp-time" id="bvp-time" aria-live="off">0:00 / 1:00</span>
+
+        <div class="bvp-scrub" id="bvp-scrub" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="60" aria-valuenow="0" aria-valuetext="0:00">
+          <div class="bvp-scrub-track">
+            <div class="bvp-scrub-fill" id="bvp-scrub-fill"></div>
+          </div>
+          <div class="bvp-scrub-ticks" id="bvp-scrub-ticks"></div>
+          <div class="bvp-scrub-thumb" id="bvp-scrub-thumb"></div>
+          <div class="bvp-scrub-tip" id="bvp-scrub-tip" aria-hidden="true"><b></b><span></span></div>
+        </div>
+
+        <button class="bvp-btn" id="bvp-sound" type="button" aria-label="Sound off" title="Sound (M)">
+          <svg class="i-snd-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="M15.5 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <svg class="i-snd-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="M15.2 9a4.2 4.2 0 0 1 0 6M17.8 6.6a7.6 7.6 0 0 1 0 10.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span class="bvp-spin" aria-hidden="true"></span>
+        </button>
+
+        <div class="bvp-seg" role="group" aria-label="Format">
+          <button type="button" data-format="landscape" aria-pressed="true" title="Landscape 16:9">16:9</button>
+          <button type="button" data-format="portrait" aria-pressed="false" title="Portrait 9:16">9:16</button>
+        </div>
+
+        <button class="bvp-btn" id="bvp-full" type="button" aria-label="Fullscreen" title="Fullscreen (F)">
+          <svg class="i-full" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg class="i-exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+
+        <button class="bvp-cta" id="bvp-cta" type="button"><span>Rip a pack</span></button>
+      </div>
+    </section>
+
+    <p class="bvp-fine bvp-ui" id="bvp-fine"></p>
+  </main>
+
+  <noscript><p class="bvp-noscript">This film is rendered live in your browser and needs JavaScript.</p></noscript>
+
+  <!-- ── SCRIPTS (contract order; all deferred so a missing file never blocks the rest) ── -->
+  <script defer src="config.js"></script>
+  <script defer src="kit.js"></script>
+  <script defer src="art.js"></script>
+  <script defer src="film.js"></script>
+  <!-- SCENES -->
+  <script defer src="audio.js"></script>
+  <script defer src="play.js"></script>
+  <script defer src="app.js"></script>
+</body>
+</html>

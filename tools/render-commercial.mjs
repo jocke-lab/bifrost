@@ -3,9 +3,12 @@
  * tools/render-commercial.mjs - deterministic MP4 renderer for the Bifrost Vault commercial.
  *
  * Opens commercial/index.html?render=1&format=<f> in headless Chromium (Playwright), waits for
- * BV.ready, then for every frame i calls BV.seek(i / fps), screenshots the 1:1 logical stage and
- * pipes the images into ffmpeg (libx264, yuv420p, BT.709). The soundtrack comes from
- * BVAudio.wav() (offline render, base64 transfer) and is muxed as AAC 192k / 48 kHz.
+ * BV.ready, then for every frame i calls BV.seek(i / fps), captures the 1:1 logical stage as a
+ * JPEG (q94) and pipes the frames, in order, into ffmpeg (libx264, yuv420p, BT.709, +faststart).
+ * The soundtrack comes from BVAudio.wav() (offline render, base64 transfer) and is muxed as
+ * AAC 192k / 48 kHz. Frames are captured by several independent Chromium instances in parallel
+ * (worker k takes frames k, k+N, ...); seek is a pure function of t, so the result is identical
+ * to a single-worker render, just faster.
  *
  * Usage:
  *   node tools/render-commercial.mjs                      # both cuts, full length
@@ -23,6 +26,7 @@
  *   --preset NAME                      x264 preset (default slow)
  *   --no-audio                         render a silent video
  *   --no-poster                        skip poster-16x9.jpg / poster-9x16.jpg (end card, t = duration - 1.5)
+ *   --workers N                        parallel Chromium instances (default: ~3/4 of CPU cores, max 4)
  *   --image jpeg|png                   frame transport: jpeg q94 (default) or lossless png (slower)
  *   --quality N                        JPEG frame quality (default 94)
  *   --frames                           also write every frame to <out>/frames/<format>/NNNNNN.<ext>
@@ -53,6 +57,7 @@ const FFPROBE = process.env.FFPROBE_PATH || 'ffprobe';
 
 const READY_TIMEOUT_MS = 120_000;
 const SEEK_TIMEOUT_MS = 30_000;
+const SHOT_TIMEOUT_MS = 60_000;
 const AUDIO_TIMEOUT_MS = 300_000;
 const WAV_CHUNK = 3 * 1024 * 1024;
 const POSTER_FROM_END = 1.5;
@@ -77,6 +82,8 @@ const CHROME_ARGS = [
   '--mute-audio',
   '--allow-file-access-from-files',
 ];
+// ffmpeg chatter that is expected for this pipeline and not worth surfacing.
+const FFMPEG_BENIGN = /Guessed Channel Layout|deprecated pixel format|Thread message queue blocking|^\s*$/;
 
 class UsageError extends Error {}
 
@@ -95,20 +102,38 @@ function fmtDur(sec) {
 }
 const fmtT = (t) => String(Number(Number(t).toFixed(3)));
 const mb = (n) => (n / 1048576).toFixed(1) + ' MB';
+const rel = (p) => { const r = path.relative(process.cwd(), p); return r && !r.startsWith('..') && !path.isAbsolute(r) ? r : p; };
+
+// Page console output is deduplicated across workers and frames (a per-frame error would flood).
+const seenMsgs = new Map();
+function pageMsg(tag, text) {
+  const n = (seenMsgs.get(text) || 0) + 1;
+  seenMsgs.set(text, n);
+  if (n === 1 && seenMsgs.size <= 300) errln(`${tag} ${text}`);
+  else if (n === 1 && seenMsgs.size === 301) errln(`${tag} (further page messages suppressed)`);
+}
 
 // ---------------------------------------------------------------------------------------------
 // CLI
 
 const USAGE = `Usage: node tools/render-commercial.mjs [--format landscape|portrait|both] [--fps 30]
        [--out commercial/dist] [--from S] [--to S] [--stills "1.5,12"] [--crf 18] [--preset slow]
-       [--no-audio] [--no-poster] [--image jpeg|png] [--quality 94] [--frames] [--verbose] [--url URL]`;
+       [--no-audio] [--no-poster] [--workers N] [--image jpeg|png] [--quality 94] [--frames]
+       [--verbose] [--url URL]`;
+
+function defaultWorkers() {
+  const cpus = (os.availableParallelism ? os.availableParallelism() : os.cpus().length) || 1;
+  const byMem = Math.floor(os.totalmem() / (900 * 1048576)); // ~0.9 GB per 1080p Chromium
+  return Math.max(1, Math.min(4, Math.round(cpus * 0.75), byMem));
+}
 
 function parseArgs(argv) {
   const o = {
     format: 'both', fps: null, out: null, from: null, to: null, stills: null, crf: 18, preset: 'slow',
-    audio: true, poster: true, image: 'jpeg', quality: 94, frames: false, verbose: false, url: null, help: false,
+    audio: true, poster: true, image: 'jpeg', quality: 94, frames: false, verbose: false, url: null,
+    workers: null, help: false,
   };
-  const valued = new Set(['format', 'fps', 'out', 'from', 'to', 'stills', 'crf', 'preset', 'image', 'quality', 'url']);
+  const valued = new Set(['format', 'fps', 'out', 'from', 'to', 'stills', 'crf', 'preset', 'image', 'quality', 'url', 'workers']);
   for (let i = 0; i < argv.length; i++) {
     let a = argv[i];
     if (a === '-h' || a === '--help') { o.help = true; continue; }
@@ -132,7 +157,7 @@ function parseArgs(argv) {
     };
     switch (a) {
       case 'format':
-        if (!['landscape', 'portrait', 'both'].includes(val)) throw new UsageError(`--format must be landscape, portrait or both`);
+        if (!['landscape', 'portrait', 'both'].includes(val)) throw new UsageError('--format must be landscape, portrait or both');
         o.format = val; break;
       case 'fps': o.fps = num('fps', val, 1, 240); break;
       case 'out': o.out = path.resolve(val); break;
@@ -140,11 +165,12 @@ function parseArgs(argv) {
       case 'to': o.to = num('to', val, 0, 86400); break;
       case 'crf': o.crf = num('crf', val, 0, 51); break;
       case 'quality': o.quality = Math.round(num('quality', val, 1, 100)); break;
+      case 'workers': o.workers = Math.round(num('workers', val, 1, 16)); break;
       case 'preset':
         if (!PRESETS.includes(val)) throw new UsageError(`--preset must be one of ${PRESETS.join(', ')}`);
         o.preset = val; break;
       case 'image':
-        if (!['jpeg', 'jpg', 'png'].includes(val)) throw new UsageError(`--image must be jpeg or png`);
+        if (!['jpeg', 'jpg', 'png'].includes(val)) throw new UsageError('--image must be jpeg or png');
         o.image = val === 'png' ? 'png' : 'jpeg'; break;
       case 'stills': {
         const ts = String(val).split(/[,\s]+/).filter(Boolean).map((s) => num('stills', s, 0, 86400));
@@ -163,6 +189,7 @@ function parseArgs(argv) {
   o.out = o.out || DEFAULT_OUT;
   o.formats = o.format === 'both' ? ['landscape', 'portrait'] : [o.format];
   o.preview = o.from != null || o.to != null;
+  o.workers = o.stills ? 1 : (o.workers || defaultWorkers());
   return o;
 }
 
@@ -182,10 +209,16 @@ function runCleanups() {
   }
   return cleaning;
 }
-function defer(fn) { cleanups.push(fn); return () => { const i = cleanups.indexOf(fn); if (i >= 0) cleanups.splice(i, 1); }; }
+function defer(fn) {
+  cleanups.push(fn);
+  return () => { const i = cleanups.indexOf(fn); if (i >= 0) cleanups.splice(i, 1); };
+}
 
+let interrupted = false;
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, async () => {
+    if (interrupted) return;
+    interrupted = true;
     errln(`\n[render] ${sig} received, cleaning up...`);
     await runCleanups();
     process.exit(130);
@@ -210,13 +243,12 @@ function loadPlaywright() {
     '\nInstall it globally or make /opt/node-tools/node_modules/playwright available.');
 }
 
-function checkBinary(bin, label) {
+function checkBinary(bin, envName) {
   const r = spawnSync(bin, ['-version'], { encoding: 'utf8' });
   if (r.error || r.status !== 0) {
-    throw new Error(`${label} not usable (${bin}): ${r.error ? r.error.message : (r.stderr || '').trim().split('\n')[0]}. ` +
-      `Install ffmpeg or set ${label === 'ffmpeg' ? 'FFMPEG_PATH' : 'FFPROBE_PATH'}.`);
+    throw new Error(`${bin} is not usable (${r.error ? r.error.message : (r.stderr || '').trim().split('\n')[0]}). ` +
+      `Install ffmpeg or set ${envName}.`);
   }
-  return true;
 }
 
 function withTimeout(promise, ms, what) {
@@ -228,9 +260,10 @@ function withTimeout(promise, ms, what) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// network bridge: when an HTTPS proxy is configured (corporate / sandbox egress with its own CA),
-// Chromium may not trust the proxy CA. Remote requests (Google Fonts) are then fetched by Node,
-// which honours HTTPS_PROXY + NODE_EXTRA_CA_CERTS with normal TLS verification, and cached per run.
+// network bridge: behind an HTTPS proxy with its own CA (sandbox / corporate egress), Chromium may
+// not trust that CA and Google Fonts would silently fall back. Remote GETs are then fetched by
+// Node instead, which honours HTTPS_PROXY + NODE_EXTRA_CA_CERTS with normal TLS verification.
+// Responses are cached for the run, so every worker sees byte-identical fonts.
 
 const netCache = new Map();
 const netWarned = new Set();
@@ -242,27 +275,44 @@ async function installNetBridge(context) {
     try {
       let hit = netCache.get(url);
       if (!hit) {
-        const resp = await route.fetch({ timeout: 45_000 });
-        const headers = { ...resp.headers() };
-        delete headers['content-encoding'];
-        delete headers['content-length'];
-        delete headers['transfer-encoding'];
-        hit = { status: resp.status(), headers, body: await resp.body() };
-        if (hit.status < 400) netCache.set(url, hit);
+        const pending = (async () => {
+          const resp = await route.fetch({ timeout: 45_000 });
+          const headers = { ...resp.headers() };
+          delete headers['content-encoding'];
+          delete headers['content-length'];
+          delete headers['transfer-encoding'];
+          return { status: resp.status(), headers, body: await resp.body() };
+        })();
+        netCache.set(url, pending);
+        pending.then((r) => { if (r.status >= 400) netCache.delete(url); }, () => netCache.delete(url));
+        hit = pending;
       }
-      await route.fulfill(hit);
+      await route.fulfill(await hit);
     } catch (e) {
       const host = (() => { try { return new URL(url).host; } catch { return url; } })();
-      if (!netWarned.has(host)) { netWarned.add(host); warn(`could not fetch ${host} (${e.message.split('\n')[0]}); fonts/assets from it will fall back`); }
+      if (!netWarned.has(host)) { netWarned.add(host); warn(`could not fetch ${host} (${String(e.message).split('\n')[0]}); fonts/assets from it will fall back`); }
       await route.abort('failed').catch(() => {});
     }
   });
 }
 
 // ---------------------------------------------------------------------------------------------
-// film session: one browser context + page per format
+// film session: one browser context + page per (worker, format)
 
-async function openFilm(browser, format, opts) {
+function filmURL(format, opts) {
+  let url;
+  if (opts.url) {
+    url = /^[a-z][a-z0-9+.-]*:/i.test(opts.url) && !/^[a-z]:[\\/]/i.test(opts.url) ? new URL(opts.url) : pathToFileURL(path.resolve(opts.url));
+  } else {
+    url = pathToFileURL(DEFAULT_PAGE);
+  }
+  if (url.protocol === 'file:' && !existsSync(fileURLToPath(url))) throw new Error(`film page not found: ${fileURLToPath(url)}`);
+  url.searchParams.set('render', '1');
+  url.searchParams.set('format', format);
+  return url;
+}
+
+async function openFilm(browser, format, opts, worker) {
   const spec = FORMATS[format];
   const context = await browser.newContext({
     viewport: { width: spec.W, height: spec.H },
@@ -275,10 +325,20 @@ async function openFilm(browser, format, opts) {
     serviceWorkers: 'block',
   });
   const undefer = defer(() => context.close());
+  const close = async () => { undefer(); await context.close().catch(() => {}); };
+  try {
+    return await setupFilm(context, spec, format, opts, worker, close);
+  } catch (e) {
+    await close();
+    throw e;
+  }
+}
+
+async function setupFilm(context, spec, format, opts, worker, close) {
   const bridged = !!(process.env.HTTPS_PROXY || process.env.https_proxy);
   if (bridged) await installNetBridge(context);
   const page = await context.newPage();
-  const tag = `[page:${format}]`;
+  const tag = `[page:${format}${opts.workers > 1 ? '#' + worker : ''}]`;
 
   // Fail loudly: any uncaught page exception / crash aborts the render.
   let fatal = null;
@@ -288,42 +348,32 @@ async function openFilm(browser, format, opts) {
   const setFatal = (e) => { if (!fatal) { fatal = e; rejectFatal(e); } };
   page.on('pageerror', (e) => {
     errln(`${tag} UNCAUGHT ${e && e.stack ? e.stack : e}`);
-    setFatal(new Error(`page error: ${e && e.message ? e.message : e}`));
+    setFatal(new Error(`uncaught page error: ${e && e.message ? e.message : e}`));
   });
-  page.on('crash', () => setFatal(new Error('page crashed (out of memory?)')));
+  page.on('crash', () => setFatal(new Error(`${tag} page crashed (out of memory?)`)));
   page.on('console', (msg) => {
     const type = msg.type();
     if (type === 'error' || type === 'warning' || opts.verbose) {
       const loc = msg.location();
       const where = loc && loc.url ? ` (${loc.url.replace(/^.*\/commercial\//, 'commercial/')}:${loc.lineNumber})` : '';
-      errln(`${tag} console.${type}: ${msg.text()}${where}`);
+      pageMsg(tag, `console.${type}: ${msg.text()}${where}`);
     }
   });
   page.on('requestfailed', (req) => {
     const u = req.url();
     if (bridged && /^https?:/i.test(u)) return; // the network bridge reports its own failures
-    errln(`${tag} request failed: ${u.length > 160 ? u.slice(0, 160) + '...' : u} (${req.failure() ? req.failure().errorText : '?'})`);
+    pageMsg(tag, `request failed: ${u.length > 160 ? u.slice(0, 160) + '...' : u} (${req.failure() ? req.failure().errorText : '?'})`);
   });
   const guard = (p) => Promise.race([p, fatalP]);
 
-  // Build URL
-  let url;
-  if (opts.url) {
-    url = /^[a-z][a-z0-9+.-]*:/i.test(opts.url) ? new URL(opts.url) : pathToFileURL(path.resolve(opts.url));
-  } else {
-    if (!existsSync(DEFAULT_PAGE)) throw new Error(`film page not found: ${DEFAULT_PAGE}`);
-    url = pathToFileURL(DEFAULT_PAGE);
-  }
-  url.searchParams.set('render', '1');
-  url.searchParams.set('format', format);
-
+  const url = filmURL(format, opts);
   const t0 = Date.now();
   await guard(page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: READY_TIMEOUT_MS }));
   try {
     await guard(page.waitForFunction(() => !!(window.BV && window.BV.ready), null, { timeout: READY_TIMEOUT_MS, polling: 100 }));
   } catch (e) {
     if (fatal) throw fatal;
-    throw new Error(`window.BV / BV.ready never appeared within ${READY_TIMEOUT_MS / 1000}s at ${url.href} (${e.message.split('\n')[0]})`);
+    throw new Error(`window.BV / BV.ready never appeared within ${READY_TIMEOUT_MS / 1000}s at ${url.href} (${String(e.message).split('\n')[0]})`);
   }
   const left = Math.max(1000, READY_TIMEOUT_MS - (Date.now() - t0));
   await guard(withTimeout(page.evaluate(() => Promise.resolve(window.BV.ready).then(() => true)), left, 'BV.ready'));
@@ -342,7 +392,7 @@ async function openFilm(browser, format, opts) {
     return {
       W: BV.W, H: BV.H, duration: BV.duration, fps: BV.fps, render: BV.render, portrait: !!BV.portrait,
       canSetFormat: typeof BV.setFormat === 'function',
-      hasAudio: typeof window.BVAudio !== 'undefined' && window.BVAudio && typeof window.BVAudio.wav === 'function',
+      hasAudio: !!(window.BVAudio && typeof window.BVAudio.wav === 'function'),
       rect: r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null,
       vw: window.innerWidth, vh: window.innerHeight, fonts: fams,
     };
@@ -351,18 +401,20 @@ async function openFilm(browser, format, opts) {
   let info = await readInfo();
   if (info.portrait !== (format === 'portrait')) {
     if (!info.canSetFormat) throw new Error(`page ignored ?format=${format} and has no BV.setFormat()`);
-    warn(`page did not honour ?format=${format}; calling BV.setFormat`);
+    if (worker === 0) warn(`page did not honour ?format=${format}; calling BV.setFormat`);
     await guard(page.evaluate((f) => Promise.resolve(window.BV.setFormat(f)).then(() => window.BV.ready).then(() => 0), format));
     info = await readInfo();
   }
-  if (!(info.W > 0 && info.H > 0) || !Number.isFinite(info.W) || !Number.isFinite(info.H)) throw new Error(`invalid BV.W/BV.H: ${info.W}x${info.H}`);
-  if (!(info.duration > 0) || !Number.isFinite(info.duration)) throw new Error(`invalid BV.duration: ${info.duration}`);
+  if (!Number.isFinite(info.W) || !Number.isFinite(info.H) || info.W <= 0 || info.H <= 0) throw new Error(`invalid BV.W/BV.H: ${info.W}x${info.H}`);
+  if (!Number.isFinite(info.duration) || info.duration <= 0) throw new Error(`invalid BV.duration: ${info.duration}`);
   if (info.W % 2 || info.H % 2) throw new Error(`stage ${info.W}x${info.H} must have even dimensions for yuv420p`);
-  if (info.render !== true) warn('BV.render is not true - is ?render=1 honoured? UI or autoplay may leak into frames');
-  if (info.W !== spec.W || info.H !== spec.H) warn(`stage is ${info.W}x${info.H}, expected ${spec.W}x${spec.H} for ${format}`);
+  if (worker === 0) {
+    if (info.render !== true) warn('BV.render is not true - is ?render=1 honoured? UI or autoplay may leak into frames');
+    if (info.W !== spec.W || info.H !== spec.H) warn(`stage is ${info.W}x${info.H}, expected ${spec.W}x${spec.H} for ${format}`);
+  }
   if (info.vw !== info.W || info.vh !== info.H) {
     await page.setViewportSize({ width: info.W, height: info.H });
-    await guard(page.evaluate((t) => { const r = window.BV.seek(t); return Promise.resolve(r).then(() => 0); }, 0));
+    await guard(page.evaluate((t) => Promise.resolve(window.BV.seek(t)).then(() => 0), 0));
     info = await readInfo();
   }
 
@@ -371,7 +423,7 @@ async function openFilm(browser, format, opts) {
     Math.abs(i.rect.w - i.W) < 0.5 && Math.abs(i.rect.h - i.H) < 0.5;
   if (!info.rect) throw new Error('no stage element (BV.root / #bv-stage) found');
   if (!stageOk(info)) {
-    warn(`stage rect is ${JSON.stringify(info.rect)} (expected 0,0 ${info.W}x${info.H}); pinning it`);
+    if (worker === 0) warn(`stage rect is ${JSON.stringify(info.rect)} (expected 0,0 ${info.W}x${info.H}); pinning it`);
     await page.addStyleTag({ content: '#bv-stage{position:fixed!important;left:0!important;top:0!important;margin:0!important;transform:none!important;}' });
     info = await readInfo();
     if (!stageOk(info)) throw new Error(`stage is not ${info.W}x${info.H} at the viewport origin: ${JSON.stringify(info.rect)}`);
@@ -380,39 +432,59 @@ async function openFilm(browser, format, opts) {
   // Font report: a family whose faces all failed renders in a fallback font.
   const fontLines = [];
   for (const [fam, s] of Object.entries(info.fonts)) {
-    if (s.loaded === 0 && s.error > 0) warn(`font "${fam}" failed to load (${s.error}/${s.total} faces errored) - text will use a fallback font`);
+    if (worker === 0 && s.loaded === 0 && s.error > 0) warn(`font "${fam}" failed to load (${s.error}/${s.total} faces errored) - text will use a fallback font`);
     fontLines.push(`${fam} ${s.loaded ? 'ok' : s.error ? 'FAILED' : 'unused'}`);
   }
 
-  const clip = { x: 0, y: 0, width: info.W, height: info.H };
   const seek = async (t) => {
     const n = await guard(withTimeout(page.evaluate(async (tt) => {
       const r = window.BV.seek(tt);
       if (r && typeof r.then === 'function') await r;
-      // Never capture a frame with an undecoded image (new src set during seek).
+      // Never capture a frame with an undecoded image (e.g. a new src set during seek).
       const pending = [];
       const imgs = document.images;
-      for (let k = 0; k < imgs.length; k++) {
-        const im = imgs[k];
-        if (!im.complete) pending.push(im.decode().catch(() => {}));
-      }
+      for (let k = 0; k < imgs.length; k++) if (!imgs[k].complete) pending.push(imgs[k].decode().catch(() => {}));
       if (pending.length) await Promise.race([Promise.all(pending), new Promise((res) => setTimeout(res, 10000))]);
       if (document.fonts && document.fonts.status !== 'loaded') await document.fonts.ready;
       return pending.length;
-    }, t), SEEK_TIMEOUT_MS, `BV.seek(${fmtT(t)})`));
+    }, t), SEEK_TIMEOUT_MS, `BV.seek(${fmtT(t)})`)).catch((e) => {
+      if (fatal) throw fatal;
+      const m = String((e && e.message) || e).replace(/^page\.evaluate: /, '')
+        .split('\n').filter((l) => !/UtilityScript|eval at evaluate/.test(l)).join('\n');
+      throw new Error(`BV.seek(${fmtT(t)}) failed: ${m}`);
+    });
     if (fatal) throw fatal;
     return n;
   };
+
+  // Capture straight through CDP (the viewport is exactly the stage); fall back to page.screenshot.
+  let cdp = null;
+  try { cdp = await context.newCDPSession(page); } catch { cdp = null; }
+  const clip = { x: 0, y: 0, width: info.W, height: info.H };
   const shot = async (type, quality) => {
-    const o = { type, clip, animations: 'allow', caret: 'hide', scale: 'css', timeout: 60_000 };
-    if (type === 'jpeg') o.quality = quality;
-    const buf = await guard(page.screenshot(o));
+    let buf;
+    if (cdp) {
+      try {
+        const params = { format: type, fromSurface: true, captureBeyondViewport: false, optimizeForSpeed: true };
+        if (type === 'jpeg') params.quality = quality;
+        const r = await guard(withTimeout(cdp.send('Page.captureScreenshot', params), SHOT_TIMEOUT_MS, 'screenshot'));
+        buf = Buffer.from(r.data, 'base64');
+      } catch (e) {
+        if (fatal) throw fatal;
+        if (worker === 0) warn(`CDP capture failed (${String(e.message).split('\n')[0]}); using page.screenshot`);
+        cdp = null;
+      }
+    }
+    if (!buf) {
+      const o = { type, clip, animations: 'allow', caret: 'hide', scale: 'css', timeout: SHOT_TIMEOUT_MS };
+      if (type === 'jpeg') o.quality = quality;
+      buf = await guard(page.screenshot(o));
+    }
     if (fatal) throw fatal;
     return buf;
   };
-  const close = async () => { undefer(); await context.close().catch(() => {}); };
 
-  return { format, spec, page, info, fontLines, seek, shot, close, guard, url: url.href, loadMs: Date.now() - t0 };
+  return { format, spec, page, info, fontLines, seek, shot, close, guard, worker, url: url.href, loadMs: Date.now() - t0 };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -444,7 +516,8 @@ async function fetchWav(film, tmpDir) {
   const meta = parseWav(buf);
   const file = path.join(tmpDir, 'soundtrack.wav');
   await fsp.writeFile(file, buf);
-  log(`[audio] BVAudio.wav(): ${mb(n)}, ${meta.sampleRate} Hz, ${meta.channels} ch, ${meta.bits}-bit, ${meta.duration.toFixed(2)}s (${fmtDur((Date.now() - t0) / 1000)})`);
+  log(`[audio] BVAudio.wav(): ${mb(n)}, ${meta.sampleRate} Hz, ${meta.channels} ch, ${meta.bits}-bit, ` +
+    `${meta.duration.toFixed(2)}s (rendered in ${fmtDur((Date.now() - t0) / 1000)})`);
   return { file, ...meta };
 }
 
@@ -465,7 +538,7 @@ function parseWav(buf) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// ffmpeg sink
+// ffmpeg sink (frames on stdin, backpressure-aware)
 
 class FFmpegSink {
   constructor(args, label) {
@@ -476,8 +549,7 @@ class FFmpegSink {
     this.proc = spawn(FFMPEG, args, { stdio: ['pipe', 'ignore', 'pipe'] });
     this.proc.stderr.setEncoding('utf8');
     this.proc.stderr.on('data', (d) => { this.stderr = (this.stderr + d).slice(-20000); });
-    this.stdinError = null;
-    this.proc.stdin.on('error', (e) => { this.stdinError = e; });
+    this.proc.stdin.on('error', () => { /* EPIPE: reported through the exit code */ });
     this.done = new Promise((resolve) => {
       this.proc.on('error', (e) => { this.spawnError = e; this.exited = true; resolve(); });
       this.proc.on('close', (code, signal) => { this.exited = true; this.code = code; this.signal = signal; resolve(); });
@@ -500,9 +572,26 @@ class FFmpegSink {
     if (!this.exited) this.proc.stdin.end();
     await this.done;
     if (this.spawnError || this.code !== 0) throw this.failure();
-    return this.stderr;
+    return this.stderr.split('\n').filter((l) => !FFMPEG_BENIGN.test(l)).join('\n').trim();
   }
   kill() { if (!this.exited) { try { this.proc.kill('SIGKILL'); } catch { /* gone */ } } }
+}
+
+let zscaleOk = null;
+function colorFilter(image) {
+  if (zscaleOk === null) {
+    const r = spawnSync(FFMPEG, ['-hide_banner', '-filters'], { encoding: 'utf8' });
+    zscaleOk = !r.error && /\bzscale\b/.test(r.stdout || '');
+  }
+  if (zscaleOk) {
+    return image === 'png'
+      ? 'zscale=matrix=709:range=limited:chromal=left,format=yuv420p'
+      : 'zscale=rangein=full:matrixin=470bg:chromalin=center:matrix=709:range=limited:chromal=left,format=yuv420p';
+  }
+  const sws = 'flags=accurate_rnd+full_chroma_int';
+  return image === 'png'
+    ? `scale=out_color_matrix=bt709:out_range=tv:${sws},format=yuv420p`
+    : `scale=in_color_matrix=bt601:in_range=full:${sws},format=gbrp,scale=out_color_matrix=bt709:out_range=tv:${sws},format=yuv420p`;
 }
 
 function ffprobe(file) {
@@ -511,6 +600,56 @@ function ffprobe(file) {
     '-of', 'json', file], { encoding: 'utf8' });
   if (r.error || r.status !== 0) return null;
   try { return JSON.parse(r.stdout); } catch { return null; }
+}
+
+// ---------------------------------------------------------------------------------------------
+// frame capture: N workers render interleaved frames; a reorder buffer emits them strictly in order
+
+async function captureFrames(films, f0, f1, fps, opts, emit) {
+  const N = films.length;
+  const WINDOW = 2 * N + 2; // max frames a worker may run ahead of the writer
+  const ready = new Map();
+  let next = f0;
+  let error = null;
+  let waiters = [];
+  let flushing = false;
+  let undecoded = 0;
+  const wake = () => { const w = waiters; waiters = []; for (const f of w) f(); };
+
+  async function flush() {
+    if (flushing) return; // the active flusher picks up whatever lands meanwhile
+    flushing = true;
+    try {
+      while (!error && ready.has(next)) {
+        const buf = ready.get(next);
+        ready.delete(next);
+        await emit(next, buf);
+        next++;
+        wake();
+      }
+    } finally {
+      flushing = false;
+    }
+  }
+
+  async function worker(k) {
+    const film = films[k];
+    for (let i = f0 + k; i < f1; i += N) {
+      while (!error && i - next >= WINDOW) await new Promise((r) => waiters.push(r));
+      if (error) return;
+      if (await film.seek(i / fps)) undecoded++;
+      const buf = await film.shot(opts.image, opts.quality);
+      if (error) return;
+      ready.set(i, buf);
+      await flush();
+    }
+  }
+
+  await Promise.all(films.map((_, k) => worker(k).catch((e) => { if (!error) error = e; wake(); throw e; })));
+  await flush();
+  if (error) throw error;
+  if (next !== f1) throw new Error(`internal: wrote ${next - f0} of ${f1 - f0} frames`);
+  return { undecoded };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -527,11 +666,12 @@ async function renderStills(film, opts, fps) {
     const buf = await film.shot('png');
     const file = path.join(dir, `${film.format}-${fmtT(t0)}.png`);
     await fsp.writeFile(file, buf);
-    log(`[stills] ${path.relative(process.cwd(), file) || file}  (t=${fmtT(t)}s, ${film.info.W}x${film.info.H})`);
+    log(`[stills] ${rel(file)}  (t=${fmtT(t)}s, ${film.info.W}x${film.info.H})`);
   }
 }
 
-async function renderVideo(film, opts, fps, wav) {
+async function renderVideo(films, opts, fps, wav) {
+  const film = films[0];
   const { duration, W, H } = film.info;
   const from = opts.from != null ? opts.from : 0;
   let to = opts.to != null ? opts.to : duration;
@@ -547,24 +687,22 @@ async function renderVideo(film, opts, fps, wav) {
   await fsp.mkdir(opts.out, { recursive: true });
   const name = `bifrost-vault-commercial-${film.spec.tag}${opts.preview ? '-preview' : ''}.mp4`;
   const finalPath = path.join(opts.out, name);
-  const partPath = path.join(opts.out, `.${name.replace(/\.mp4$/, '')}.partial.${process.pid}.mp4`);
+  const partPath = path.join(opts.out, `.${name.replace(/\.mp4$/, '')}.partial-${process.pid}.mp4`);
+  const ext = opts.image === 'png' ? 'png' : 'jpg';
   let frameDir = null;
   if (opts.frames) {
     frameDir = path.join(opts.out, 'frames', film.format);
     await fsp.mkdir(frameDir, { recursive: true });
   }
 
-  const input = opts.image === 'png'
-    ? ['-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'png', '-i', 'pipe:0']
-    : ['-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', 'pipe:0'];
-  // Screenshots are sRGB. Go through RGB explicitly so the encode is true BT.709 limited range
-  // (JPEG frames decode as full-range BT.601 YCbCr; swscale cannot change matrix YUV->YUV).
-  const vf = opts.image === 'png'
-    ? 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p'
-    : 'scale=in_color_matrix=bt601:in_range=full:flags=accurate_rnd+full_chroma_int,format=gbrp,' +
-      'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p';
-  const args = ['-hide_banner', '-nostdin', '-loglevel', 'warning', '-y', ...input];
-  if (wav) args.push('-ss', segStart.toFixed(6), '-t', segDur.toFixed(6), '-i', wav.file);
+  // Screenshots are sRGB; encode as true BT.709 limited range. JPEG frames decode as full-range
+  // BT.601 YCbCr with centred chroma, so the matrix has to change (swscale can't do that YUV->YUV,
+  // hence zscale, or an explicit trip through RGB when zscale is missing).
+  const vf = colorFilter(opts.image);
+  const args = ['-hide_banner', '-nostdin', '-loglevel', 'warning', '-y',
+    '-thread_queue_size', '512', '-f', 'image2pipe', '-framerate', String(fps),
+    '-c:v', opts.image === 'png' ? 'png' : 'mjpeg', '-i', 'pipe:0'];
+  if (wav) args.push('-thread_queue_size', '512', '-ss', segStart.toFixed(6), '-t', segDur.toFixed(6), '-i', wav.file);
   args.push('-map', '0:v:0');
   if (wav) args.push('-map', '1:a:0');
   args.push('-vf', vf, '-c:v', 'libx264', '-preset', opts.preset, '-crf', String(opts.crf), '-pix_fmt', 'yuv420p',
@@ -574,17 +712,14 @@ async function renderVideo(film, opts, fps, wav) {
   args.push('-movflags', '+faststart', '-f', 'mp4', partPath);
 
   log(`[${film.format}] rendering ${W}x${H} @ ${fps} fps, frames ${f0}..${f1 - 1} (${total}, t=${fmtT(segStart)}..${fmtT(to)}s), ` +
-    `${opts.image} -> x264 crf ${opts.crf} ${opts.preset}${wav ? ' + AAC 192k' : ', silent'}`);
+    `${films.length} worker${films.length > 1 ? 's' : ''}, ${opts.image} -> x264 crf ${opts.crf} ${opts.preset}${wav ? ' + AAC 192k' : ', silent'}`);
   const sink = new FFmpegSink(args, film.format);
   const undefer = defer(async () => { sink.kill(); await fsp.rm(partPath, { force: true }); });
 
   const t0 = Date.now();
-  const ext = opts.image === 'png' ? 'png' : 'jpg';
-  let undecodedFrames = 0;
+  let stats;
   try {
-    for (let i = f0; i < f1; i++) {
-      if (await film.seek(i / fps)) undecodedFrames++;
-      const buf = await film.shot(opts.image, opts.quality);
+    stats = await captureFrames(films, f0, f1, fps, opts, async (i, buf) => {
       await sink.write(buf);
       if (frameDir) await fsp.writeFile(path.join(frameDir, `${String(i).padStart(6, '0')}.${ext}`), buf);
       const done = i - f0 + 1;
@@ -595,9 +730,9 @@ async function renderVideo(film, opts, fps, wav) {
           `${(100 * done / total).toFixed(1).padStart(5)}%  t=${(i / fps).toFixed(2)}s  ${rate.toFixed(1)} fps  ` +
           `elapsed ${fmtDur(el)}  ETA ${fmtDur((total - done) / rate)}`);
       }
-    }
+    });
     log(`[${film.format}] frames captured, finishing encode...`);
-    const ffWarn = (await sink.finish()).trim();
+    const ffWarn = await sink.finish();
     if (ffWarn) warn(`ffmpeg (${film.format}) said:\n    ` + ffWarn.split('\n').slice(-10).join('\n    '));
     await fsp.rename(partPath, finalPath);
   } catch (e) {
@@ -607,11 +742,11 @@ async function renderVideo(film, opts, fps, wav) {
   } finally {
     undefer();
   }
-  if (undecodedFrames) warn(`${undecodedFrames} frame(s) had images still decoding after BV.seek (waited for them)`);
+  if (stats.undecoded) warn(`${stats.undecoded} frame(s) had images still decoding after BV.seek (waited for them)`);
 
   const el = (Date.now() - t0) / 1000;
   const st = await fsp.stat(finalPath);
-  log(`[${film.format}] wrote ${path.relative(process.cwd(), finalPath) || finalPath}  ${mb(st.size)}  ${segDur.toFixed(3)}s  ` +
+  log(`[${film.format}] wrote ${rel(finalPath)}  ${mb(st.size)}  ${segDur.toFixed(3)}s  ` +
     `${total} frames in ${fmtDur(el)} (${(total / el).toFixed(1)} fps)`);
   const probe = ffprobe(finalPath);
   if (probe) {
@@ -626,14 +761,14 @@ async function renderVideo(film, opts, fps, wav) {
   return finalPath;
 }
 
-async function renderPoster(film) {
+async function renderPoster(film, opts) {
   const t = Math.max(0, film.info.duration - POSTER_FROM_END);
   await film.seek(t);
   const buf = await film.shot('jpeg', 95);
-  const file = path.join(film.opts.out, `poster-${film.spec.tag}.jpg`);
+  const file = path.join(opts.out, `poster-${film.spec.tag}.jpg`);
   await fsp.mkdir(path.dirname(file), { recursive: true });
   await fsp.writeFile(file, buf);
-  log(`[${film.format}] poster ${path.relative(process.cwd(), file) || file} (t=${fmtT(t)}s)`);
+  log(`[${film.format}] poster ${rel(file)} (t=${fmtT(t)}s)`);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -650,25 +785,40 @@ async function main() {
 
   const started = Date.now();
   const pw = loadPlaywright();
-  if (!opts.stills) { checkBinary(FFMPEG, 'ffmpeg'); }
+  if (!opts.stills) checkBinary(FFMPEG, 'FFMPEG_PATH');
+  filmURL('landscape', opts); // fail fast if the page is missing
 
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'bv-render-'));
   defer(() => fsp.rm(tmpDir, { recursive: true, force: true }));
 
+  // One Chromium per worker: separate browser processes rasterise in parallel (contexts in a
+  // single browser share one compositor and barely scale).
   const launch = { headless: true, args: CHROME_ARGS };
   const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
   if (proxy) launch.proxy = { server: proxy, bypass: 'localhost,127.0.0.1,::1' };
-  const browser = await pw.chromium.launch(launch);
-  defer(() => browser.close());
-  log(`[render] Chromium ${browser.version()} | out ${opts.out}${opts.url ? ` | url override ${opts.url}` : ''}`);
+  const browsers = [];
+  await Promise.all(Array.from({ length: opts.workers }, async () => {
+    const b = await pw.chromium.launch(launch);
+    browsers.push(b);
+    defer(() => b.close());
+  }));
+  log(`[render] Chromium ${browsers[0].version()} x${browsers.length} | out ${rel(opts.out)}${opts.url ? ` | url override ${opts.url}` : ''}`);
 
   let wav = null;
   let audioDecided = !opts.audio || !!opts.stills;
   const outputs = [];
   for (const format of opts.formats) {
-    const film = await openFilm(browser, format, opts);
-    film.opts = opts;
+    const settled = await Promise.allSettled(browsers.map((b, k) => openFilm(b, format, opts, k)));
+    const films = settled.filter((s) => s.status === 'fulfilled').map((s) => s.value).sort((a, b) => a.worker - b.worker);
+    const failed = settled.find((s) => s.status === 'rejected');
     try {
+      if (failed) throw failed.reason;
+      const film = films[0];
+      for (const f of films) {
+        if (f.info.W !== film.info.W || f.info.H !== film.info.H || f.info.duration !== film.info.duration) {
+          throw new Error(`worker ${f.worker} disagrees on stage/duration (${f.info.W}x${f.info.H} ${f.info.duration}s) - page is not deterministic`);
+        }
+      }
       const fps = opts.fps || (Number(film.info.fps) > 0 ? Number(film.info.fps) : 30);
       log(`[${format}] ready in ${fmtDur(film.loadMs / 1000)}: ${film.info.W}x${film.info.H}, ${film.info.duration}s, ${fps} fps` +
         (film.fontLines.length ? ` | fonts: ${film.fontLines.join(', ')}` : ''));
@@ -680,26 +830,30 @@ async function main() {
         audioDecided = true;
         if (film.info.hasAudio) {
           wav = await fetchWav(film, tmpDir);
-          if (Math.abs(wav.duration - film.info.duration) > 0.1) warn(`soundtrack is ${wav.duration.toFixed(2)}s, film is ${film.info.duration}s (padded/trimmed to video)`);
+          if (Math.abs(wav.duration - film.info.duration) > 0.1) {
+            warn(`soundtrack is ${wav.duration.toFixed(2)}s, film is ${film.info.duration}s (audio is padded/trimmed to the video)`);
+          }
         } else {
           warn('window.BVAudio.wav is not available - rendering SILENT video');
         }
       }
-      outputs.push(await renderVideo(film, opts, fps, wav));
-      if (opts.poster) await renderPoster(film);
+      outputs.push(await renderVideo(films, opts, fps, wav));
+      if (opts.poster) await renderPoster(film, opts);
     } finally {
-      await film.close();
+      await Promise.all(films.map((f) => f.close()));
     }
   }
-  if (outputs.length) log(`[render] done in ${fmtDur((Date.now() - started) / 1000)}:\n  ` + outputs.join('\n  '));
-  else log(`[render] done in ${fmtDur((Date.now() - started) / 1000)}`);
+  const took = fmtDur((Date.now() - started) / 1000);
+  log(outputs.length ? `[render] done in ${took}:\n  ${outputs.map(rel).join('\n  ')}` : `[render] done in ${took}`);
   return 0;
 }
 
 main()
   .then(async (code) => { await runCleanups(); process.exit(code); })
   .catch(async (e) => {
-    errln(`[render] FAILED: ${e && e.stack && !(e instanceof UsageError) && process.env.BV_RENDER_DEBUG ? e.stack : (e && e.message) || e}`);
+    if (interrupted) return; // the signal handler owns cleanup and the exit code
+    const msg = e instanceof UsageError || !process.env.BV_RENDER_DEBUG ? (e && e.message) || String(e) : e.stack;
+    errln(`[render] FAILED: ${msg}`);
     await runCleanups();
     process.exit(e instanceof UsageError ? 2 : 1);
   });

@@ -24,11 +24,14 @@
   };
 
   // The four pulls, in reveal order. `t` = the beat the coin lands and flips.
+  // Silver pulls are real coins from the Eye of the Unknown series (1 oz .9999 Ag, 100 minted each,
+  // struck by CIT in Liechtenstein). The gold pulls are the Bifrost Gold concept coin (1/4 oz and 1 oz).
+  // Tier assignments are placeholders until the published odds table exists.
   const PULLS = [
-    { coin: 'huginn',   tier: 'silver',    t: 14.0, edition: 412, mintage: 999, metal: 'ag', grams: 31.10, label: 'SILVER.' },
-    { coin: 'fjord',    tier: 'rare',      t: 15.5, edition: 88,  mintage: 250, metal: 'ag', grams: 31.10, label: 'RARE SILVER.' },
-    { coin: 'valkyrie', tier: 'gold',      t: 17.0, edition: 19,  mintage: 99,  metal: 'au', grams: 7.78,  label: 'GOLD.' },
-    { coin: 'heimdall', tier: 'legendary', t: 22.0, edition: 7,   mintage: 25,  metal: 'au', grams: 31.10, label: 'LEGENDARY' }
+    { coin: 'silence',       tier: 'silver',    t: 14.0, edition: 41, mintage: 100, metal: 'ag', grams: 31.10, label: 'SILVER.' },
+    { coin: 'ametherion',    tier: 'rare',      t: 15.5, edition: 12, mintage: 100, metal: 'ag', grams: 31.10, label: 'RARE SILVER.' },
+    { coin: 'bifrost-gold-q', tier: 'gold',     t: 17.0, edition: 19, mintage: 99,  metal: 'au', grams: 7.78,  label: 'GOLD.' },
+    { coin: 'bifrost-gold',  tier: 'legendary', t: 22.0, edition: 7,  mintage: 25,  metal: 'au', grams: 31.10, label: 'LEGENDARY' }
   ];
 
   // Running metal totals (grams) as the HUD odometer should read after each pull.
