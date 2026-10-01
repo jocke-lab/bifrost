@@ -58,9 +58,9 @@
     foley: {
       clasp: { src: [2.90, 3.62], align: 3.315, at: 13.0, rate: 1, gain: 0.30, pan: -0.25 },
       latch: { src: [3.88, 4.60], align: 4.03, at: 13.0, rate: 1, gain: 0.62, pan: 0.15 },
-      lid: { src: [4.62, 6.14], align: 4.62, at: 13.04, rate: 0.76, gain: 0.42, pan: 0.1 },
-      settle: { src: [6.18, 6.72], align: 6.37, at: 14.97, rate: 0.85, gain: 0.16, pan: 0.2 },
-      rustle: { src: [8.18, 9.08], align: 8.18, at: 15.2, rate: 0.95, gain: 0.34, pan: 0 }
+      lid: { src: [4.62, 6.14], align: 4.62, at: 13.04, rate: 0.76, gain: 0.8, pan: 0.1 },
+      settle: { src: [6.18, 6.72], align: 6.3682, at: 15.0, rate: 0.85, gain: 0.16, pan: 0.2 },     // the lid stops on the freeze
+      rustle: { src: [8.40, 9.08], align: 8.4379, at: 15.2, rate: 0.85, gain: 1.2, pan: 0 }        // first brush on the rise, to ~15.96
     },
     // the case film's own track: the seam bed at 1x under 10.0-12.9 (film 0-2.9), then the release
     // slowed like the picture (film 3.0-4.375 over 13.0-15.0 = rate 0.6875) with its hit on the latch
@@ -396,8 +396,15 @@
     }
     function revCymbal(tEnd, len, v, o) {
       o = o || {};
-      const n = revCrashB[0].length, k = n - Math.round(len * SR);
-      mixIn('sfx', [revCrashB[0].subarray(k), revCrashB[1].subarray(k)], tEnd - len, v,
+      // a reversed crash cut shorter than its 1.6 s buffer starts mid-decay: fade it in (raised cosine)
+      // so the swell starts from nothing instead of a broadband step
+      const n = revCrashB[0].length, k = n - Math.round(len * SR), fi = Math.round(Math.min(0.15, len * 0.4) * SR);
+      const seg = [0, 1].map((c) => {
+        const d = revCrashB[c].slice(k);
+        for (let i = 0; i < fi; i++) d[i] *= 0.5 - 0.5 * Math.cos(Math.PI * i / fi);
+        return d;
+      });
+      mixIn('sfx', seg, tEnd - len, v,
         { rev: 0.25, pan: o.pan == null ? 0 : o.pan, len: (o.cut || tEnd) - (tEnd - len) });
     }
     let last808 = null;
@@ -673,7 +680,11 @@
       noiseBurst(t, v * (o.air == null ? 0.3 : o.air), o.airHz || 5200, 220, o.airDec || 0.7, { rev: 0.4, huge: o.huge == null ? 0.35 : o.huge });
       if (o.crash) crash(t, v * o.crash, { huge: 0.25, rev: 0.25 });
     }
-    const uiTap = (t, pan) => { tick(t, 2600, 0.07, pan || 0, 0.018, 'sine', { rev: 0.12 }); play(clickB, t, 0.3, { pan: pan || 0 }); };
+    const uiTap = (t, pan) => {
+      tick(t, 2600, 0.09, pan || 0, 0.018, 'sine', { rev: 0.12 }); play(clickB, t, 0.42, { pan: pan || 0 });
+      thud(t, 72, 0.2, { slap: 0.12, dec: 0.14, rev: 0.08, pan: pan || 0 });   // the fingertip: a soft, round touch
+      duck.gain.setTargetAtTime(0.6, t - 0.004, 0.003); duck.gain.setTargetAtTime(1, t + 0.05, 0.09);
+    };
     function chord(t, midis, v, o) { // glass chord, voices fanned L -> R
       o = o || {};
       midis.forEach((m, i) => bell(t + (o.strum || 0) * i, mtof(m), v, midis.length > 1 ? -o.spread + 2 * o.spread * i / (midis.length - 1) : 0, o.dec || 1.4,
@@ -756,7 +767,7 @@
           bell(t, mtof(m - 12), 0.07, pan, 0.9, { ratio: 3, index: 1.2, rev: 0.25 });
         });
         const t = C.fiveRow;
-        chord(t, [62, 65, 69, 72, 76], 0.06, { spread: 0.8, strum: 0.03, dec: 1.8, huge: 0.2 });
+        chord(t, C.fivePitch, 0.085, { spread: 0.8, strum: 0.005, dec: 1.8, huge: 0.2 });   // the five coins' own notes, fanned L -> R like the row
         choir(t, 5.0, [50, 57, 62, 65, 69], 0.06, { a: 0.18, r: 0.25, huge: 0.4 });
         whoosh(t - 0.15, 0.6, 3000, 10000, 0.05, -0.7, 0.7, { type: 'highpass', peak: 0.3, rev: 0.4 }); // light along the arc
       }
@@ -775,7 +786,7 @@
           pad(B.t0, B.t1 - 0.02, B.pad, 0.03, { a: bi ? 0.05 : 0.25, r: B.t1 >= 10 ? 0.02 : 0.08 });
           b808(B.t0, B.root, Math.min(1.8, B.t1 - B.t0 - 0.05), 0.3, bi === 0 ? { glideFrom: 33, glide: 0.25 } : {});
           forSteps(B.t0, B.t1 - 0.01, (t, i, s) => {
-            if (i % 4 === 0) kick(t, i === 0 ? 0.5 : 0.36, { f1: 52, f2: 44, dec: 0.36, depth: 0.75 });   // the low pulse, on the beat
+            if (i % 8 === 0 && Math.abs(t - C.confirmed + 0.1) > 0.15) kick(t, i === 0 ? 0.5 : 0.38, { f1: 52, f2: 44, dec: 0.4, depth: 0.75 });    // the low pulse, half-time (sparse, not four-on-the-floor)
             if (i % 2 === 0) {
               const pat = [0, 2, 1, 3, 0, 2, 4, 2];
               pluck(t, B.arp[pat[(s / 2) % 8]] - 12, 0.026 * (i % 8 === 0 ? 1.2 : 0.9), (s % 4 ? 0.35 : -0.35), { cut: 2800, dec: 0.16, dly: 0.25 });
@@ -787,13 +798,13 @@
         whoosh(4.82, 0.3, 700, 3200, 0.14, 0.6, 0, { peak: 0.6, rev: 0.2 });   // the phone slides in
         uiTap(C.tapCoin, -0.1); tick(C.tapCoin + 0.02, 180, 0.12, 0, 0.05, 'sine');
         glassTick(C.tapCoin + 0.06, mtof(86), 0.05, -0.1, { dec: 0.35 });        // card lifts
-        whoosh(C.sheet - 0.05, 0.3, 700, 3200, 0.12, 0, 0, { peak: 0.55, rev: 0.15 }); // checkout sheet
+        whoosh(C.sheet - 0.16, 0.34, 700, 3200, 0.12, 0, 0, { peak: 0.47, rev: 0.15 }); // checkout sheet (peaks on 6.4)
         uiTap(C.tapMint, 0.05); tick(C.tapMint + 0.02, 160, 0.14, 0, 0.06, 'sine');
         [7.45, 7.62, 7.79, 7.96].forEach((t, k) => glassTick(t, mtof(81 + [0, 2, 4, 5][k]), 0.025, 0.1, { dec: 0.2 })); // progress rail
         const c = C.confirmed;                                                     // 'Payment confirmed'
-        chord(c, [77, 81, 84, 89], 0.07, { spread: 0.5, strum: 0.04, dec: 1.3 });
-        glassTick(c, mtof(93), 0.07, 0.2, { dec: 0.5 });
-        subDrop(c, 80, 42, 0.15, 0.35, 0.6);
+        chord(c, [77, 81, 84, 89], 0.085, { spread: 0.5, strum: 0.04, dec: 1.3 });
+        glassTick(c, mtof(93), 0.08, 0.2, { dec: 0.5 });
+        hit(c, 0.42, { f0: 78, f1: 40, drop: 0.2, subDec: 0.8, body: 58, slap: 0.2, air: 0.16, airDec: 0.4, huge: 0.15 });
         whoosh(8.42, 0.4, 900, 7000, 0.18, 0, 0.3, { peak: 0.75, rev: 0.25 });  // coin flies up out of the phone
         const k = C.certificate;                                                   // certificate chip docks
         tick(k, 3300, 0.05, 0.3, 0.02, 'sine', { rev: 0.1 });
@@ -807,17 +818,21 @@
       await slice();
       {
         // near-silence: just the real seam bed, a breath of sub and the pulses
+        // (the music bus stays closed through the cut and reopens smoothly under the release swell)
+        mlp.setValueAtTime(700, 12.0); mlp.exponentialRampToValueAtTime(20000, 12.95);
         if (rec.film) placeRec(rec.film, FI.bed);
         else drone(10.0, 12.85, [26, 33], 'saw', 0.035, 2.2, 0.06, { lp: 120, lp1: 320, q: 1.2, dest: 'sfx' });
         drone(10.2, 12.86, [38], 'sine', 0.02, 2.0, 0.04, { dest: 'sfx' });
         whoosh(10.3, 2.5, 5000, 9000, 0.006, -0.3, 0.3, { type: 'highpass', peak: 0.9, rev: 0 }); // faint air in the dark
-        C.seamPulses.forEach((t, i) => seamPulse(t, 0.38 + 0.1 * i));
+        C.seamPulses.forEach((t, i) => seamPulse(t, 0.3 + 0.09 * i));
         // 12.65 the light release: a glassy swell that stops just before the latch
         revCymbal(12.88, 0.75, 0.22, { cut: 12.88 });
         whoosh(12.2, 0.7, 250, 4500, 0.07, 0, 0, { peak: 0.99, q: 1.2, rev: 0.05 });
         sweepTone(12.25, 12.86, 220, 440, 0.03);
         whoosh(C.release, 0.25, 6000, 11000, 0.03, -0.4, 0.4, { type: 'highpass', peak: 0.3, rev: 0.4 });
-        bell(C.release, mtof(93), 0.02, 0.2, 1.0, { ratio: 2.76, index: 0.4, rev: 0.4, dly: 0 });
+        bell(C.release, mtof(93), 0.045, 0.2, 1.0, { ratio: 2.76, index: 0.4, rev: 0.4, dly: 0 });   // the radial light release
+        bell(C.release, mtof(86), 0.03, -0.2, 0.9, { ratio: 2.76, index: 0.3, rev: 0.4, dly: 0 });
+        noiseBurst(C.release, 0.035, 9000, 5000, 0.3, { type: 'highpass', a: 0.004, rev: 0.4 });
 
         // 13.0 THE LATCH: the client's real clasp + latch, the film's own release slowed like the picture, an impact
         const L = C.latch;
@@ -829,26 +844,27 @@
         if (rec.foley) { placeRec(rec.foley, FO.lid, { rev: 0.1 }); placeRec(rec.foley, FO.settle, { rev: 0.1 }); }
         else whoosh(13.05, 1.9, 300, 900, 0.05, -0.2, 0.2, { type: 'lowpass', peak: 0.5, rev: 0.2 });
         whoosh(13.05, 2.0, 180, 1400, 0.05, -0.4, 0.4, { type: 'lowpass', peak: 0.45, rev: 0.3, huge: 0.3 });
-        choir(13.1, 15.0, [50, 57, 62, 64, 65, 69], 0.045, { a: 0.7, r: 0.6, huge: 0.6 });
+        choir(13.1, 15.0, [50, 57, 62, 64, 65, 69], 0.032, { a: 0.7, r: 0.6, huge: 0.6 });   // under the recorded lid
         drone(13.0, 15.1, [26, 38], 'sine', 0.045, 0.4, 0.5, { dest: 'pad' });
         padLPset('setValueAtTime', 500, 13.0); padLPset('exponentialRampToValueAtTime', 1600, 15.2);
-        pad(13.1, 16.08, [50, 57, 62, 64, 65], 0.026, { a: 1.0, r: 0.03 });
+        pad(13.1, 16.08, [50, 57, 62, 64, 65], 0.022, { a: 1.0, r: 0.03 });
 
         // 15.0 glitter from the case mouth; 15.2-16.1 the coin rises from inside the rim (recorded rustle)
         const g = C.freeze;
-        sparkle(g, 18, 1.1, 0.022, 0, 2, 4);
-        whoosh(g, 1.2, 6000, 12000, 0.03, -0.5, 0.5, { type: 'highpass', peak: 0.4, rev: 0.4, huge: 0.2 });
+        glassTick(g, mtof(98), 0.05, 0.1, { dec: 0.4 });                     // the first grain lands on the freeze
+        sparkle(g + 0.04, 18, 1.06, 0.022, 0, 2, 4);
+        whoosh(g, 1.2, 6000, 12000, 0.022, -0.5, 0.5, { type: 'highpass', peak: 0.4, rev: 0.4, huge: 0.2 });
         if (rec.foley) placeRec(rec.foley, FO.rustle, { rev: 0.1 });
         else noiseBurst(C.rise, 0.05, 1800, 900, 0.8, { type: 'bandpass', rev: 0.2 });
         sweepTone(C.rise, C.clearsRim - 0.01, 147, 587, 0.04, { rev: 0.2 });
-        revCymbal(C.clearsRim, 0.9, 0.35);
+        revCymbal(C.clearsRim, 0.6, 0.35);                 // starts 15.5: leaves the rustle in the clear
         whoosh(C.clearsRim - 0.45, 0.47, 400, 8000, 0.14, 0, 0, { peak: 0.97, q: 1.2, rev: 0.1 });
 
         // 16.1 THE BLOOM: the coin clears the rim, D MAJOR
         const B = C.clearsRim;
         hit(B, 1.05, { f0: 95, f1: 33, drop: 0.55, subDec: 2.4, body: 50, huge: 0.55, air: 0.32, crash: 0.42 });
         horn(B, [38, 45, 50, 54, 57, 62], 1.1, 0.04, { a: 0.09, cut: 1500, rev: 0.4, huge: 0.45, rel: 0.5, scoop: 25 });
-        choir(B, 17.8, [50, 57, 62, 66, 69, 74], 0.06, { a: 0.08, r: 1.0, huge: 0.55 });
+        choir(B, 16.95, [50, 57, 62, 66, 69, 74], 0.06, { a: 0.08, r: 0.6, huge: 0.55 });   // releases into the 17.0 resolve
         chord(B, [62, 66, 69, 74, 78, 81], 0.08, { spread: 0.85, strum: 0.025, dec: 2.2, huge: 0.25 });
         silverRing(B + 0.02, 0.8, 0, { huge: 0.25 });
         sparkle(B + 0.03, 20, 1.0, 0.03, 0, 2, 4);
@@ -858,7 +874,8 @@
 
         // 17.0 resolve: the result type lands on a soft glass motif; 18.5-20 slow hold
         const R = C.result;
-        chord(R, [69, 74, 78, 81, 86], 0.045, { spread: 0.6, strum: 0.09, dec: 1.6, dly: 0.2 });
+        chord(R, [81, 86, 90, 93], 0.13, { spread: 0.6, strum: 0.006, dec: 1.6, dly: 0.2 });   // above the bloom's bed so it reads
+        glassTick(R, mtof(98), 0.07, -0.2, { dec: 0.5 });
         subDrop(R, 70, 38, 0.2, 0.3, 1.2);
         [[17.5, 81], [18.0, 78], [18.5, 74], [19.0, 76], [19.5, 69]].forEach(([t, m], i) =>
           bell(t, mtof(m), 0.035, i % 2 ? 0.4 : -0.4, 1.0, { ratio: 3, index: 0.9, rev: 0.35, dly: 0.2 }));
@@ -878,7 +895,6 @@
         ];
         padLPset('setValueAtTime', 1800, 20.0); padLPset('exponentialRampToValueAtTime', 2800, 24.9);
         dlp.setValueAtTime(2200, 20.0);
-        mlp.setValueAtTime(20000, 10.0);
         C.decide.forEach((t, i) => {
           const S = STEPS[i], t1 = i < 3 ? C.decide[i + 1] : C.end;
           if (i) whoosh(t - 0.16, 0.18, 4500, 900, 0.1, 0.4, -0.2, { peak: 0.5 });
@@ -890,12 +906,14 @@
           if (i < 3) pluck(t + 0.3125, S.ring - 12, 0.03, i % 2 ? -0.3 : 0.3, { cut: 2600, dec: 0.18, dly: 0.25 });
         });
         // 80% ring meter: a rising tone + a gold ring, resolving into the confirm chord
-        sweepTone(C.buybackRing[0], C.buybackRing[1], 440, 1174.7, 0.05, { rev: 0.2 });
+        sweepTone(C.buybackRing[0], C.buybackRing[1] - 0.03, 440, 1174.7, 0.05, { rev: 0.2 });   // gone by 24.5: the confirm enters clean
         goldRing(C.decide[3] + 0.02, 0.45, 0, { decay: 2.0 });
-        chord(C.buybackConfirm, [86, 90, 93, 98], 0.06, { spread: 0.45, strum: 0.02, dec: 1.0, dly: 0.12 });
+        chord(C.buybackConfirm, [86, 90, 93, 98], 0.11, { spread: 0.45, strum: 0.01, dec: 1.0, dly: 0.12 });
+        glassTick(C.buybackConfirm, mtof(102), 0.05, 0.15, { dec: 0.35 });
+        subDrop(C.buybackConfirm, 74, 40, 0.15, 0.25, 0.6);
         // into the end card: suck + reverse air
-        revCymbal(C.end, 0.62, 0.38);
-        whoosh(24.4, 0.6, 400, 9000, 0.14, 0, 0, { peak: 0.97, q: 1.2 });
+        revCymbal(C.end, 0.45, 0.38);
+        whoosh(C.buybackConfirm + 0.05, 0.45, 400, 9000, 0.14, 0, 0, { peak: 0.97, q: 1.2 });
       }
 
       // ---- 06 END CARD 25.0-30.0: final impact, THE BIFROST CHORD as the arc draws, tail decayed by 29.8
@@ -911,8 +929,8 @@
         // the arc draws through the five coins L -> R: the BIFROST CHORD rises with it
         [62, 66, 69, 74, 78].forEach((m, i) => bell(t + 0.12 + i * 0.13, mtof(m + 12), 0.06, -0.85 + i * 0.425, 1.3, { ratio: 3, index: 1.2, rev: 0.4, dly: 0.12 }));
         const L = C.logo;  // the mark resolves: the full chord, the silver ring on the gold ring
-        chord(L, [74, 78, 81, 86], 0.14, { spread: 0.85, strum: 0.1, dec: 1.8, huge: 0.15 });
-        silverRing(L + 0.42, 0.75, 0.5, { rev: 0.35 });
+        chord(L, [74, 78, 81, 86], 0.14, { spread: 0.85, strum: 0.04, dec: 1.8, huge: 0.15 });
+        silverRing(L, 0.6, 0.5, { rev: 0.35 });
         sparkle(L + 0.02, 10, 0.7, 0.022, 0, 2, 4);
         drone(L, 28.6, [38, 50], 'sine', 0.04, 0.6, 1.2, { dest: 'pad' });
         bell(C.glint, 4186, 0.012, 0.2, 0.45, { ratio: 2.76, index: 0.3, rev: 0, dly: 0 }); // glint (dry, gone by 29.3)
