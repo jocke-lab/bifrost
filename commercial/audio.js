@@ -17,8 +17,8 @@
 
   // ------------------------------------------------------------------ CUES
   // 120 BPM -> beat 0.5 s, bar 2.0 s. D minor, Picardy lift to D MAJOR at 23.0.
-  const CUES = {
-    bpm: 120, beat: 0.5, bar: 2.0, key: 'D minor -> D major @ 23.0',
+  const CUES60 = {
+    version: '60s', bpm: 120, beat: 0.5, bar: 2.0, key: 'D minor -> D major @ 23.0',
     scenes: [
       { id: 'nft-era',        start: 0,  end: 3,  name: 'The NFT Era' },
       { id: 'weighs',         start: 3,  end: 6,  name: 'Now It Weighs Something' },
@@ -60,10 +60,27 @@
     violetDot: 52.8, mintDotRing: 52.92, glint: 58.5, tailEnd: 59.8,
     silences: [[2.7, 3.0], [11.5, 12.0], [21.93, 22.0], [45.5, 46.0]]
   };
+  // v2 30 s app-first cut (ARCH.md v2 / SCRIPT_V2.md; mirrors BVShared.CUES)
+  const CUES30 = {
+    version: '30s', bpm: 120, beat: 0.5, bar: 2.0, key: 'D minor -> D major @ 12.3',
+    scenes: [
+      { id: 'hook', start: 0.0, end: 2.2 }, { id: 'app-pack', start: 2.0, end: 4.2 }, { id: 'rip', start: 4.0, end: 6.2 },
+      { id: 'reveal', start: 6.0, end: 10.2 }, { id: 'legendary', start: 10.0, end: 14.2 }, { id: 'decide', start: 14.0, end: 22.2 },
+      { id: 'proof', start: 22.0, end: 24.7 }, { id: 'endcard', start: 24.5, end: 30.0 }
+    ],
+    hookStab: 0.0, strike: 1.0, intoPhone: 1.7, groove: 2.0, everyPackHits: 2.4, silverOrGold: 3.0, tapRip: 3.5,
+    rip: 4.0, tear: 4.6, slowmo: [4.6, 5.4], slowOut: 5.4,
+    tiers: { silver: 6.0, rare: 7.3, gold: 8.6 }, filterDown: [9.2, 10.0],
+    heartbeats: [10.0, 10.8], silence: [11.4, 11.5], legendary: 11.5, oneOf25: 12.3, majorLift: 12.3, engrave: 12.6, backIntoPhone: 13.4,
+    decide: [14.0, 16.0, 18.0, 20.0], ringMeter: [18.3, 18.9], confirmChord: 18.9, vaultClunk: 20.6, vaultLine: 20.8,
+    proof: 22.0, nfcTap: 22.5, mintLog: 23.2, endCard: 24.5, logo: 25.3, glint: 28.8, tailEnd: 29.8,
+    silences: [[11.4, 11.5]]
+  };
+  const cuesFor = (d) => (d < 45 ? CUES30 : CUES60);
 
   const SR = 48000;
   const TARGET_LUFS = -14;
-  const CEIL_DBTP = -1.5;
+  const CEIL_DBTP = -1.8;
 
   // ------------------------------------------------------------- helpers
   function mulberry32(a) {
@@ -377,9 +394,9 @@
     // ---------------------------------------------------------- main bus graph
     const out = ctx.createGain(); out.connect(ctx.destination);            // gated (silences)
     const lim = ctx.createDynamicsCompressor();
-    lim.threshold.value = -3.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
+    lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
     const glue = ctx.createDynamicsCompressor();
-    glue.threshold.value = -17; glue.knee.value = 8; glue.ratio.value = 2.4; glue.attack.value = 0.012; glue.release.value = 0.2;
+    glue.threshold.value = -20; glue.knee.value = 10; glue.ratio.value = 2; glue.attack.value = 0.012; glue.release.value = 0.2;
     const G = (v, dest) => { const g = ctx.createGain(); g.gain.value = v; if (dest) g.connect(dest); return g; };
     const F = (type, f, q, dest) => { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = q; if (dest) n.connect(dest); return n; };
     function shaper(drive, dest) {
@@ -387,9 +404,13 @@
       for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(drive * x) / k; }
       w.curve = c; w.oversample = '2x'; if (dest) w.connect(dest); return w;
     }
-    const mix = G(0.62); mix.connect(glue); glue.connect(lim); lim.connect(out);
+    const mix = G(0.3);
+    // master tilt EQ: tame the sub, open the top ("expensive" air)
+    const eqLo = F('lowshelf', 110, 0.7), eqMid = F('peaking', 2600, 0.9), eqHi = F('highshelf', 6500, 0.7);
+    eqLo.gain.value = -3.5; eqMid.gain.value = 2; eqHi.gain.value = 3.5;
+    mix.connect(eqLo); eqLo.connect(eqMid); eqMid.connect(eqHi); eqHi.connect(glue); glue.connect(lim); lim.connect(out);
     const sfx = G(1, mix);
-    const subBus = G(1); subBus.connect(shaper(1.4, sfx));
+    const subBus = G(0.5); subBus.connect(shaper(1.4, sfx));
     const musicOut = G(1, mix);
     const musicLP = F('lowpass', 20000, 0.8, musicOut);
     const musicPre = G(1, musicLP);
@@ -397,11 +418,11 @@
     const drumLP = F('lowpass', 20000, 0.9, musicPre);
     const drumBus = G(0.9); drumBus.connect(shaper(1.25, drumLP));
     const bassLP = F('lowpass', 650, 0.7, duck);
-    const bassBus = G(0.8); bassBus.connect(shaper(2.4, bassLP));
+    const bassBus = G(0.42); bassBus.connect(shaper(2.4, bassLP));
     const padLP = F('lowpass', 2200, 0.6, duck);
-    const padBus = G(1, padLP);
-    const arpBus = G(1, duck);
-    const leadBus = G(1, musicOut); // horns + choir (not filtered by the music-bus sweeps)
+    const padBus = G(1.45, padLP);
+    const arpBus = G(1.35, duck);
+    const leadBus = G(1.25, musicOut); // horns + choir (not filtered by the music-bus sweeps)
     const padAuto = [];             // pad lowpass automation, replayed in the FX context
     const padLPset = (m, v, t) => { padAuto.push([m, v, t]); padLP.frequency[m](v, t); };
     duck.gain.setValueAtTime(1, 0);
@@ -409,7 +430,7 @@
     // ---------------------------------------------------------- instruments (JS synthesis -> stems)
     function kick(t, v, o) {
       v = v == null ? 1 : v; o = o || {};
-      const f1 = o.f1 || 54, f2 = o.f2 || 43, dec = o.dec || 0.5;
+      const f1 = o.f1 || 56, f2 = o.f2 || 46, dec = o.dec || 0.42;
       const b = cached('kick' + f1 + '/' + f2 + '/' + dec, dec + 0.15, 1, (d) => {
         const tau = dec / 4.6; let ph = 0;
         for (let i = 0; i < d.length; i++) {
@@ -694,8 +715,8 @@
       return v;
     })();
     function scratch(t, v) { mixIn('sfx', scratchShape, t, v, { pan: 0, rev: 0.1 }); }
-    function heartbeat(t, v) {
-      [[0, 1], [0.17, 0.62]].forEach(([dt, a]) => {
+    function heartbeat(t, v, gap) {
+      [[0, 1], [gap || 0.17, 0.62]].forEach(([dt, a]) => {
         const tt0 = t + dt, d = new Float32Array(Math.round(0.5 * SR)), h = new Float32Array(Math.round(0.3 * SR)); let ph = 0;
         for (let i = 0; i < d.length; i++) { const tt = i / SR; ph += pw(82, 55, tt / 0.06) / SR; d[i] = Math.sin(TAU * ph) * env1(tt, 0.006, 0.3 / 4.6) * v * a; }
         for (let i = 0; i < h.length; i++) { const tt = i / SR; h[i] = Math.sin(TAU * 110 * tt) * env1(tt, 0.006, 0.16 / 4.6) * v * a * 0.22; }
@@ -726,410 +747,625 @@
       G: { pad: [59, 62, 66, 67], root: 31, arp: [71, 74, 79, 83, 86] },
       Bm: { pad: [59, 62, 66, 71], root: 35, arp: [71, 74, 78, 83, 86] }
     };
-    const SECTIONS = [
-      { t0: 4.0, t1: 6.0, ch: 'Dm', st: 'ambient', pad: 0.045, lp: 900, a: 0.6, r: 0.25 },
-      { t0: 6.0, t1: 8.0, ch: 'Dm', st: 'intro', pad: 0.05, lp: 1400 },
-      { t0: 8.0, t1: 10.0, ch: 'Bb', st: 'intro', pad: 0.055, lp: 1800 },
-      { t0: 10.0, t1: 11.5, ch: 'Asus', st: 'riser', pad: 0.05, lp: 1200, r: 0.02 },
-      { t0: 12.25, t1: 13.5, ch: 'Dm', st: 'slowmo', pad: 0.05, lp: 700, a: 0.3, r: 0.1 },
-      { t0: 13.5, t1: 14.0, ch: 'Dm9', st: 'chord', pad: 0.05, lp: 2600, a: 0.05, r: 0.1 },
-      { t0: 14.0, t1: 16.0, ch: 'Dm', st: 'groove', pad: 0.055, lp: 2600 },
-      { t0: 16.0, t1: 18.0, ch: 'F', st: 'groove', pad: 0.058, lp: 3000 },
-      { t0: 18.0, t1: 20.0, ch: 'Bb', st: 'groove', pad: 0.06, lp: 3000, r: 0.02 },
-      { t0: 22.0, t1: 23.0, ch: 'Dm', st: 'legend', pad: 0.05, lp: 900, a: 0.05, r: 0.03 },
-      { t0: 23.0, t1: 26.0, ch: 'D', st: 'lift', pad: 0.06, lp: 3600, a: 0.02 },
-      { t0: 26.0, t1: 28.0, ch: 'Bm', st: 'data', pad: 0.045, lp: 2000 },
-      { t0: 28.0, t1: 30.0, ch: 'G', st: 'data', pad: 0.045, lp: 2000 },
-      { t0: 30.0, t1: 32.0, ch: 'D', st: 'half', pad: 0.055, lp: 2400 },
-      { t0: 32.0, t1: 34.0, ch: 'A', st: 'half', pad: 0.055, lp: 2400 },
-      { t0: 34.0, t1: 36.0, ch: 'G', st: 'warm', pad: 0.05, lp: 1500 },
-      { t0: 36.0, t1: 38.0, ch: 'A', st: 'warm', pad: 0.05, lp: 1700 },
-      { t0: 38.0, t1: 40.0, ch: 'D', st: 'drop', pad: 0.06, lp: 5000 },
-      { t0: 40.0, t1: 42.0, ch: 'Bm', st: 'drop', pad: 0.06, lp: 5000 },
-      { t0: 42.0, t1: 44.0, ch: 'G', st: 'drop', pad: 0.06, lp: 5000 },
-      { t0: 44.0, t1: 45.0, ch: 'A', st: 'drop', pad: 0.06, lp: 5000 },
-      { t0: 45.0, t1: 45.5, ch: 'A', st: 'filtered', pad: 0.06, lp: 5000, r: 0.01 },
-      { t0: 46.0, t1: 48.0, ch: 'D', st: 'drop4', pad: 0.06, lp: 4500 },
-      { t0: 48.0, t1: 50.0, ch: 'G', st: 'drop4', pad: 0.06, lp: 4500 },
-      { t0: 50.0, t1: 51.0, ch: 'Bm', st: 'callback', pad: 0.055, lp: 4000 },
-      { t0: 51.0, t1: 52.0, ch: 'A', st: 'callback', pad: 0.055, lp: 4000 },
-      { t0: 52.0, t1: 55.2, ch: 'D', st: 'end', pad: 0.055, lp: 2600, a: 0.02, r: 2.0 }
-    ];
     const STY = {
-      intro: { k: [0, 4, 8, 12], c: [], h: 1, oh: [], hv: 0.32, b: [[0, 1.85]], arp: null },
-      groove: { k: [0, 4, 8, 12], c: [4, 12], h: 1, oh: [2, 6, 10, 14], hv: 0.36, b: [[0, 0.7], [6, 0.4], [10, 0.85]], arp: 'pluck8' },
-      lift: { k: [0, 4, 8, 12], c: [4, 12], h: 1, oh: [2, 6, 10, 14], hv: 0.4, b: [[0, 0.7], [6, 0.4], [10, 0.85]], arp: 'bell16' },
-      data: { k: [0, 6, 10], c: [4, 12], h: 1, oh: [14], hv: 0.3, b: [[0, 1.0], [10, 0.6]], arp: 'pluck16' },
-      half: { k: [0, 11], c: [8], h: 2, oh: [], hv: 0.32, b: [[0, 1.4], [11, 0.5]], arp: 'bellHalf' },
-      warm: { k: [0, 10], c: [4, 12], cv: 0.35, h: 2, oh: [], hv: 0.22, b: [[0, 1.6]], arp: 'ep' },
-      drop: { k: [0, 4, 8, 12, 14], c: [4, 12], h: 1, oh: [2, 6, 10, 14], hv: 0.46, b: [[0, 0.7], [6, 0.4], [10, 0.85]], arp: 'bell16' },
-      filtered: { k: [0, 4], c: [], h: 1, oh: [2], hv: 0.3, b: [[0, 0.5]], arp: 'bell16' },
-      drop4: { k: [0, 4, 8, 12, 14], c: [4, 12], h: 1, oh: [2, 6, 10, 14], hv: 0.44, b: [[0, 0.7], [6, 0.4], [10, 0.85]], arp: 'bell16' },
-      callback: { k: [0, 2, 4, 6, 8, 10, 12, 14], c: [4, 12], h: 1, oh: [], hv: 0.4, b: [[0, 0.24], [4, 0.24], [8, 0.24], [12, 0.24]], arp: null }
+      intro: { lv: 0.85, k: [0, 4, 8, 12], c: [], h: 1, oh: [], hv: 0.32, b: [[0, 1.85]], arp: null },
+      groove: { lv: 0.92, k: [0, 4, 8, 12], c: [4, 12], h: 1, oh: [2, 6, 10, 14], hv: 0.36, b: [[0, 0.7], [6, 0.4], [10, 0.85]], arp: 'pluck8' },
+      lift: { lv: 1.0, k: [0, 4, 8, 12], c: [4, 12], h: 1, oh: [2, 6, 10, 14], hv: 0.4, b: [[0, 0.7], [6, 0.4], [10, 0.85]], arp: 'bell16' },
+      data: { lv: 0.72, k: [0, 6, 10], c: [4, 12], h: 1, oh: [14], hv: 0.3, b: [[0, 1.0], [10, 0.6]], arp: 'pluck16' },
+      half: { lv: 0.85, k: [0, 11], c: [8], h: 2, oh: [], hv: 0.32, b: [[0, 1.4], [11, 0.5]], arp: 'bellHalf' },
+      warm: { lv: 0.6, k: [0, 10], c: [4, 12], cv: 0.35, h: 2, oh: [], hv: 0.22, b: [[0, 1.6]], arp: 'ep' },
+      drop: { lv: 1.05, k: [0, 4, 8, 12, 14], c: [4, 12], h: 1, oh: [2, 6, 10, 14], hv: 0.46, b: [[0, 0.7], [6, 0.4], [10, 0.85]], arp: 'bell16' },
+      filtered: { lv: 0.8, k: [0, 4], c: [], h: 1, oh: [2], hv: 0.3, b: [[0, 0.5]], arp: 'bell16' },
+      drop4: { lv: 1.05, k: [0, 4, 8, 12, 14], c: [4, 12], h: 1, oh: [2, 6, 10, 14], hv: 0.44, b: [[0, 0.7], [6, 0.4], [10, 0.85]], arp: 'bell16' },
+      callback: { lv: 0.95, k: [0, 2, 4, 6, 8, 10, 12, 14], c: [4, 12], h: 1, oh: [], hv: 0.4, b: [[0, 0.24], [4, 0.24], [8, 0.24], [12, 0.24]], arp: null }
     };
     function forSteps(t0, t1, fn) {
       for (let s = Math.ceil(t0 / 0.125 - 1e-6); s * 0.125 < t1 - 1e-6; s++) fn(s * 0.125, ((s % 16) + 16) % 16, s);
     }
-    padLPset('setValueAtTime', 2200, 0);
-    SECTIONS.forEach((S) => {
-      const ch = CH[S.ch], st = STY[S.st];
-      padLPset('setValueAtTime', S.lp, S.t0);
-      if (S.st === 'intro' && S.t0 === 6.0) padLPset('exponentialRampToValueAtTime', 2400, 10.0);
-      pad(S.t0, S.t1, ch.pad, S.pad, { a: S.a, r: S.r });
-      if (!st) return;
-      const drop = S.st === 'drop' || S.st === 'drop4';
-      forSteps(S.t0, S.t1, (t, i, s) => {
-        if (st.k.indexOf(i) >= 0) kick(t, i === 0 ? 1 : 0.92);
-        if (st.c.indexOf(i) >= 0) clap(t, (st.cv || 0.62) * (drop ? 1.12 : 1));
-        if (st.h === 1 || (st.h === 2 && i % 2 === 0)) {
-          const accent = (i % 4 === 2) ? 1 : (i % 2 ? 0.55 : 0.75), open = st.oh.indexOf(i) >= 0;
-          hat(t + (i % 2 ? 0.006 : 0), st.hv * accent * (open ? 0.75 : 1), open);
-        }
-        st.b.forEach(([bi, len]) => {
-          if (bi !== i) return;
-          const L = Math.min(len, S.t1 - t - 0.02);
-          if (L <= 0.05) return;
-          const glide = (S.st === 'intro' && t === 6.0) ? 38 : (bi === 10 && last808 != null ? last808 + 12 : null);
-          b808(t, ch.root, L, S.st === 'warm' ? 0.42 : 0.6, glide != null ? { glideFrom: glide, glide: t === 6.0 ? 0.28 : 0.07 } : {});
+    function runSections(SECTIONS) {
+      SECTIONS.forEach((S) => {
+        const ch = CH[S.ch], st = STY[S.st];
+        padLPset('setValueAtTime', S.lp, S.t0);
+        if (S.lpTo) padLPset('exponentialRampToValueAtTime', S.lpTo[0], S.lpTo[1]);
+        pad(S.t0, S.t1, ch.pad, S.pad, { a: S.a, r: S.r });
+        if (!st) return;
+        const drop = S.st === 'drop' || S.st === 'drop4';
+        forSteps(S.t0, S.t1, (t, i, s) => {
+          const lv = st.lv || 1;
+          if (st.k.indexOf(i) >= 0) kick(t, (i === 0 ? 1 : 0.92) * lv);
+          if (st.c.indexOf(i) >= 0) clap(t, (st.cv || 0.62) * (drop ? 1.12 : 1) * lv);
+          if (st.h === 1 || (st.h === 2 && i % 2 === 0)) {
+            const accent = (i % 4 === 2) ? 1 : (i % 2 ? 0.55 : 0.75), open = st.oh.indexOf(i) >= 0;
+            hat(t + (i % 2 ? 0.006 : 0), st.hv * accent * (open ? 0.75 : 1) * lv, open);
+          }
+          st.b.forEach(([bi, len]) => {
+            if (bi !== i) return;
+            const L = Math.min(len, S.t1 - t - 0.02);
+            if (L <= 0.05) return;
+            const glide = (S.glideIn && t === S.t0) ? 38 : (bi === 10 && last808 != null ? last808 + 12 : null);
+            b808(t, ch.root, L, (S.st === 'warm' ? 0.42 : 0.6) * lv, glide != null ? { glideFrom: glide, glide: (S.glideIn && t === S.t0) ? 0.28 : 0.07 } : {});
+          });
+          const arp = st.arp;
+          if (arp === 'bell16') {
+            const pat = [0, 2, 1, 3, 2, 4, 3, 1];
+            const m = ch.arp[pat[s % 8]] + (s % 16 >= 8 ? 12 : 0);
+            bell(t, mtof(m), (S.st === 'drop' ? 0.075 : 0.06) * (i % 4 === 0 ? 1.2 : 0.85), (s % 2 ? 0.45 : -0.45), 0.42,
+              { dest: 'arp', ratio: 3, index: 0.9, rev: 0.12, dly: 0.2 });
+          } else if (arp === 'pluck8' && i % 2 === 0) {
+            const pat = [0, 2, 1, 3, 0, 2, 4, 2];
+            pluck(t, ch.arp[pat[(s / 2) % 8]] - 12, 0.05, (s % 4 ? 0.35 : -0.35), { cut: 3200, dec: 0.16 });
+          } else if (arp === 'pluck16') {
+            const pat = [0, 1, 2, 3, 4, 3, 2, 1];
+            pluck(t, ch.arp[pat[s % 8]], 0.032 * (i % 4 === 0 ? 1.3 : 1), (s % 2 ? 0.5 : -0.5), { cut: 2600, dec: 0.1, type: 'square' });
+          } else if (arp === 'bellHalf' && [0, 3, 6, 10, 12].indexOf(i) >= 0) {
+            bell(t, mtof(ch.arp[[0, 3, 6, 10, 12].indexOf(i)]), 0.06, (i % 2 ? 0.4 : -0.4), 0.9, { dest: 'arp', ratio: 3, index: 1.1, dly: 0.25 });
+          } else if (arp === 'ep' && [0, 3, 6, 10, 12].indexOf(i) >= 0) {
+            ch.pad.forEach((m, j) => bell(t + j * 0.012, mtof(m + 12), 0.035, -0.4 + j * 0.27, 1.1, { dest: 'arp', ratio: 1, index: 1.3, rev: 0.25 }));
+          }
         });
-        const arp = st.arp;
-        if (arp === 'bell16') {
-          const pat = [0, 2, 1, 3, 2, 4, 3, 1];
-          const m = ch.arp[pat[s % 8]] + (s % 16 >= 8 ? 12 : 0);
-          bell(t, mtof(m), (S.st === 'drop' ? 0.075 : 0.06) * (i % 4 === 0 ? 1.2 : 0.85), (s % 2 ? 0.45 : -0.45), 0.42,
-            { dest: 'arp', ratio: 3, index: 0.9, rev: 0.12, dly: 0.2 });
-        } else if (arp === 'pluck8' && i % 2 === 0) {
-          const pat = [0, 2, 1, 3, 0, 2, 4, 2];
-          pluck(t, ch.arp[pat[(s / 2) % 8]] - 12, 0.05, (s % 4 ? 0.35 : -0.35), { cut: 3200, dec: 0.16 });
-        } else if (arp === 'pluck16') {
-          const pat = [0, 1, 2, 3, 4, 3, 2, 1];
-          pluck(t, ch.arp[pat[s % 8]], 0.032 * (i % 4 === 0 ? 1.3 : 1), (s % 2 ? 0.5 : -0.5), { cut: 2600, dec: 0.1, type: 'square' });
-        } else if (arp === 'bellHalf' && [0, 3, 6, 10, 12].indexOf(i) >= 0) {
-          bell(t, mtof(ch.arp[[0, 3, 6, 10, 12].indexOf(i)]), 0.06, (i % 2 ? 0.4 : -0.4), 0.9, { dest: 'arp', ratio: 3, index: 1.1, dly: 0.25 });
-        } else if (arp === 'ep' && [0, 3, 6, 10, 12].indexOf(i) >= 0) {
-          ch.pad.forEach((m, j) => bell(t + j * 0.012, mtof(m + 12), 0.035, -0.4 + j * 0.27, 1.1, { dest: 'arp', ratio: 1, index: 1.3, rev: 0.25 }));
-        }
       });
-    });
-    // whole-music-bus filter sweeps & snaps
-    const mlp = musicLP.frequency;
-    mlp.setValueAtTime(20000, 0);
-    mlp.setValueAtTime(20000, 12.25); mlp.exponentialRampToValueAtTime(800, 12.5); mlp.setValueAtTime(800, 13.4); mlp.exponentialRampToValueAtTime(20000, 13.5);
-    mlp.setValueAtTime(20000, 18.5); mlp.exponentialRampToValueAtTime(320, 20.0); mlp.setValueAtTime(20000, 20.02);
-    mlp.setValueAtTime(1100, 22.0); mlp.setValueAtTime(1100, 22.98); mlp.exponentialRampToValueAtTime(20000, 23.0);
-    mlp.setValueAtTime(20000, 44.95); mlp.exponentialRampToValueAtTime(650, 45.05); mlp.exponentialRampToValueAtTime(380, 45.5); mlp.setValueAtTime(20000, 46.0);
-    // intro: kick/drums through a lowpass opening 300 Hz -> 3 kHz
+    }
+    musicLP.frequency.setValueAtTime(20000, 0);
     drumLP.frequency.setValueAtTime(20000, 0);
-    drumLP.frequency.setValueAtTime(300, 6.0); drumLP.frequency.exponentialRampToValueAtTime(3000, 9.95); drumLP.frequency.setValueAtTime(20000, 10.0);
+    padLPset('setValueAtTime', 2200, 0);
 
-    // ================================================================ SFX / CUES
-    // (1) 0-2 NFT era: bitcrushed chiptune, gated stabs + vinyl scratch per word; tape-stop at 2.0
-    {
-      const tape = varispeed(chipB, 2.75, (tt) => (tt < 2.0 ? 1 : Math.max(0.03, 1 - (tt - 2.0) / 0.6 * 0.97)));
-      let flt = null;
-      for (let i = 0; i < tape.length; i++) {
-        const tt = i / SR;
-        if ((i & 31) === 0) flt = jsBiquadState(flt, 'lp', tt < 2.0 ? 12000 : pw(12000, 700, (tt - 2.0) / 0.6), 0.707);
-        tape[i] = flt.run(tape[i]) * 0.85 * (tt < 2.4 ? 1 : Math.max(0, 1 - (tt - 2.4) / 0.22));
-      }
-      mixIn('music', tape, 0, 1);
-      CUES.nftSlams.forEach((t, i) => {
-        scratch(t + 0.01, 0.32);
-        kick(t, 0.55, { duck: false, dec: 0.25 });
-        noiseBurst(t, 0.12, 6000, 1200, 0.12, { type: 'highpass', rev: 0.05, pan: i % 2 ? 0.3 : -0.3 });
-      });
-      [2.3, 2.6].forEach((t) => { tick(t, 2000, 0.14, 0, 0.06, 'square', { a: 0.002 }); tick(t, 2000, 0.12, 0, 0.06, 'sine'); });
-    }
-    // (2/3) 3.0-4.0 reverse whoosh + pixel gather + hydraulic hiss; 4.0 THE STRIKE; 4.8 THE GOLD RING
-    {
-      whoosh(3.0, 0.62, 500, 6000, 0.42, -0.6, 0.2, { peak: 0.95, rev: 0.3 });
-      for (let i = 0; i < 26; i++) {
-        const u = i / 26, t = 3.0 + 0.6 * Math.sqrt(u) + rr(0, 0.02);
-        tick(t, mtof(74 + Math.floor(u * 24) + [0, 3, 7][i % 3]), 0.05 + 0.04 * u, rr(-0.8, 0.8), 0.025, 'square');
-      }
-      whoosh(3.2, 0.8, 2500, 9000, 0.28, 0, 0, { type: 'highpass', q: 0.7, peak: 0.97, rev: 0.1 });
-      whoosh(3.6, 0.4, 3000, 300, 0.35, 0, 0, { peak: 0.9, rev: 0.15 });
-      subDrop(4.0, 70, 40, 0.08, 1.0, 1.5);
-      kick(4.0, 0.9, { duck: false, dec: 0.6 });
-      [3150, 4720, 6930, 9810, 12400].forEach((f, i) => tick(4.0, f, 0.06 / (1 + i * 0.3), (i % 2 ? 0.3 : -0.3), 0.09, 'sine', { rev: 0.2 }));
-      noiseBurst(4.0, 0.4, 9000, 1500, 0.12, { type: 'highpass', rev: 0.25, huge: 0.15 });
-      silverRing(4.0, 1.0, 0, { huge: 0.15 });
-      sparkle(4.05, 7, 0.5, 0.05, 0, 1, 2);
-      whoosh(4.1, 0.5, 6000, 2500, 0.16, 0, 0, { type: 'highpass', q: 0.7, peak: 0.15, rev: 0.1 });
-      for (let i = 0; i < 16; i++) tick(4.1 + i * 0.025, 3300, 0.03, 0.15, 0.008, 'square');
-      tick(4.52, 1760, 0.06, 0.15, 0.08, 'sine'); tick(4.6, 2349, 0.05, 0.15, 0.1, 'sine');
-      thud(4.8, 98, 0.28, { slap: 0.3, rev: 0.2 });
-      goldRing(4.8, 1.0, 0.25);
-      for (let i = 0; i < 8; i++) tick(4.86 + i * 0.022, 3000, 0.022, 0.15, 0.008, 'square');
-      whoosh(5.2, 0.4, 800, 2400, 0.08, 0.2, 0.8, { rev: 0.1 });
-      { // HUGINN spins: 3 decelerating turns -> pulsing whoosh
-        const n = Math.round(0.65 * SR), d = new Float32Array(n), off = Math.round(1.3 * SR); let flt = null;
-        for (let i = 0; i < n; i++) {
-          const u = i / n, th = 6 * Math.PI * (1 - (1 - u) * (1 - u));
-          if ((i & 31) === 0) flt = jsBiquadState(flt, 'bp', pw(2600, 900, u), 1.6);
-          d[i] = flt.run(noise[0][off + i]) * 0.2 * Math.pow(Math.abs(Math.sin(th)), 2) * (1 - 0.6 * u);
-        }
-        mixIn('sfx', d, 5.2, 1, { rev: 0.2 });
-      }
-      whoosh(5.82, 0.2, 1500, 9000, 0.45, -0.3, 0.3, { peak: 0.85, rev: 0.15 });
-      drone(4.0, 5.9, [38], 'sine', 0.08, 0.5, 0.1);
-      drone(4.0, 5.9, [50], 'tri', 0.024, 0.5, 0.1);
-    }
-    // (4) 6-10 intro groove sfx
-    {
-      whoosh(5.95, 0.4, 600, 4000, 0.32, -0.7, 0.4, { peak: 0.25, rev: 0.25 });
-      subDrop(6.0, 80, 36, 0.3, 0.55, 0.9);
-      crash(6.0, 0.25);
-      tick(6.2, 2349, 0.035, -0.6, 0.06, 'sine', { rev: 0.2 }); tick(6.26, 3136, 0.03, -0.6, 0.06, 'sine', { rev: 0.2 });
-      [6.6, 7.6, 8.75].forEach((t) => chatPop(t, 0.07, 0.6));
-      [6.6, 8.9].forEach((t) => { // foil-crinkle grains panned with the specular sweeps
-        play(crinkleSweep, t - 0.1, 0.24, { pan: [-0.8, 0.8, t - 0.1, t + 0.6], rev: 0.2 });
-        sparkle(t, 5, 0.5, 0.025, 0, 2, 3);
-      });
-      horn(7.2, [38, 45, 50, 53, 57], 1.15, 0.05, { a: 0.3, cut: 1200, rev: 0.35, huge: 0.3, rel: 0.25 }); // Gjallarhorn
-      subDrop(7.2, 60, 37, 0.2, 0.5, 1.2);
-      crash(7.2, 0.18, { huge: 0.2 });
-      whoosh(7.95, 0.35, 900, 5000, 0.3, 0.6, -0.6, { peak: 0.6 });
-      thud(8.4, 62, 0.75, { slap: 0.7, rev: 0.25 }); // 'NO EMPTY PULLS' stamp
-      crash(8.4, 0.12);
-      whoosh(9.35, 0.32, 900, 5000, 0.22, -0.6, 0.6, { peak: 0.6 });
-    }
-    // (5) 10-11.5 crinkle intensifies + Shepard riser (drums out); 11.5-12 TOTAL SILENCE
-    {
-      tick(10.0, 2600, 0.05, 0.5, 0.02, 'sine', { rev: 0.1 });
-      play(crinkleRise, 9.95, 0.32, { pan: 0.35, rev: 0.2, stop: 11.5 });
-      play(shep1, 10.0, 0.5, { rev: 0.2, stop: 11.5 });
-      whoosh(10.0, 1.5, 300, 7000, 0.3, -0.2, 0.2, { peak: 0.99, q: 1.4, rev: 0.25 });
-      for (let i = 0; i < 6; i++) tick(10.2 + i * 0.2, 1200 + i * 150, 0.02, -0.7, 0.03, 'sine');
-      drone(10.0, 11.47, [33], 'saw', 0.06, 1.2, 0.02, { lp: 300, q: 1 });
-    }
-    // (6) 12.0 DROP 1 — THE TEAR; (7) 12.25-13.5 slow-mo; 13.5 THE BIFROST CHORD
-    {
-      const t = 12.0;
-      noiseBurst(t, 0.9, 2000, 9000, 0.35, { type: 'bandpass', q: 1.4, sweep: 0.25, rev: 0.25, huge: 0.2 });
-      play(tearB, t, 0.9, { rev: 0.2, huge: 0.15 });
-      subDrop(t, 110, 35, 0.5, 1.0, 1.6);
-      kick(t, 1.0, { duck: false });
-      crash(t, 0.7, { huge: 0.35 });
-      noiseBurst(t, 0.4, 3000, 200, 0.4, { huge: 0.3 });
-      thud(t, 55, 0.5, { slap: 0.5 });
-      choir(12.25, 13.35, [50, 57, 62, 65, 69], 0.11, { a: 0.4, r: 0.25 });
-      crash(12.25, 0.22, { rate: 0.5, huge: 0.6, rev: 0 });
-      subDrop(12.3, 60, 30, 0.8, 0.45, 1.2);
-      for (let i = 0; i < 12; i++) bell(12.6 + rr(0, 0.35), mtof(86 + Math.floor(rr(0, 14))) * 0.5, 0.03, rr(-0.8, 0.8), 0.9, { ratio: 2.76, index: 0.4, huge: 0.4, rev: 0 });
-      revCymbal(13.5, 1.0, 0.5);
-      whoosh(13.38, 0.24, 700, 7000, 0.4, -0.5, 0.5, { peak: 0.5 });
-      [74, 77, 81, 84, 88].forEach((m, i) => bell(13.5 + i * 0.09, mtof(m), 0.17, -0.8 + i * 0.4, 1.2, { ratio: 3, index: 1.4, rev: 0.35, dly: 0.15, huge: 0.15 }));
-      subDrop(13.5, 90, 38, 0.3, 0.5, 0.8);
-      noiseBurst(13.5, 0.15, 9000, 3000, 0.6, { type: 'highpass', rev: 0.4 });
-      sparkle(13.55, 14, 0.5, 0.035, 0, 2, 3);
-    }
-    // (8) 14-20 tier escalation (each louder and brighter)
-    {
-      [[13.4, 0.3], [14.9, 0.34], [16.4, 0.4]].forEach(([t, v]) => whoosh(t, 0.6, 700, 3800, v, -0.75, 0.05, { peak: 0.85, rev: 0.2 }));
-      // SILVER 14.0: D5 ping + silver ring
-      bell(14.0, mtof(74), 0.2, 0, 1.2, { ratio: 3, index: 1.2, rev: 0.3, dly: 0.15 });
-      silverRing(14.0, 0.75, -0.1);
-      sparkle(14.02, 5, 0.3, 0.03, 0, 2, 3);
-      whoosh(14.0, 0.25, 4000, 900, 0.18, -0.9, -0.2, { peak: 0.2 });
-      for (let i = 0; i < 12; i++) tick(14.2 + i * 0.028, 2900, 0.018, 0.4, 0.008, 'square');
-      chatPop(14.6, 0.07); whoosh(14.6, 0.2, 2500, 900, 0.07, 0, 0.2, { peak: 0.3 });
-      // RARE SILVER 15.5: F5 + sparkle layer, +2 dB (rim leak 0.25 s before)
-      whoosh(15.2, 0.32, 3000, 9000, 0.1, 0, 0, { type: 'highpass', peak: 0.95, rev: 0.4 });
-      const r2 = Math.pow(10, 2 / 20);
-      bell(15.5, mtof(77), 0.2 * r2, 0, 1.3, { ratio: 3, index: 1.3, rev: 0.32, dly: 0.15 });
-      silverRing(15.5, 0.75 * r2, 0.1);
-      sparkle(15.5, 16, 0.55, 0.045 * r2, 0, 2, 4);
-      subDrop(15.5, 90, 40, 0.2, 0.35, 0.6);
-      for (let i = 0; i < 12; i++) tick(15.7 + i * 0.028, 3100, 0.018, 0.4, 0.008, 'square');
-      chatPop(16.1, 0.07);
-      // GOLD 17.0: A5 + gold ring + Gjallarhorn stab + 808 boom, +4 dB
-      whoosh(16.7, 0.32, 2000, 7000, 0.14, 0, 0, { peak: 0.95, rev: 0.4 });
-      const r4 = Math.pow(10, 4 / 20);
-      bell(17.0, mtof(81), 0.2 * r4, 0, 1.5, { ratio: 3, index: 1.4, rev: 0.35, dly: 0.18 });
-      goldRing(17.0, 0.8 * r4, 0);
-      horn(17.0, [41, 48, 53, 57, 60, 65], 0.5, 0.055, { a: 0.06, cut: 1700, rev: 0.35, huge: 0.3, rel: 0.2, scoop: 30 });
-      subDrop(17.0, 75, 36, 0.4, 0.9, 1.6);
-      crash(17.0, 0.4, { huge: 0.25 });
-      sparkle(17.02, 18, 0.7, 0.04 * r4, 0, 2, 3);
-      for (let i = 0; i < 14; i++) tick(17.2 + i * 0.028, 2500, 0.02, 0.4, 0.008, 'square');
-      bell(17.65, mtof(93), 0.04, -0.3, 0.6, { ratio: 3.5, index: 0.6 });
-      chatPop(17.6, 0.08);
-      [14.85, 16.35, 17.85].forEach((t, i) => glassTick(t, mtof(86 + i * 2), 0.05, 0.0, { dec: 0.3 }));
-      whoosh(18.5, 1.2, 500, 2200, 0.16, -0.75, 0.0, { peak: 0.75, rev: 0.3 }); // 4th coin rides slowly
-    }
-    // (9) 20.0 hard cut: heartbeat under a Shepard riser; 21.93-22.0 silence
-    {
-      CUES.heartbeats.forEach((t, i) => {
-        heartbeat(t, 0.8 + 0.07 * i);
-        whoosh(t, 0.5, 4000, 9000, 0.03 + 0.012 * i, 0, 0, { type: 'highpass', peak: 0.15, rev: 0.4 });
-      });
-      play(shep2, 20.0, 0.42, { rev: 0.2, stop: 21.93 });
-      drone(20.0, 21.9, [33, 45], 'saw', 0.07, 1.5, 0.02, { lp: 200, lp1: 900, q: 1.5, det: [0, 6] });
-      revCymbal(21.93, 0.9, 0.45, { cut: 21.93 });
-      whoosh(20.9, 1.03, 300, 6000, 0.18, 0, 0, { peak: 0.99, q: 1.5, rev: 0.1 });
-    }
-    // (10) 22.0 DROP 2 — LEGENDARY; 23.0 D MAJOR lift
-    {
-      const t = 22.0;
-      subDrop(t, 62, 40, 0.15, 1.0, 2.4);
-      impact(t, 1.0, { huge: 0.4, crashV: 0.7 });
-      horn(t, [38, 45, 50, 53, 57, 62], 0.95, 0.065, { a: 0.07, cut: 1600, rev: 0.4, huge: 0.5, rel: 0.12, scoop: 35 });
-      choir(t, 23.0, [50, 57, 62, 65, 69, 74], 0.12, { a: 0.12, r: 0.1, huge: 0.6 });
-      whoosh(22.2, 0.6, 1200, 8000, 0.14, -0.9, 0.9, { peak: 0.5, rev: 0.35, huge: 0.3 });
-      tick(22.5, 2349, 0.05, 0, 0.6, 'sine', { rev: 0.5, f1: 4699 });
-      whoosh(22.82, 0.2, 800, 8000, 0.42, 0.4, -0.4, { peak: 0.85 });
-      impact(23.0, 0.65, { huge: 0.25, crashV: 0.5, subDec: 1.0 });
-      horn(23.0, [38, 45, 50, 54, 57, 62, 66], 0.55, 0.06, { a: 0.03, cut: 2000, rev: 0.35, huge: 0.3, rel: 0.25, scoop: 20 });
-      choir(23.0, 24.6, [50, 57, 62, 66, 69, 74], 0.075, { a: 0.05, r: 0.8, huge: 0.45 });
-      goldRing(23.0, 0.95, 0, { decay: 4.0, huge: 0.2 });
-      sparkle(23.0, 18, 0.8, 0.04, 0, 2, 4);
-      thud(23.2, 73, 0.45, { slap: 0.4 }); // '1 OF 25 · GOLD'
-      play(engraveB, 23.6, 0.22, { pan: [-0.4, 0.4, 23.6, 24.2], rev: 0.25 }); // engraving crackle
-      bell(24.22, mtof(98), 0.045, 0.4, 0.5, { ratio: 3.5, index: 0.5 });
-      for (let i = 0; i < 12; i++) tick(24.05 + i * 0.026, 2700, 0.018, -0.4, 0.008, 'square');
-      bell(24.4, mtof(86), 0.09, -0.4, 1.0, { ratio: 3, index: 1.2, rev: 0.35 }); // AU odometer ding
-      let tt = 23.1; // chat-pop storm, rate tied to the hype meter
-      while (tt < 25.9) { chatPop(tt, 0.045 + 0.02 * rnd(), 0.35 + 0.4 * rnd()); tt += 0.13 - 0.07 * Math.min(1, (tt - 23.1) / 1.5) + rr(-0.02, 0.02); }
-      whoosh(24.7, 1.0, 3000, 9000, 0.05, -0.5, 0.5, { type: 'highpass', peak: 0.5, rev: 0.4 });
-    }
-    // (11) 26-30 data groove: hash blips, mint ticks, NFC two-tone, verified chime
-    {
-      whoosh(25.85, 0.26, 900, 6000, 0.38, 0.8, -0.8, { peak: 0.6 });
-      for (let i = 0; i < 6; i++) tick(26.02 + i * 0.05, 3000 + i * 300, 0.03, 0.5, 0.02, 'sine', { rev: 0.15 });
-      for (let i = 0; i < 12; i++) tick(26.675 + i * 0.025, 2000, 0.045, 0.45, 0.02, 'square', { a: 0.001 });
-      tick(27.25, 1760, 0.05, 0.45, 0.08, 'sine'); tick(27.31, 2637, 0.045, 0.45, 0.1, 'sine');
-      [[26.3, 86], [26.8, 88], [27.0, 90], [27.2, 93]].forEach(([t, m], i) => glassTick(t, mtof(m), 0.09, -0.3 + i * 0.15, { dly: 0.15 }));
-      [26.8, 27.0, 27.2].forEach((t) => whoosh(t - 0.35, 0.4, 1500, 5000, 0.06, -0.5, 0.2, { peak: 0.85 }));
-      glassTick(27.45, mtof(93), 0.06, 0.45, { dec: 0.3 });
-      thud(28.0, 180, 0.22, { slap: 0.3, dec: 0.15 });
-      whoosh(28.05, 0.5, 600, 3500, 0.22, 0.9, 0.1, { peak: 0.8 });
-      tick(28.6, 1760, 0.16, 0.1, 0.09, 'sine', { a: 0.004, rev: 0.25 });
-      tick(28.71, 2349, 0.16, 0.1, 0.12, 'sine', { a: 0.004, rev: 0.25 });
-      [0, 0.12, 0.24].forEach((d) => whoosh(28.6 + d, 0.3, 4000, 7000, 0.025, 0, 0, { type: 'highpass', peak: 0.3, rev: 0.3 }));
-      [86, 90, 93, 98].forEach((m, i) => bell(28.86 + i * 0.05, mtof(m), 0.07, -0.2 + i * 0.15, 1.0, { ratio: 3, index: 1.0, rev: 0.4, dly: 0.15 }));
-    }
-    // (12) 30-34 half-time: four stamp thuds a step higher each, vault-door clunk at 32.9
-    {
-      whoosh(29.6, 0.42, 5000, 600, 0.2, 0, 0, { peak: 0.95, rev: 0.3 });
-      whoosh(30.0, 0.6, 2000, 8000, 0.06, -0.8, 0.8, { type: 'highpass', peak: 0.5, rev: 0.4 });
-      [30.35, 30.5, 30.65, 30.8].forEach((t, i) => tick(t, mtof(81 + [0, 2, 4, 7][i]), 0.035, [-0.6, 0.6, -0.3, 0.3][i], 0.08, 'sine', { rev: 0.3 }));
-      [[31.0, 55, -0.6, 1.0], [31.5, 61.7, 0.6, 0.8], [32.0, 69.3, -0.3, 0.85], [32.5, 73.4, 0.3, 0.9]].forEach(([t, f, p, v]) => {
-        thud(t, f, 0.85 * v, { slap: 0.8, rev: 0.25, pan: p * 0.4 });
-        bell(t, f * 8, 0.05, p * 0.4, 0.5, { ratio: 1.5, index: 0.6, rev: 0.2 });
-        whoosh(t + 0.05, 0.35, 2500, 700, 0.1, 0, p, { peak: 0.35 });
-      });
-      sparkle(31.02, 10, 0.4, 0.04, -0.4, 2, 3);
-      for (let i = 0; i < 7; i++) tick(32.62 + i * 0.04, 1900 + i * 60, 0.05, 0.3, 0.015, 'square', { rev: 0.1 });
-      const t = 32.9; // vault-door clunk + lock
-      subDrop(t, 70, 42, 0.12, 0.85, 1.2);
-      [180, 287, 419, 610, 873, 1240].forEach((f, i) => tick(t, f, 0.07 / (1 + i * 0.4), 0.2, 0.7 - i * 0.07, 'sine', { rev: 0.3, huge: 0.35 }));
-      noiseBurst(t, 0.45, 1400, 200, 0.16, { rev: 0.3, huge: 0.4 });
-      play(clickB, t, 0.6, { pan: null }); play(clickB, t + 0.045, 0.4, { pan: null });
-      kick(t, 0.7, { depth: 0.4 });
-      drone(32.95, 33.8, [33], 'saw', 0.07, 0.4, 0.3, { lp: 260, q: 2 }); // SECURED IN LIECHTENSTEIN
-      whoosh(33.0, 1.0, 4000, 9000, 0.05, -0.6, 0.6, { type: 'highpass', peak: 0.5, rev: 0.5, huge: 0.3 });
-      sparkle(33.05, 8, 0.8, 0.03, 0, 2, 4);
-    }
-    // (13) 34-38 warm: offer tink, swipe, capsule snap, seal slap, flaps, tape zip, label printer, door chime
-    {
-      whoosh(33.85, 0.26, 6000, 700, 0.32, 0, 0, { peak: 0.5 });
-      [[3520, 0.1], [8180, 0.035]].forEach(([f, v]) => tick(34.1, f, v, 0.2, 0.28, 'sine', { rev: 0.35, dly: 0.1 }));
-      whoosh(34.4, 0.3, 900, 4000, 0.2, 0.0, 0.9, { peak: 0.5 });
-      noiseBurst(34.6, 0.3, 2800, 2200, 0.025, { type: 'bandpass', q: 1.5, rev: 0.15 });
-      tick(34.6, 1150, 0.08, 0, 0.03, 'triangle'); play(clickB, 34.6, 0.4, { pan: null });
-      thud(35.0, 150, 0.32, { slap: 0.9, dec: 0.12, rev: 0.12 });
-      bell(35.02, mtof(93), 0.03, 0.1, 0.4, { ratio: 3.5, index: 0.5 });
-      thud(35.15, 90, 0.3, { slap: 0.4, dec: 0.2 });
-      [35.3, 35.4, 35.5, 35.6].forEach((t, i) => noiseBurst(t, 0.22, 600, 150, 0.08, { rev: 0.1, pan: i % 2 ? 0.3 : -0.3 }));
-      play(zipB, 35.62, 0.3, { pan: [-0.5, 0.5, 35.62, 35.95], rev: 0.15 });
-      play(printerB, 35.8, 0.17, { pan: 0.15, rev: 0.1 });
-      whoosh(36.6, 0.6, 800, 2500, 0.07, -0.6, 0.6, { peak: 0.6, rev: 0.3 });
-      bell(37.2, mtof(78), 0.11, -0.1, 1.4, { ratio: 1.0, index: 0.8, rev: 0.4, a: 0.004 });
-      bell(37.5, mtof(74), 0.11, 0.1, 1.6, { ratio: 1.0, index: 0.8, rev: 0.4, a: 0.004 });
-      thud(37.6, 120, 0.15, { slap: 0.3, dec: 0.12 });
-      tick(37.8, 1760, 0.05, 0.1, 0.05, 'sine'); tick(37.86, 2349, 0.05, 0.1, 0.07, 'sine');
-    }
-    // (14) 38.0 DROP 3 — brightest: horn countermelody, bids, escrow, release, royalties, confirmations
-    {
-      whoosh(37.78, 0.24, 700, 8000, 0.4, -0.6, 0.6, { peak: 0.85 });
-      impact(38.0, 0.7, { crashV: 0.6, subDec: 1.2 });
-      crash(42.0, 0.3);
-      const MEL = [
-        [38.0, 0.5, 69], [38.5, 0.75, 74], [39.25, 0.25, 73], [39.5, 0.25, 74], [39.75, 0.25, 76],
-        [40.0, 0.75, 78], [40.75, 0.25, 76], [41.0, 0.5, 74], [41.5, 0.5, 71],
-        [42.0, 0.5, 74], [42.5, 0.25, 76], [42.75, 0.25, 78], [43.0, 0.75, 79], [43.75, 0.25, 78],
-        [44.0, 0.5, 76], [44.5, 0.5, 73]
+    // =========================================================== 60 s score (FINAL_SCRIPT.json arc)
+    function score60() {
+      const SECTIONS = [
+        { t0: 4.0, t1: 6.0, ch: 'Dm', st: 'ambient', pad: 0.045, lp: 900, a: 0.6, r: 0.25 },
+        { t0: 6.0, t1: 8.0, ch: 'Dm', st: 'intro', pad: 0.05, lp: 1400, lpTo: [2400, 10.0], glideIn: true },
+        { t0: 8.0, t1: 10.0, ch: 'Bb', st: 'intro', pad: 0.055, lp: 1800 },
+        { t0: 10.0, t1: 11.5, ch: 'Asus', st: 'riser', pad: 0.05, lp: 1200, r: 0.02 },
+        { t0: 12.25, t1: 13.5, ch: 'Dm', st: 'slowmo', pad: 0.05, lp: 700, a: 0.3, r: 0.1 },
+        { t0: 13.5, t1: 14.0, ch: 'Dm9', st: 'chord', pad: 0.05, lp: 2600, a: 0.05, r: 0.1 },
+        { t0: 14.0, t1: 16.0, ch: 'Dm', st: 'groove', pad: 0.055, lp: 2600 },
+        { t0: 16.0, t1: 18.0, ch: 'F', st: 'groove', pad: 0.058, lp: 3000 },
+        { t0: 18.0, t1: 20.0, ch: 'Bb', st: 'groove', pad: 0.06, lp: 3000, r: 0.02 },
+        { t0: 22.0, t1: 23.0, ch: 'Dm', st: 'legend', pad: 0.05, lp: 900, a: 0.05, r: 0.03 },
+        { t0: 23.0, t1: 26.0, ch: 'D', st: 'lift', pad: 0.06, lp: 3600, a: 0.02 },
+        { t0: 26.0, t1: 28.0, ch: 'Bm', st: 'data', pad: 0.045, lp: 2000 },
+        { t0: 28.0, t1: 30.0, ch: 'G', st: 'data', pad: 0.045, lp: 2000 },
+        { t0: 30.0, t1: 32.0, ch: 'D', st: 'half', pad: 0.055, lp: 2400 },
+        { t0: 32.0, t1: 34.0, ch: 'A', st: 'half', pad: 0.055, lp: 2400 },
+        { t0: 34.0, t1: 36.0, ch: 'G', st: 'warm', pad: 0.05, lp: 1500 },
+        { t0: 36.0, t1: 38.0, ch: 'A', st: 'warm', pad: 0.05, lp: 1700 },
+        { t0: 38.0, t1: 40.0, ch: 'D', st: 'drop', pad: 0.06, lp: 5000 },
+        { t0: 40.0, t1: 42.0, ch: 'Bm', st: 'drop', pad: 0.06, lp: 5000 },
+        { t0: 42.0, t1: 44.0, ch: 'G', st: 'drop', pad: 0.06, lp: 5000 },
+        { t0: 44.0, t1: 45.0, ch: 'A', st: 'drop', pad: 0.06, lp: 5000 },
+        { t0: 45.0, t1: 45.5, ch: 'A', st: 'filtered', pad: 0.06, lp: 5000, r: 0.01 },
+        { t0: 46.0, t1: 48.0, ch: 'D', st: 'drop4', pad: 0.06, lp: 4500 },
+        { t0: 48.0, t1: 50.0, ch: 'G', st: 'drop4', pad: 0.06, lp: 4500 },
+        { t0: 50.0, t1: 51.0, ch: 'Bm', st: 'callback', pad: 0.055, lp: 4000 },
+        { t0: 51.0, t1: 52.0, ch: 'A', st: 'callback', pad: 0.055, lp: 4000 },
+        { t0: 52.0, t1: 55.2, ch: 'D', st: 'end', pad: 0.055, lp: 2600, a: 0.02, r: 2.0 }
       ];
-      MEL.forEach(([t, d, m]) => horn(t, [m - 12, m], d * 0.92, 0.042, { a: 0.04, cut: 2400, rev: 0.25, rel: 0.08, scoop: 25 }));
-      tick(38.2, 2349, 0.05, 0.5, 0.06, 'sine'); tick(38.27, 2960, 0.05, 0.5, 0.08, 'sine');
-      const LON = [10.75, 139.7, -46.6, -79.4, 13.4, 127.0, 18.1]; // Oslo, Tokyo, Sao Paulo, Toronto, Berlin, Seoul, Stockholm
-      const PENT = [74, 76, 78, 81, 83, 86, 88];
-      CUES.bids.forEach((t, i) => {
-        const pan = clamp(LON[i] / 150, -0.9, 0.9);
-        glassTick(t, mtof(PENT[i] + 12), 0.1, pan, { dec: 0.35, dly: 0.1 });
-        whoosh(t, 0.25, 1500, 4000, 0.04, pan, 0.4, { peak: 0.6, rev: 0.2 });
-      });
-      play(clickB, 41.0, 0.6, { pan: null }); play(clickB, 41.055, 0.5, { pan: null }); // escrow latch
-      tick(41.0, 2200, 0.08, 0.3, 0.08, 'triangle'); tick(41.055, 1650, 0.1, 0.3, 0.12, 'triangle', { rev: 0.2 });
-      thud(41.055, 110, 0.35, { slap: 0.4, dec: 0.15 });
-      [41.25, 41.6, 42.1].forEach((t, i) => tick(t, mtof(81 + i * 2), 0.04, 0.3, 0.05, 'sine'));
-      bell(42.6, 880, 0.12, 0.3, 0.8, { ratio: 3, index: 0.6, rev: 0.3 }); bell(42.72, 1318.5, 0.12, 0.3, 1.0, { ratio: 3, index: 0.6, rev: 0.3 });
-      sparkle(43.0, 12, 0.48, 0.07, 0.4, 3, 1.5, { desc: true });
-      whoosh(43.4, 0.5, 900, 4000, 0.12, -0.7, 0.7, { peak: 0.6 });
-      for (let i = 0; i < 8; i++) glassTick(43.62 + i * 0.19, mtof([86, 90, 93, 88, 91, 95, 93, 98][i]), 0.06, (i % 2 ? 0.6 : -0.6), { dec: 0.3, dly: 0.08 });
-    }
-    // (15) 45.0 whip to centre, filtered half-bar, silence 45.5-46.0
-    whoosh(44.86, 0.22, 6000, 900, 0.3, 0.5, 0, { peak: 0.5 });
-    // (16) 46.0 DROP 4 on '80%': 808 + crash + cascade of 8 silver rings; meter sweep -> confirm chord; INSTANT
-    {
-      const t = 46.0;
-      impact(t, 1.0, { crashV: 0.75, huge: 0.3 });
-      subDrop(t, 75, 37, 0.35, 0.6, 1.4);
-      for (let i = 0; i < 8; i++) silverRing(t + 0.02 + i * 0.065, 0.42 * (1 - i * 0.05), (i % 2 ? 1 : -1) * (0.2 + 0.09 * i), { rev: 0.25, dly: 0.03 });
-      sweepTone(t, 46.5, 440, 1174.7, 0.07, { rev: 0.2 });
-      [86, 90, 93, 98].forEach((m, i) => bell(46.5, mtof(m), 0.08, -0.45 + i * 0.3, 1.2, { ratio: 3, index: 1.0, rev: 0.35, dly: 0.12 }));
-      thud(46.6, 73.4, 0.85, { slap: 0.9, rev: 0.25 });
-      tick(47.0, 1760, 0.06, 0.2, 0.06, 'sine'); tick(47.07, 2349, 0.06, 0.2, 0.09, 'sine');
-      whoosh(47.15, 0.35, 3000, 900, 0.08, 0, 0.4, { peak: 0.4 });
-      CUES.buybackTags.forEach((tt, i) => glassTick(tt, mtof([86, 88, 90, 93][i]), 0.08, -0.6 + i * 0.4, { dec: 0.35 }));
-    }
-    // (17) 50-52 double-time callback: tear / gold ring / offer tink / bid tick
-    {
-      noiseBurst(50.0, 0.65, 2000, 9000, 0.3, { type: 'bandpass', q: 1.4, sweep: 0.25, rev: 0.25 });
-      play(tearB, 50.0, 0.6, { rev: 0.2 });
-      impact(50.0, 0.6, { crashV: 0.4, subDec: 0.5 });
-      goldRing(50.5, 0.75, -0.3, { decay: 1.6 }); impact(50.5, 0.45, { crash: false, subDec: 0.4 });
-      [[3520, 0.12], [8180, 0.04]].forEach(([f, v]) => tick(51.0, f, v, 0.3, 0.28, 'sine', { rev: 0.35, dly: 0.1 }));
-      impact(51.0, 0.45, { crash: false, subDec: 0.4 });
-      glassTick(51.5, mtof(88), 0.14, 0.5, { dec: 0.35 }); impact(51.5, 0.5, { crash: false, subDec: 0.4 });
-      [50.42, 50.92, 51.42].forEach((t, i) => whoosh(t, 0.12, 900, 7000, 0.22, (i % 2 ? 0.6 : -0.6), (i % 2 ? -0.6 : 0.6), { peak: 0.8 }));
-      for (let i = 0; i < 8; i++) clap(51.0 + i * 0.0625, 0.18 + 0.05 * i, { rev: 0.1 });
-      whoosh(51.0, 1.0, 400, 9000, 0.22, 0, 0, { peak: 0.99, q: 1.3 });
-      revCymbal(52.0, 0.9, 0.4);
-    }
-    // (18) 52.0 final impact + THE BIFROST CHORD in D major panned L -> R + silver ring on the mint dot
-    {
-      const t = 52.0;
-      impact(t, 1.05, { crashV: 0.8, huge: 0.0, subDec: 2.4 });
-      b808(t, 26, 2.6, 0.55, { glideFrom: 33, glide: 0.12 });
-      horn(t, [38, 45, 50, 54, 57, 62], 1.1, 0.06, { a: 0.05, cut: 1800, rev: 0.35, rel: 0.4, scoop: 20 });
-      choir(t, 54.0, [50, 57, 62, 66, 69], 0.06, { a: 0.1, r: 1.2, huge: 0, rev: 0.3 });
-      sparkle(52.02, 16, 0.8, 0.035, 0, 2, 4);
-      [74, 78, 81, 86].forEach((m, i) => bell(52.4 + i * 0.1, mtof(m), 0.17, -0.85 + i * 0.57, 1.6, { ratio: 3, index: 1.4, rev: 0.4, dly: 0.12 }));
-      tick(52.8, 600, 0.07, -0.7, 0.05, 'sine', { f1: 1300 }); // violet dot pop
-      silverRing(52.92, 0.9, 0.7, { rev: 0.35 });
-      bell(58.5, 4186, 0.012, 0.2, 0.5, { ratio: 2.76, index: 0.3, rev: 0, dly: 0 }); // glint (dry, gone by 59.1)
+      runSections(SECTIONS);
+      // whole-music-bus filter sweeps & snaps
+      const mlp = musicLP.frequency;
+      mlp.setValueAtTime(20000, 12.25); mlp.exponentialRampToValueAtTime(800, 12.5); mlp.setValueAtTime(800, 13.4); mlp.exponentialRampToValueAtTime(20000, 13.5);
+      mlp.setValueAtTime(20000, 18.5); mlp.exponentialRampToValueAtTime(320, 20.0); mlp.setValueAtTime(20000, 20.02);
+      mlp.setValueAtTime(1100, 22.0); mlp.setValueAtTime(1100, 22.98); mlp.exponentialRampToValueAtTime(20000, 23.0);
+      mlp.setValueAtTime(20000, 44.95); mlp.exponentialRampToValueAtTime(650, 45.05); mlp.exponentialRampToValueAtTime(380, 45.5); mlp.setValueAtTime(20000, 46.0);
+      // intro: kick/drums through a lowpass opening 300 Hz -> 3 kHz
+      drumLP.frequency.setValueAtTime(300, 6.0); drumLP.frequency.exponentialRampToValueAtTime(3000, 9.95); drumLP.frequency.setValueAtTime(20000, 10.0);
+
+      // ================================================================ SFX / CUES
+      // (1) 0-2 NFT era: bitcrushed chiptune, gated stabs + vinyl scratch per word; tape-stop at 2.0
+      {
+        const tape = varispeed(chipB, 2.75, (tt) => (tt < 2.0 ? 1 : Math.max(0.03, 1 - (tt - 2.0) / 0.6 * 0.97)));
+        let flt = null;
+        for (let i = 0; i < tape.length; i++) {
+          const tt = i / SR;
+          if ((i & 31) === 0) flt = jsBiquadState(flt, 'lp', tt < 2.0 ? 12000 : pw(12000, 700, (tt - 2.0) / 0.6), 0.707);
+          tape[i] = flt.run(tape[i]) * 0.85 * (tt < 2.4 ? 1 : Math.max(0, 1 - (tt - 2.4) / 0.22));
+        }
+        mixIn('music', tape, 0, 1);
+        CUES60.nftSlams.forEach((t, i) => {
+          scratch(t + 0.01, 0.32);
+          kick(t, 0.55, { duck: false, dec: 0.25 });
+          noiseBurst(t, 0.12, 6000, 1200, 0.12, { type: 'highpass', rev: 0.05, pan: i % 2 ? 0.3 : -0.3 });
+        });
+        [2.3, 2.6].forEach((t) => { tick(t, 2000, 0.14, 0, 0.06, 'square', { a: 0.002 }); tick(t, 2000, 0.12, 0, 0.06, 'sine'); });
+      }
+      // (2/3) 3.0-4.0 reverse whoosh + pixel gather + hydraulic hiss; 4.0 THE STRIKE; 4.8 THE GOLD RING
+      {
+        whoosh(3.0, 0.62, 500, 6000, 0.42, -0.6, 0.2, { peak: 0.95, rev: 0.3 });
+        for (let i = 0; i < 26; i++) {
+          const u = i / 26, t = 3.0 + 0.6 * Math.sqrt(u) + rr(0, 0.02);
+          tick(t, mtof(74 + Math.floor(u * 24) + [0, 3, 7][i % 3]), 0.05 + 0.04 * u, rr(-0.8, 0.8), 0.025, 'square');
+        }
+        whoosh(3.2, 0.8, 2500, 9000, 0.28, 0, 0, { type: 'highpass', q: 0.7, peak: 0.97, rev: 0.1 });
+        whoosh(3.6, 0.4, 3000, 300, 0.35, 0, 0, { peak: 0.9, rev: 0.15 });
+        subDrop(4.0, 70, 40, 0.08, 1.0, 1.5);
+        kick(4.0, 0.9, { duck: false, dec: 0.6 });
+        [3150, 4720, 6930, 9810, 12400].forEach((f, i) => tick(4.0, f, 0.06 / (1 + i * 0.3), (i % 2 ? 0.3 : -0.3), 0.09, 'sine', { rev: 0.2 }));
+        noiseBurst(4.0, 0.4, 9000, 1500, 0.12, { type: 'highpass', rev: 0.25, huge: 0.15 });
+        silverRing(4.0, 1.0, 0, { huge: 0.15 });
+        sparkle(4.05, 7, 0.5, 0.05, 0, 1, 2);
+        whoosh(4.1, 0.5, 6000, 2500, 0.16, 0, 0, { type: 'highpass', q: 0.7, peak: 0.15, rev: 0.1 });
+        for (let i = 0; i < 16; i++) tick(4.1 + i * 0.025, 3300, 0.03, 0.15, 0.008, 'square');
+        tick(4.52, 1760, 0.06, 0.15, 0.08, 'sine'); tick(4.6, 2349, 0.05, 0.15, 0.1, 'sine');
+        thud(4.8, 98, 0.28, { slap: 0.3, rev: 0.2 });
+        goldRing(4.8, 1.0, 0.25);
+        for (let i = 0; i < 8; i++) tick(4.86 + i * 0.022, 3000, 0.022, 0.15, 0.008, 'square');
+        whoosh(5.2, 0.4, 800, 2400, 0.08, 0.2, 0.8, { rev: 0.1 });
+        { // HUGINN spins: 3 decelerating turns -> pulsing whoosh
+          const n = Math.round(0.65 * SR), d = new Float32Array(n), off = Math.round(1.3 * SR); let flt = null;
+          for (let i = 0; i < n; i++) {
+            const u = i / n, th = 6 * Math.PI * (1 - (1 - u) * (1 - u));
+            if ((i & 31) === 0) flt = jsBiquadState(flt, 'bp', pw(2600, 900, u), 1.6);
+            d[i] = flt.run(noise[0][off + i]) * 0.2 * Math.pow(Math.abs(Math.sin(th)), 2) * (1 - 0.6 * u);
+          }
+          mixIn('sfx', d, 5.2, 1, { rev: 0.2 });
+        }
+        whoosh(5.82, 0.2, 1500, 9000, 0.45, -0.3, 0.3, { peak: 0.85, rev: 0.15 });
+        drone(4.0, 5.9, [38], 'sine', 0.08, 0.5, 0.1);
+        drone(4.0, 5.9, [50], 'tri', 0.024, 0.5, 0.1);
+      }
+      // (4) 6-10 intro groove sfx
+      {
+        whoosh(5.95, 0.4, 600, 4000, 0.32, -0.7, 0.4, { peak: 0.25, rev: 0.25 });
+        subDrop(6.0, 80, 36, 0.3, 0.55, 0.9);
+        crash(6.0, 0.25);
+        tick(6.2, 2349, 0.035, -0.6, 0.06, 'sine', { rev: 0.2 }); tick(6.26, 3136, 0.03, -0.6, 0.06, 'sine', { rev: 0.2 });
+        [6.6, 7.6, 8.75].forEach((t) => chatPop(t, 0.07, 0.6));
+        [6.6, 8.9].forEach((t) => { // foil-crinkle grains panned with the specular sweeps
+          play(crinkleSweep, t - 0.1, 0.24, { pan: [-0.8, 0.8, t - 0.1, t + 0.6], rev: 0.2 });
+          sparkle(t, 5, 0.5, 0.025, 0, 2, 3);
+        });
+        horn(7.2, [38, 45, 50, 53, 57], 1.15, 0.05, { a: 0.3, cut: 1200, rev: 0.35, huge: 0.3, rel: 0.25 }); // Gjallarhorn
+        subDrop(7.2, 60, 37, 0.2, 0.5, 1.2);
+        crash(7.2, 0.18, { huge: 0.2 });
+        whoosh(7.95, 0.35, 900, 5000, 0.3, 0.6, -0.6, { peak: 0.6 });
+        thud(8.4, 62, 0.75, { slap: 0.7, rev: 0.25 }); // 'NO EMPTY PULLS' stamp
+        crash(8.4, 0.12);
+        whoosh(9.35, 0.32, 900, 5000, 0.22, -0.6, 0.6, { peak: 0.6 });
+      }
+      // (5) 10-11.5 crinkle intensifies + Shepard riser (drums out); 11.5-12 TOTAL SILENCE
+      {
+        tick(10.0, 2600, 0.05, 0.5, 0.02, 'sine', { rev: 0.1 });
+        play(crinkleRise, 9.95, 0.32, { pan: 0.35, rev: 0.2, stop: 11.5 });
+        play(shep1, 10.0, 0.5, { rev: 0.2, stop: 11.5 });
+        whoosh(10.0, 1.5, 300, 7000, 0.3, -0.2, 0.2, { peak: 0.99, q: 1.4, rev: 0.25 });
+        for (let i = 0; i < 6; i++) tick(10.2 + i * 0.2, 1200 + i * 150, 0.02, -0.7, 0.03, 'sine');
+        drone(10.0, 11.47, [33], 'saw', 0.06, 1.2, 0.02, { lp: 300, q: 1 });
+      }
+      // (6) 12.0 DROP 1 — THE TEAR; (7) 12.25-13.5 slow-mo; 13.5 THE BIFROST CHORD
+      {
+        const t = 12.0;
+        noiseBurst(t, 0.9, 2000, 9000, 0.35, { type: 'bandpass', q: 1.4, sweep: 0.25, rev: 0.25, huge: 0.2 });
+        play(tearB, t, 0.9, { rev: 0.2, huge: 0.15 });
+        subDrop(t, 110, 35, 0.5, 1.0, 1.6);
+        kick(t, 1.0, { duck: false });
+        crash(t, 0.7, { huge: 0.35 });
+        noiseBurst(t, 0.4, 3000, 200, 0.4, { huge: 0.3 });
+        thud(t, 55, 0.5, { slap: 0.5 });
+        choir(12.25, 13.35, [50, 57, 62, 65, 69], 0.11, { a: 0.4, r: 0.25 });
+        crash(12.25, 0.22, { rate: 0.5, huge: 0.6, rev: 0 });
+        subDrop(12.3, 60, 30, 0.8, 0.45, 1.2);
+        for (let i = 0; i < 12; i++) bell(12.6 + rr(0, 0.35), mtof(86 + Math.floor(rr(0, 14))) * 0.5, 0.03, rr(-0.8, 0.8), 0.9, { ratio: 2.76, index: 0.4, huge: 0.4, rev: 0 });
+        revCymbal(13.5, 1.0, 0.5);
+        whoosh(13.38, 0.24, 700, 7000, 0.4, -0.5, 0.5, { peak: 0.5 });
+        [74, 77, 81, 84, 88].forEach((m, i) => bell(13.5 + i * 0.09, mtof(m), 0.17, -0.8 + i * 0.4, 1.2, { ratio: 3, index: 1.4, rev: 0.35, dly: 0.15, huge: 0.15 }));
+        subDrop(13.5, 90, 38, 0.3, 0.5, 0.8);
+        noiseBurst(13.5, 0.15, 9000, 3000, 0.6, { type: 'highpass', rev: 0.4 });
+        sparkle(13.55, 14, 0.5, 0.035, 0, 2, 3);
+      }
+      // (8) 14-20 tier escalation (each louder and brighter)
+      {
+        [[13.4, 0.3], [14.9, 0.34], [16.4, 0.4]].forEach(([t, v]) => whoosh(t, 0.6, 700, 3800, v, -0.75, 0.05, { peak: 0.85, rev: 0.2 }));
+        // SILVER 14.0: D5 ping + silver ring
+        bell(14.0, mtof(74), 0.2, 0, 1.2, { ratio: 3, index: 1.2, rev: 0.3, dly: 0.15 });
+        silverRing(14.0, 0.75, -0.1);
+        sparkle(14.02, 5, 0.3, 0.03, 0, 2, 3);
+        whoosh(14.0, 0.25, 4000, 900, 0.18, -0.9, -0.2, { peak: 0.2 });
+        for (let i = 0; i < 12; i++) tick(14.2 + i * 0.028, 2900, 0.018, 0.4, 0.008, 'square');
+        chatPop(14.6, 0.07); whoosh(14.6, 0.2, 2500, 900, 0.07, 0, 0.2, { peak: 0.3 });
+        // RARE SILVER 15.5: F5 + sparkle layer, +2 dB (rim leak 0.25 s before)
+        whoosh(15.2, 0.32, 3000, 9000, 0.1, 0, 0, { type: 'highpass', peak: 0.95, rev: 0.4 });
+        const r2 = Math.pow(10, 2 / 20);
+        bell(15.5, mtof(77), 0.2 * r2, 0, 1.3, { ratio: 3, index: 1.3, rev: 0.32, dly: 0.15 });
+        silverRing(15.5, 0.75 * r2, 0.1);
+        sparkle(15.5, 16, 0.55, 0.045 * r2, 0, 2, 4);
+        subDrop(15.5, 90, 40, 0.2, 0.35, 0.6);
+        for (let i = 0; i < 12; i++) tick(15.7 + i * 0.028, 3100, 0.018, 0.4, 0.008, 'square');
+        chatPop(16.1, 0.07);
+        // GOLD 17.0: A5 + gold ring + Gjallarhorn stab + 808 boom, +4 dB
+        whoosh(16.7, 0.32, 2000, 7000, 0.14, 0, 0, { peak: 0.95, rev: 0.4 });
+        const r4 = Math.pow(10, 4 / 20);
+        bell(17.0, mtof(81), 0.2 * r4, 0, 1.5, { ratio: 3, index: 1.4, rev: 0.35, dly: 0.18 });
+        goldRing(17.0, 0.8 * r4, 0);
+        horn(17.0, [41, 48, 53, 57, 60, 65], 0.5, 0.055, { a: 0.06, cut: 1700, rev: 0.35, huge: 0.3, rel: 0.2, scoop: 30 });
+        subDrop(17.0, 75, 36, 0.4, 0.9, 1.6);
+        crash(17.0, 0.4, { huge: 0.25 });
+        sparkle(17.02, 18, 0.7, 0.04 * r4, 0, 2, 3);
+        for (let i = 0; i < 14; i++) tick(17.2 + i * 0.028, 2500, 0.02, 0.4, 0.008, 'square');
+        bell(17.65, mtof(93), 0.04, -0.3, 0.6, { ratio: 3.5, index: 0.6 });
+        chatPop(17.6, 0.08);
+        [14.85, 16.35, 17.85].forEach((t, i) => glassTick(t, mtof(86 + i * 2), 0.05, 0.0, { dec: 0.3 }));
+        whoosh(18.5, 1.2, 500, 2200, 0.16, -0.75, 0.0, { peak: 0.75, rev: 0.3 }); // 4th coin rides slowly
+      }
+      // (9) 20.0 hard cut: heartbeat under a Shepard riser; 21.93-22.0 silence
+      {
+        CUES60.heartbeats.forEach((t, i) => {
+          heartbeat(t, 0.8 + 0.07 * i, [0.17, 0.16, 0.14, 0.1][i]);
+          whoosh(t, 0.5, 4000, 9000, 0.03 + 0.012 * i, 0, 0, { type: 'highpass', peak: 0.15, rev: 0.4 });
+        });
+        play(shep2, 20.0, 0.42, { rev: 0.2, stop: 21.93 });
+        drone(20.0, 21.9, [33, 45], 'saw', 0.07, 1.5, 0.02, { lp: 200, lp1: 900, q: 1.5, det: [0, 6] });
+        revCymbal(21.93, 0.9, 0.45, { cut: 21.93 });
+        whoosh(20.9, 1.03, 300, 6000, 0.18, 0, 0, { peak: 0.99, q: 1.5, rev: 0.1 });
+      }
+      // (10) 22.0 DROP 2 — LEGENDARY; 23.0 D MAJOR lift
+      {
+        const t = 22.0;
+        subDrop(t, 62, 40, 0.15, 1.0, 2.4);
+        impact(t, 1.0, { huge: 0.4, crashV: 0.7 });
+        horn(t, [38, 45, 50, 53, 57, 62], 0.95, 0.065, { a: 0.07, cut: 1600, rev: 0.4, huge: 0.5, rel: 0.12, scoop: 35 });
+        choir(t, 23.0, [50, 57, 62, 65, 69, 74], 0.12, { a: 0.12, r: 0.1, huge: 0.6 });
+        whoosh(22.2, 0.6, 1200, 8000, 0.14, -0.9, 0.9, { peak: 0.5, rev: 0.35, huge: 0.3 });
+        tick(22.5, 2349, 0.05, 0, 0.6, 'sine', { rev: 0.5, f1: 4699 });
+        whoosh(22.82, 0.2, 800, 8000, 0.42, 0.4, -0.4, { peak: 0.85 });
+        impact(23.0, 0.65, { huge: 0.25, crashV: 0.5, subDec: 1.0 });
+        horn(23.0, [38, 45, 50, 54, 57, 62, 66], 0.55, 0.06, { a: 0.03, cut: 2000, rev: 0.35, huge: 0.3, rel: 0.25, scoop: 20 });
+        choir(23.0, 24.6, [50, 57, 62, 66, 69, 74], 0.075, { a: 0.05, r: 0.8, huge: 0.45 });
+        goldRing(23.0, 0.95, 0, { decay: 4.0, huge: 0.2 });
+        sparkle(23.0, 18, 0.8, 0.04, 0, 2, 4);
+        thud(23.2, 73, 0.45, { slap: 0.4 }); // '1 OF 25 · GOLD'
+        play(engraveB, 23.6, 0.22, { pan: [-0.4, 0.4, 23.6, 24.2], rev: 0.25 }); // engraving crackle
+        bell(24.22, mtof(98), 0.045, 0.4, 0.5, { ratio: 3.5, index: 0.5 });
+        for (let i = 0; i < 12; i++) tick(24.05 + i * 0.026, 2700, 0.018, -0.4, 0.008, 'square');
+        bell(24.4, mtof(86), 0.09, -0.4, 1.0, { ratio: 3, index: 1.2, rev: 0.35 }); // AU odometer ding
+        let tt = 23.1; // chat-pop storm, rate tied to the hype meter
+        while (tt < 25.9) { chatPop(tt, 0.045 + 0.02 * rnd(), 0.35 + 0.4 * rnd()); tt += 0.13 - 0.07 * Math.min(1, (tt - 23.1) / 1.5) + rr(-0.02, 0.02); }
+        whoosh(24.7, 1.0, 3000, 9000, 0.05, -0.5, 0.5, { type: 'highpass', peak: 0.5, rev: 0.4 });
+      }
+      // (11) 26-30 data groove: hash blips, mint ticks, NFC two-tone, verified chime
+      {
+        whoosh(25.85, 0.26, 900, 6000, 0.38, 0.8, -0.8, { peak: 0.6 });
+        for (let i = 0; i < 6; i++) tick(26.02 + i * 0.05, 3000 + i * 300, 0.03, 0.5, 0.02, 'sine', { rev: 0.15 });
+        for (let i = 0; i < 12; i++) tick(26.675 + i * 0.025, 2000, 0.045, 0.45, 0.02, 'square', { a: 0.001 });
+        tick(27.25, 1760, 0.05, 0.45, 0.08, 'sine'); tick(27.31, 2637, 0.045, 0.45, 0.1, 'sine');
+        [[26.3, 86], [26.8, 88], [27.0, 90], [27.2, 93]].forEach(([t, m], i) => glassTick(t, mtof(m), 0.09, -0.3 + i * 0.15, { dly: 0.15 }));
+        [26.8, 27.0, 27.2].forEach((t) => whoosh(t - 0.35, 0.4, 1500, 5000, 0.06, -0.5, 0.2, { peak: 0.85 }));
+        glassTick(27.45, mtof(93), 0.06, 0.45, { dec: 0.3 });
+        thud(28.0, 180, 0.22, { slap: 0.3, dec: 0.15 });
+        whoosh(28.05, 0.5, 600, 3500, 0.22, 0.9, 0.1, { peak: 0.8 });
+        tick(28.6, 1760, 0.16, 0.1, 0.09, 'sine', { a: 0.004, rev: 0.25 });
+        tick(28.71, 2349, 0.16, 0.1, 0.12, 'sine', { a: 0.004, rev: 0.25 });
+        [0, 0.12, 0.24].forEach((d) => whoosh(28.6 + d, 0.3, 4000, 7000, 0.025, 0, 0, { type: 'highpass', peak: 0.3, rev: 0.3 }));
+        [86, 90, 93, 98].forEach((m, i) => bell(28.86 + i * 0.05, mtof(m), 0.07, -0.2 + i * 0.15, 1.0, { ratio: 3, index: 1.0, rev: 0.4, dly: 0.15 }));
+      }
+      // (12) 30-34 half-time: four stamp thuds a step higher each, vault-door clunk at 32.9
+      {
+        whoosh(29.6, 0.42, 5000, 600, 0.2, 0, 0, { peak: 0.95, rev: 0.3 });
+        whoosh(30.0, 0.6, 2000, 8000, 0.06, -0.8, 0.8, { type: 'highpass', peak: 0.5, rev: 0.4 });
+        [30.35, 30.5, 30.65, 30.8].forEach((t, i) => tick(t, mtof(81 + [0, 2, 4, 7][i]), 0.035, [-0.6, 0.6, -0.3, 0.3][i], 0.08, 'sine', { rev: 0.3 }));
+        [[31.0, 55, -0.6, 1.0], [31.5, 61.7, 0.6, 0.8], [32.0, 69.3, -0.3, 0.85], [32.5, 73.4, 0.3, 0.9]].forEach(([t, f, p, v]) => {
+          thud(t, f, 0.85 * v, { slap: 0.8, rev: 0.25, pan: p * 0.4 });
+          bell(t, f * 8, 0.05, p * 0.4, 0.5, { ratio: 1.5, index: 0.6, rev: 0.2 });
+          whoosh(t + 0.05, 0.35, 2500, 700, 0.1, 0, p, { peak: 0.35 });
+        });
+        sparkle(31.02, 10, 0.4, 0.04, -0.4, 2, 3);
+        for (let i = 0; i < 7; i++) tick(32.62 + i * 0.04, 1900 + i * 60, 0.05, 0.3, 0.015, 'square', { rev: 0.1 });
+        const t = 32.9; // vault-door clunk + lock
+        subDrop(t, 70, 42, 0.12, 0.85, 1.2);
+        [180, 287, 419, 610, 873, 1240].forEach((f, i) => tick(t, f, 0.07 / (1 + i * 0.4), 0.2, 0.7 - i * 0.07, 'sine', { rev: 0.3, huge: 0.35 }));
+        noiseBurst(t, 0.45, 1400, 200, 0.16, { rev: 0.3, huge: 0.4 });
+        play(clickB, t, 0.6, { pan: null }); play(clickB, t + 0.045, 0.4, { pan: null });
+        kick(t, 0.7, { depth: 0.4 });
+        drone(32.95, 33.8, [33], 'saw', 0.07, 0.4, 0.3, { lp: 260, q: 2 }); // SECURED IN LIECHTENSTEIN
+        whoosh(33.0, 1.0, 4000, 9000, 0.05, -0.6, 0.6, { type: 'highpass', peak: 0.5, rev: 0.5, huge: 0.3 });
+        sparkle(33.05, 8, 0.8, 0.03, 0, 2, 4);
+      }
+      // (13) 34-38 warm: offer tink, swipe, capsule snap, seal slap, flaps, tape zip, label printer, door chime
+      {
+        whoosh(33.85, 0.26, 6000, 700, 0.32, 0, 0, { peak: 0.5 });
+        [[3520, 0.1], [8180, 0.035]].forEach(([f, v]) => tick(34.1, f, v, 0.2, 0.28, 'sine', { rev: 0.35, dly: 0.1 }));
+        whoosh(34.4, 0.3, 900, 4000, 0.2, 0.0, 0.9, { peak: 0.5 });
+        noiseBurst(34.6, 0.3, 2800, 2200, 0.025, { type: 'bandpass', q: 1.5, rev: 0.15 });
+        tick(34.6, 1150, 0.08, 0, 0.03, 'triangle'); play(clickB, 34.6, 0.4, { pan: null });
+        thud(35.0, 150, 0.32, { slap: 0.9, dec: 0.12, rev: 0.12 });
+        bell(35.02, mtof(93), 0.03, 0.1, 0.4, { ratio: 3.5, index: 0.5 });
+        thud(35.15, 90, 0.3, { slap: 0.4, dec: 0.2 });
+        [35.3, 35.4, 35.5, 35.6].forEach((t, i) => noiseBurst(t, 0.22, 600, 150, 0.08, { rev: 0.1, pan: i % 2 ? 0.3 : -0.3 }));
+        play(zipB, 35.62, 0.3, { pan: [-0.5, 0.5, 35.62, 35.95], rev: 0.15 });
+        play(printerB, 35.8, 0.17, { pan: 0.15, rev: 0.1 });
+        whoosh(36.6, 0.6, 800, 2500, 0.07, -0.6, 0.6, { peak: 0.6, rev: 0.3 });
+        bell(37.2, mtof(78), 0.11, -0.1, 1.4, { ratio: 1.0, index: 0.8, rev: 0.4, a: 0.004 });
+        bell(37.5, mtof(74), 0.11, 0.1, 1.6, { ratio: 1.0, index: 0.8, rev: 0.4, a: 0.004 });
+        thud(37.6, 120, 0.15, { slap: 0.3, dec: 0.12 });
+        tick(37.8, 1760, 0.05, 0.1, 0.05, 'sine'); tick(37.86, 2349, 0.05, 0.1, 0.07, 'sine');
+      }
+      // (14) 38.0 DROP 3 — brightest: horn countermelody, bids, escrow, release, royalties, confirmations
+      {
+        whoosh(37.78, 0.24, 700, 8000, 0.4, -0.6, 0.6, { peak: 0.85 });
+        impact(38.0, 0.7, { crashV: 0.6, subDec: 1.2 });
+        crash(42.0, 0.3);
+        const MEL = [
+          [38.0, 0.5, 69], [38.5, 0.75, 74], [39.25, 0.25, 73], [39.5, 0.25, 74], [39.75, 0.25, 76],
+          [40.0, 0.75, 78], [40.75, 0.25, 76], [41.0, 0.5, 74], [41.5, 0.5, 71],
+          [42.0, 0.5, 74], [42.5, 0.25, 76], [42.75, 0.25, 78], [43.0, 0.75, 79], [43.75, 0.25, 78],
+          [44.0, 0.5, 76], [44.5, 0.5, 73]
+        ];
+        MEL.forEach(([t, d, m]) => horn(t, [m - 12, m], d * 0.92, 0.042, { a: 0.04, cut: 2400, rev: 0.25, rel: 0.08, scoop: 25 }));
+        tick(38.2, 2349, 0.05, 0.5, 0.06, 'sine'); tick(38.27, 2960, 0.05, 0.5, 0.08, 'sine');
+        const LON = [10.75, 139.7, -46.6, -79.4, 13.4, 127.0, 18.1]; // Oslo, Tokyo, Sao Paulo, Toronto, Berlin, Seoul, Stockholm
+        const PENT = [74, 76, 78, 81, 83, 86, 88];
+        CUES60.bids.forEach((t, i) => {
+          const pan = clamp(LON[i] / 150, -0.9, 0.9);
+          glassTick(t, mtof(PENT[i] + 12), 0.1, pan, { dec: 0.35, dly: 0.1 });
+          whoosh(t, 0.25, 1500, 4000, 0.04, pan, 0.4, { peak: 0.6, rev: 0.2 });
+        });
+        play(clickB, 41.0, 0.6, { pan: null }); play(clickB, 41.055, 0.5, { pan: null }); // escrow latch
+        tick(41.0, 2200, 0.08, 0.3, 0.08, 'triangle'); tick(41.055, 1650, 0.1, 0.3, 0.12, 'triangle', { rev: 0.2 });
+        thud(41.055, 110, 0.35, { slap: 0.4, dec: 0.15 });
+        [41.25, 41.6, 42.1].forEach((t, i) => tick(t, mtof(81 + i * 2), 0.04, 0.3, 0.05, 'sine'));
+        bell(42.6, 880, 0.12, 0.3, 0.8, { ratio: 3, index: 0.6, rev: 0.3 }); bell(42.72, 1318.5, 0.12, 0.3, 1.0, { ratio: 3, index: 0.6, rev: 0.3 });
+        sparkle(43.0, 12, 0.48, 0.07, 0.4, 3, 1.5, { desc: true });
+        whoosh(43.4, 0.5, 900, 4000, 0.12, -0.7, 0.7, { peak: 0.6 });
+        for (let i = 0; i < 8; i++) glassTick(43.62 + i * 0.19, mtof([86, 90, 93, 88, 91, 95, 93, 98][i]), 0.06, (i % 2 ? 0.6 : -0.6), { dec: 0.3, dly: 0.08 });
+      }
+      // (15) 45.0 whip to centre, filtered half-bar, silence 45.5-46.0
+      whoosh(44.86, 0.22, 6000, 900, 0.3, 0.5, 0, { peak: 0.5 });
+      // (16) 46.0 DROP 4 on '80%': 808 + crash + cascade of 8 silver rings; meter sweep -> confirm chord; INSTANT
+      {
+        const t = 46.0;
+        impact(t, 1.0, { crashV: 0.75, huge: 0.3 });
+        subDrop(t, 75, 37, 0.35, 0.6, 1.4);
+        for (let i = 0; i < 8; i++) silverRing(t + 0.02 + i * 0.065, 0.42 * (1 - i * 0.05), (i % 2 ? 1 : -1) * (0.2 + 0.09 * i), { rev: 0.25, dly: 0.03 });
+        sweepTone(t, 46.5, 440, 1174.7, 0.07, { rev: 0.2 });
+        [86, 90, 93, 98].forEach((m, i) => bell(46.5, mtof(m), 0.08, -0.45 + i * 0.3, 1.2, { ratio: 3, index: 1.0, rev: 0.35, dly: 0.12 }));
+        thud(46.6, 73.4, 0.85, { slap: 0.9, rev: 0.25 });
+        tick(47.0, 1760, 0.06, 0.2, 0.06, 'sine'); tick(47.07, 2349, 0.06, 0.2, 0.09, 'sine');
+        whoosh(47.15, 0.35, 3000, 900, 0.08, 0, 0.4, { peak: 0.4 });
+        CUES60.buybackTags.forEach((tt, i) => glassTick(tt, mtof([86, 88, 90, 93][i]), 0.08, -0.6 + i * 0.4, { dec: 0.35 }));
+      }
+      // (17) 50-52 double-time callback: tear / gold ring / offer tink / bid tick
+      {
+        noiseBurst(50.0, 0.65, 2000, 9000, 0.3, { type: 'bandpass', q: 1.4, sweep: 0.25, rev: 0.25 });
+        play(tearB, 50.0, 0.6, { rev: 0.2 });
+        impact(50.0, 0.6, { crashV: 0.4, subDec: 0.5 });
+        goldRing(50.5, 0.75, -0.3, { decay: 1.6 }); impact(50.5, 0.45, { crash: false, subDec: 0.4 });
+        [[3520, 0.12], [8180, 0.04]].forEach(([f, v]) => tick(51.0, f, v, 0.3, 0.28, 'sine', { rev: 0.35, dly: 0.1 }));
+        impact(51.0, 0.45, { crash: false, subDec: 0.4 });
+        glassTick(51.5, mtof(88), 0.14, 0.5, { dec: 0.35 }); impact(51.5, 0.5, { crash: false, subDec: 0.4 });
+        [50.42, 50.92, 51.42].forEach((t, i) => whoosh(t, 0.12, 900, 7000, 0.22, (i % 2 ? 0.6 : -0.6), (i % 2 ? -0.6 : 0.6), { peak: 0.8 }));
+        for (let i = 0; i < 8; i++) clap(51.0 + i * 0.0625, 0.18 + 0.05 * i, { rev: 0.1 });
+        whoosh(51.0, 1.0, 400, 9000, 0.22, 0, 0, { peak: 0.99, q: 1.3 });
+        revCymbal(52.0, 0.9, 0.4);
+      }
+      // (18) 52.0 final impact + THE BIFROST CHORD in D major panned L -> R + silver ring on the mint dot
+      {
+        const t = 52.0;
+        impact(t, 1.05, { crashV: 0.8, huge: 0.0, subDec: 2.4 });
+        b808(t, 26, 2.6, 0.55, { glideFrom: 33, glide: 0.12 });
+        horn(t, [38, 45, 50, 54, 57, 62], 1.1, 0.06, { a: 0.05, cut: 1800, rev: 0.35, rel: 0.4, scoop: 20 });
+        choir(t, 54.0, [50, 57, 62, 66, 69], 0.06, { a: 0.1, r: 1.2, huge: 0, rev: 0.3 });
+        sparkle(52.02, 16, 0.8, 0.035, 0, 2, 4);
+        [74, 78, 81, 86].forEach((m, i) => bell(52.4 + i * 0.1, mtof(m), 0.17, -0.85 + i * 0.57, 1.6, { ratio: 3, index: 1.4, rev: 0.4, dly: 0.12 }));
+        tick(52.8, 600, 0.07, -0.7, 0.05, 'sine', { f1: 1300 }); // violet dot pop
+        silverRing(52.92, 0.9, 0.7, { rev: 0.35 });
+        bell(58.5, 4186, 0.012, 0.2, 0.5, { ratio: 2.76, index: 0.3, rev: 0, dly: 0 }); // glint (dry, gone by 59.1)
+      }
     }
 
-    // ---------------------------------------------------- silences (hard gates on the final bus) + end fade
-    const og = out.gain;
-    og.setValueAtTime(1, 0);
-    CUES.silences.forEach(([a, b]) => {
-      og.setValueAtTime(1, a - 0.006); og.linearRampToValueAtTime(0, a);
-      og.setValueAtTime(0, b - 0.0015); og.linearRampToValueAtTime(1, b);
-    });
-    og.setValueAtTime(1, Math.min(59.0, END - 1)); og.linearRampToValueAtTime(0, Math.min(59.8, END - 0.1));
+    // =========================================================== v2: 30 s "app-first" cut
+    function score30() {
+      const C = CUES30;
+      runSections([
+        { t0: 1.0, t1: 2.0, ch: 'Dm', st: 'ambient', pad: 0.04, lp: 900, a: 0.4, r: 0.1 },
+        { t0: 2.0, t1: 4.0, ch: 'Dm', st: 'intro', pad: 0.05, lp: 1200, lpTo: [2600, 3.95], glideIn: true },
+        { t0: 4.0, t1: 4.6, ch: 'Asus', st: 'riser', pad: 0.05, lp: 1200, a: 0.3, r: 0.02 },
+        { t0: 4.6, t1: 5.4, ch: 'Dm', st: 'slowmo', pad: 0.05, lp: 700, a: 0.25, r: 0.1 },
+        { t0: 5.4, t1: 6.0, ch: 'Dm9', st: 'chord', pad: 0.05, lp: 2600, a: 0.05, r: 0.1 },
+        { t0: 6.0, t1: 8.0, ch: 'Dm', st: 'groove', pad: 0.055, lp: 2600 },
+        { t0: 8.0, t1: 10.0, ch: 'F', st: 'groove', pad: 0.06, lp: 3000, r: 0.02 },
+        { t0: 11.5, t1: 12.3, ch: 'Dm', st: 'legend', pad: 0.05, lp: 900, a: 0.05, r: 0.03 },
+        { t0: 12.3, t1: 14.0, ch: 'D', st: 'lift', pad: 0.06, lp: 3600, a: 0.02 },
+        { t0: 14.0, t1: 16.0, ch: 'D', st: 'half', pad: 0.055, lp: 2400 },
+        { t0: 16.0, t1: 18.0, ch: 'Bm', st: 'half', pad: 0.055, lp: 2400 },
+        { t0: 18.0, t1: 20.0, ch: 'G', st: 'half', pad: 0.055, lp: 2600 },
+        { t0: 20.0, t1: 22.0, ch: 'A', st: 'half', pad: 0.055, lp: 2600 },
+        { t0: 22.0, t1: 24.0, ch: 'Bm', st: 'data', pad: 0.045, lp: 2200 },
+        { t0: 24.0, t1: 24.5, ch: 'A', st: 'callback', pad: 0.05, lp: 3000, r: 0.02 },
+        { t0: 24.5, t1: 27.0, ch: 'D', st: 'end', pad: 0.055, lp: 2600, a: 0.02, r: 1.8 }
+      ]);
+      const mlp = musicLP.frequency;
+      mlp.setValueAtTime(20000, 4.75); mlp.exponentialRampToValueAtTime(800, 4.95); mlp.setValueAtTime(800, 5.3); mlp.exponentialRampToValueAtTime(20000, 5.4);
+      mlp.setValueAtTime(20000, 9.2); mlp.exponentialRampToValueAtTime(320, 10.0); mlp.setValueAtTime(20000, 10.02);
+      mlp.setValueAtTime(1100, 11.5); mlp.setValueAtTime(1100, 12.28); mlp.exponentialRampToValueAtTime(20000, 12.3);
+      drumLP.frequency.setValueAtTime(300, 2.0); drumLP.frequency.exponentialRampToValueAtTime(3000, 3.95); drumLP.frequency.setValueAtTime(20000, 4.0);
+      const uiTap = (t, pan) => { tick(t, 2600, 0.06, pan || 0, 0.018, 'sine', { rev: 0.1 }); play(clickB, t, 0.25, { pan: pan || 0 }); };
+      const sheet = (t) => whoosh(t, 0.28, 700, 3200, 0.14, 0, 0, { peak: 0.55, rev: 0.15 });
+      const toast = (t, m) => { glassTick(t, mtof(m), 0.08, 0.2, { dec: 0.35 }); glassTick(t + 0.07, mtof(m + 5), 0.07, 0.2, { dec: 0.45 }); };
+
+      // 01 HOOK 0.0-2.2: bitcrushed stab on '0.00 g'; 1.0 STRIKE + THE SILVER RING; 1.7 spin/whip into the phone
+      {
+        const tape = varispeed(chipB, 1.0, (tt) => (tt < 0.62 ? 1 : Math.max(0.03, 1 - (tt - 0.62) / 0.3 * 0.97)));
+        let flt = null;
+        for (let i = 0; i < tape.length; i++) {
+          const tt = i / SR;
+          if ((i & 31) === 0) flt = jsBiquadState(flt, 'lp', tt < 0.62 ? 12000 : pw(12000, 700, (tt - 0.62) / 0.3), 0.707);
+          tape[i] = flt.run(tape[i]) * 0.85 * (tt < 0.8 ? 1 : Math.max(0, 1 - (tt - 0.8) / 0.12));
+        }
+        mixIn('music', tape, 0, 1);
+        [0.0, 0.5].forEach((t, i) => {
+          scratch(t + 0.01, 0.32);
+          kick(t, 0.55, { duck: false, dec: 0.25 });
+          noiseBurst(t, 0.12, 6000, 1200, 0.12, { type: 'highpass', rev: 0.05, pan: i % 2 ? 0.3 : -0.3 });
+        });
+        tick(0.3, 2000, 0.12, 0, 0.06, 'square', { a: 0.002 }); // scale beep, '0.00 g'
+        whoosh(0.7, 0.32, 500, 6000, 0.38, -0.5, 0.2, { peak: 0.95, rev: 0.3 }); // pixels suck away
+        for (let i = 0; i < 14; i++) { const u = i / 14; tick(0.7 + 0.28 * Math.sqrt(u), mtof(74 + Math.floor(u * 24) + [0, 3, 7][i % 3]), 0.05 + 0.04 * u, rr(-0.8, 0.8), 0.025, 'square'); }
+        const t = C.strike;
+        subDrop(t, 70, 40, 0.08, 1.0, 1.4);
+        kick(t, 0.9, { duck: false, dec: 0.6 });
+        [3150, 4720, 6930, 9810, 12400].forEach((f, i) => tick(t, f, 0.06 / (1 + i * 0.3), (i % 2 ? 0.3 : -0.3), 0.09, 'sine', { rev: 0.2 }));
+        noiseBurst(t, 0.4, 9000, 1500, 0.12, { type: 'highpass', rev: 0.25, huge: 0.15 });
+        crash(t, 0.3, { huge: 0.2 });
+        silverRing(t, 1.0, 0, { huge: 0.15 });
+        sparkle(t + 0.05, 7, 0.5, 0.05, 0, 1, 2);
+        for (let i = 0; i < 16; i++) tick(1.1 + i * 0.022, 3300, 0.03, 0.15, 0.008, 'square'); // LCD 0.00 -> 31.10 g
+        tick(1.47, 1760, 0.06, 0.15, 0.08, 'sine'); tick(1.54, 2349, 0.05, 0.15, 0.1, 'sine');
+        whoosh(1.7, 0.32, 900, 3000, 0.16, 0.0, 0.5, { peak: 0.7, rev: 0.15 }); // spin
+        whoosh(1.86, 0.18, 1500, 9000, 0.42, -0.3, 0.3, { peak: 0.85, rev: 0.15 }); // whip into the phone
+        drone(1.0, 1.95, [38], 'sine', 0.07, 0.3, 0.05);
+      }
+      // 02 APP · PACK 2.0-4.2: groove opens, Gjallarhorn on EVERY PACK HITS, UI tap on 'Rip pack'
+      {
+        whoosh(1.98, 0.32, 600, 3000, 0.22, 0.5, 0, { peak: 0.3, rev: 0.2 }); // phone settles (spring)
+        subDrop(2.0, 80, 36, 0.3, 0.55, 0.9);
+        crash(2.0, 0.22);
+        play(crinkleSweep, 2.2, 0.2, { pan: [-0.8, 0.8, 2.2, 2.9], rev: 0.2 }); // foil specular sweep
+        horn(C.everyPackHits, [38, 45, 50, 53, 57], 0.95, 0.05, { a: 0.22, cut: 1300, rev: 0.35, huge: 0.3, rel: 0.25 });
+        subDrop(C.everyPackHits, 60, 37, 0.2, 0.5, 1.0);
+        crash(C.everyPackHits, 0.16, { huge: 0.2 });
+        thud(C.silverOrGold, 62, 0.45, { slap: 0.5, rev: 0.2 });
+        sparkle(C.silverOrGold, 6, 0.4, 0.03, 0.3, 2, 3);
+        uiTap(C.tapRip, 0); tick(C.tapRip + 0.02, 180, 0.15, 0, 0.06, 'sine'); // press-in + haptic
+      }
+      // 03 RIP 4.0-6.2: crinkle + riser, 4.6 DROP 1 tear, slow-mo choir, reverse cymbal into the 5.4 whip
+      {
+        play(crinkleRise, 3.98, 0.32, { pan: 0.35, rev: 0.2, stop: 4.6 });
+        play(shep1, 4.0, 0.42, { rev: 0.2, stop: 4.6 });
+        whoosh(4.0, 0.6, 300, 7000, 0.3, -0.2, 0.2, { peak: 0.99, q: 1.4, rev: 0.25 });
+        drone(4.0, 4.58, [33], 'saw', 0.06, 0.4, 0.02, { lp: 300, q: 1 });
+        const t = C.tear;
+        noiseBurst(t, 0.9, 2000, 9000, 0.35, { type: 'bandpass', q: 1.4, sweep: 0.25, rev: 0.25, huge: 0.2 });
+        play(tearB, t, 0.9, { rev: 0.2, huge: 0.15 });
+        subDrop(t, 110, 35, 0.5, 1.0, 1.5);
+        kick(t, 1.0, { duck: false });
+        crash(t, 0.7, { huge: 0.35 });
+        noiseBurst(t, 0.4, 3000, 200, 0.4, { huge: 0.3 });
+        thud(t, 55, 0.5, { slap: 0.5 }); // 'RIP IT.' slam
+        choir(4.75, 5.3, [50, 57, 62, 65, 69], 0.11, { a: 0.2, r: 0.2 });
+        crash(4.75, 0.2, { rate: 0.5, huge: 0.6, rev: 0 });
+        for (let i = 0; i < 8; i++) bell(4.8 + rr(0, 0.4), mtof(86 + Math.floor(rr(0, 14))) * 0.5, 0.03, rr(-0.8, 0.8), 0.8, { ratio: 2.76, index: 0.4, huge: 0.4, rev: 0 });
+        revCymbal(C.slowOut, 0.7, 0.45);
+        whoosh(5.3, 0.22, 700, 7000, 0.4, -0.5, 0.5, { peak: 0.5 });
+        subDrop(C.slowOut, 90, 38, 0.3, 0.45, 0.7);
+        [74, 77, 81].forEach((m, i) => bell(5.4 + i * 0.07, mtof(m), 0.1, -0.5 + i * 0.5, 0.9, { ratio: 3, index: 1.2, rev: 0.3, dly: 0.12 }));
+        [5.55, 5.65, 5.75, 5.85].forEach((tt, i) => thud(tt, 140 + i * 10, 0.12, { slap: 0.25, dec: 0.1, pan: -0.3 + i * 0.2 })); // 4 coins drop in
+      }
+      // 04 REVEAL 6.0-10.2: SILVER / RARE / GOLD, each louder and brighter
+      {
+        const [p1, p2, p3] = [6.0, 7.3, 8.6];
+        whoosh(5.7, 0.3, 700, 3800, 0.22, -0.5, 0, { peak: 0.85, rev: 0.2 });
+        bell(p1, mtof(74), 0.2, 0, 1.1, { ratio: 3, index: 1.2, rev: 0.3, dly: 0.15 });
+        silverRing(p1, 0.75, -0.1);
+        sparkle(p1 + 0.02, 5, 0.3, 0.03, 0, 2, 3);
+        whoosh(p1, 0.22, 4000, 900, 0.16, 0.9, 0.3, { peak: 0.2 }); // super slam
+        const r2 = Math.pow(10, 2 / 20), r4 = Math.pow(10, 4 / 20);
+        whoosh(7.0, 0.3, 900, 3000, 0.12, 0.2, -0.6, { peak: 0.5 }); // card slides left
+        whoosh(7.08, 0.24, 3000, 9000, 0.1, 0, 0, { type: 'highpass', peak: 0.95, rev: 0.4 }); // violet leak
+        bell(p2, mtof(77), 0.2 * r2, 0, 1.2, { ratio: 3, index: 1.3, rev: 0.32, dly: 0.15 });
+        silverRing(p2, 0.75 * r2, 0.1);
+        sparkle(p2, 16, 0.55, 0.045 * r2, 0, 2, 4);
+        subDrop(p2, 90, 40, 0.2, 0.35, 0.6);
+        whoosh(8.3, 0.3, 900, 3000, 0.12, 0.2, -0.6, { peak: 0.5 });
+        whoosh(8.36, 0.26, 2000, 7000, 0.14, 0, 0, { peak: 0.95, rev: 0.4 }); // gold leak
+        bell(p3, mtof(81), 0.2 * r4, 0, 1.4, { ratio: 3, index: 1.4, rev: 0.35, dly: 0.18 });
+        goldRing(p3, 0.8 * r4, 0);
+        horn(p3, [41, 48, 53, 57, 60, 65], 0.45, 0.055, { a: 0.06, cut: 1700, rev: 0.35, huge: 0.3, rel: 0.2, scoop: 30 });
+        subDrop(p3, 75, 36, 0.4, 0.9, 1.4);
+        crash(p3, 0.4, { huge: 0.25 });
+        sparkle(p3 + 0.02, 18, 0.7, 0.04 * r4, 0, 2, 3);
+        [p1, p2, p3].forEach((t, i) => { // 'Minted on Base' chip ticks on 0.4 s after each flip + counter
+          glassTick(t + 0.4, mtof(86 + i * 2), 0.06, 0.25, { dec: 0.3 });
+          for (let k = 0; k < 8; k++) tick(t + 0.15 + k * 0.025, 2900 + i * 200, 0.016, 0.3, 0.008, 'square');
+        });
+        whoosh(9.3, 0.7, 500, 2000, 0.1, -0.3, 0.2, { peak: 0.75, rev: 0.3 }); // last card arrives while the groove filters down
+      }
+      // 05 LEGENDARY 10.0-14.2: heartbeat + Shepard riser, 11.4-11.5 black, 11.5 DROP 2, 12.3 D MAJOR lift
+      {
+        C.heartbeats.forEach((t, i) => { heartbeat(t, 0.85 + 0.08 * i, 0.16); whoosh(t, 0.5, 4000, 9000, 0.035 + 0.015 * i, 0, 0, { type: 'highpass', peak: 0.15, rev: 0.4 }); });
+        heartbeat(11.2, 0.95, 0.1);
+        play(shep2, 10.0, 0.42, { rev: 0.2, stop: 11.4 });
+        drone(10.0, 11.38, [33, 45], 'saw', 0.07, 1.0, 0.02, { lp: 200, lp1: 900, q: 1.5, det: [0, 6] });
+        revCymbal(11.4, 0.8, 0.45, { cut: 11.4 });
+        whoosh(10.6, 0.8, 300, 6000, 0.18, 0, 0, { peak: 0.99, q: 1.5, rev: 0.1 });
+        const t = C.legendary;
+        subDrop(t, 62, 40, 0.15, 1.0, 2.2);
+        impact(t, 1.0, { huge: 0.4, crashV: 0.7 });
+        horn(t, [38, 45, 50, 53, 57, 62], 0.75, 0.065, { a: 0.07, cut: 1600, rev: 0.4, huge: 0.5, rel: 0.12, scoop: 35 });
+        choir(t, 12.3, [50, 57, 62, 65, 69, 74], 0.12, { a: 0.12, r: 0.1, huge: 0.6 });
+        whoosh(11.6, 0.6, 1200, 8000, 0.14, -0.9, 0.9, { peak: 0.5, rev: 0.35, huge: 0.3 }); // flip / anamorphic flare
+        whoosh(12.12, 0.2, 800, 8000, 0.42, 0.4, -0.4, { peak: 0.85 });
+        impact(C.oneOf25, 0.65, { huge: 0.25, crashV: 0.5, subDec: 1.0 });
+        horn(C.oneOf25, [38, 45, 50, 54, 57, 62, 66], 0.5, 0.06, { a: 0.03, cut: 2000, rev: 0.35, huge: 0.3, rel: 0.25, scoop: 20 });
+        choir(C.oneOf25, 13.6, [50, 57, 62, 66, 69, 74], 0.075, { a: 0.05, r: 0.7, huge: 0.45 });
+        goldRing(C.oneOf25, 0.95, 0, { decay: 4.0, huge: 0.2 });
+        sparkle(C.oneOf25, 16, 0.7, 0.04, 0, 2, 4);
+        play(engraveB, C.engrave, 0.22, { pan: [-0.4, 0.4, C.engrave, C.engrave + 0.6], rev: 0.25 });
+        bell(C.engrave + 0.62, mtof(98), 0.045, 0.4, 0.5, { ratio: 3.5, index: 0.5 });
+        whoosh(13.3, 0.4, 6000, 700, 0.3, 0.6, 0, { peak: 0.4, rev: 0.2 }); // back into the phone
+        thud(13.72, 120, 0.25, { slap: 0.35, dec: 0.15 }); // lands in 'Your pulls'
+      }
+      // 06 DECIDE 14.0-22.2: tap row -> sheet swish -> button tap -> confirm -> toast, per choice; stamp a step higher each
+      {
+        CHOICES30.forEach((t, i) => {
+          if (i) whoosh(t - 0.12, 0.2, 5000, 900, 0.14, 0.4, -0.2, { peak: 0.4 });
+          uiTap(t + 0.15, -0.1); sheet(t + 0.3); uiTap(t + 0.75, 0.05);
+        });
+        // ship: label created + route line LI -> HOME
+        toast(15.2, 86); whoosh(15.3, 0.5, 800, 2500, 0.07, -0.5, 0.5, { peak: 0.6, rev: 0.25 });
+        play(printerB, 14.95, 0.1, { pan: 0.1, rev: 0.1, stop: 15.2 });
+        // trade: LISTED + 3 new offers + Base tx chip
+        tick(16.9, 2349, 0.06, 0.3, 0.06, 'sine'); tick(16.97, 2960, 0.05, 0.3, 0.08, 'sine');
+        toast(17.3, 88); for (let k = 0; k < 6; k++) tick(17.45 + k * 0.025, 2000, 0.03, 0.4, 0.02, 'square');
+        // sell back 80%: ring meter rising sine resolving into a confirm chord at 18.9
+        sweepTone(18.3, 18.9, 440, 1174.7, 0.07, { rev: 0.2 });
+        [86, 90, 93, 98].forEach((m, k) => bell(18.9, mtof(m), 0.08, -0.45 + k * 0.3, 1.1, { ratio: 3, index: 1.0, rev: 0.35, dly: 0.12 }));
+        // vault: wheel ratchet -> clunk 20.6 -> SECURED IN LIECHTENSTEIN
+        for (let k = 0; k < 7; k++) tick(20.3 + k * 0.04, 1900 + k * 60, 0.05, 0.2, 0.015, 'square', { rev: 0.1 });
+        const v = C.vaultClunk;
+        subDrop(v, 70, 42, 0.12, 0.8, 1.1);
+        [180, 287, 419, 610, 873, 1240].forEach((f, k) => tick(v, f, 0.07 / (1 + k * 0.4), 0.2, 0.7 - k * 0.07, 'sine', { rev: 0.3, huge: 0.35 }));
+        noiseBurst(v, 0.45, 1400, 200, 0.16, { rev: 0.3, huge: 0.4 });
+        play(clickB, v, 0.6, { pan: null }); play(clickB, v + 0.045, 0.4, { pan: null });
+        kick(v, 0.7, { depth: 0.4 });
+        drone(C.vaultLine, 21.7, [33], 'saw', 0.06, 0.3, 0.3, { lp: 260, q: 2 });
+        whoosh(C.vaultLine, 1.0, 4000, 9000, 0.05, -0.6, 0.6, { type: 'highpass', peak: 0.5, rev: 0.5, huge: 0.3 });
+        sparkle(C.vaultLine + 0.05, 8, 0.8, 0.03, 0, 2, 4);
+        // status stamps SHIPPING / LISTED / SOLD BACK / VAULTED, each a step higher
+        [[15.35, 55], [17.05, 61.7], [19.05, 69.3], [20.75, 73.4]].forEach(([t, f], k) => thud(t, f, 0.5 + 0.05 * k, { slap: 0.6, rev: 0.2, pan: 0.15 }));
+      }
+      // 07 PROOF 22.0-24.7: NFC two-tone + verified chime, hash blips
+      {
+        whoosh(21.85, 0.24, 900, 6000, 0.36, 0.8, -0.8, { peak: 0.6 });
+        thud(22.0, 90, 0.3, { slap: 0.3, dec: 0.2 });
+        whoosh(22.05, 0.45, 600, 3500, 0.22, 0.9, 0.1, { peak: 0.8 }); // phone swings in
+        tick(C.nfcTap, 1760, 0.16, 0.1, 0.09, 'sine', { a: 0.004, rev: 0.25 });
+        tick(C.nfcTap + 0.11, 2349, 0.16, 0.1, 0.12, 'sine', { a: 0.004, rev: 0.25 });
+        [0, 0.12, 0.24].forEach((d) => whoosh(C.nfcTap + d, 0.3, 4000, 7000, 0.025, 0, 0, { type: 'highpass', peak: 0.3, rev: 0.3 }));
+        [86, 90, 93, 98].forEach((m, i) => bell(C.nfcTap + 0.26 + i * 0.05, mtof(m), 0.07, -0.2 + i * 0.15, 1.0, { ratio: 3, index: 1.0, rev: 0.4, dly: 0.15 }));
+        for (let i = 0; i < 12; i++) tick(C.mintLog + 0.25 + i * 0.025, 2000, 0.045, 0.3, 0.02, 'square', { a: 0.001 });
+        glassTick(23.3, mtof(90), 0.07, 0.4, { dec: 0.35 }); glassTick(23.62, mtof(93), 0.06, 0.4, { dec: 0.3 });
+        for (let i = 0; i < 8; i++) clap(24.0 + i * 0.0625, 0.16 + 0.05 * i, { rev: 0.1 }); // build into the end card
+        whoosh(23.8, 0.7, 400, 9000, 0.22, 0, 0, { peak: 0.99, q: 1.3 });
+        revCymbal(C.endCard, 0.8, 0.4);
+      }
+      // 08 END CARD 24.5-30.0: final impact, coins fan up, BIFROST CHORD in D major L -> R, silver ring on the mint dot
+      {
+        const t = C.endCard;
+        impact(t, 1.05, { crashV: 0.8, huge: 0.0, subDec: 2.2 });
+        b808(t, 26, 2.2, 0.55, { glideFrom: 33, glide: 0.12 });
+        horn(t, [38, 45, 50, 54, 57, 62], 0.8, 0.06, { a: 0.05, cut: 1800, rev: 0.35, rel: 0.4, scoop: 20 });
+        choir(t, 26.2, [50, 57, 62, 66, 69], 0.06, { a: 0.1, r: 1.0, huge: 0, rev: 0.3 });
+        [74, 76, 78, 81, 83, 86].forEach((m, i) => glassTick(t + 0.1 + i * 0.1, mtof(m + 12), 0.05, -0.8 + i * 0.32, { dec: 0.4 })); // 6 coins fan up
+        const L = C.logo;
+        [74, 78, 81, 86].forEach((m, i) => bell(L + i * 0.1, mtof(m), 0.17, -0.85 + i * 0.57, 1.6, { ratio: 3, index: 1.4, rev: 0.4, dly: 0.12 }));
+        tick(L + 0.4, 600, 0.07, -0.7, 0.05, 'sine', { f1: 1300 }); // violet dot pop
+        silverRing(L + 0.52, 0.9, 0.7, { rev: 0.35 }); // mint dot
+        sparkle(L + 0.02, 10, 0.6, 0.03, 0, 2, 4);
+        bell(C.glint, 4186, 0.012, 0.2, 0.45, { ratio: 2.76, index: 0.3, rev: 0, dly: 0 }); // glint (dry)
+      }
+    }
+
+    const CHOICES30 = CUES30.decide;
+    if (dur < 45) score30(); else score60();
 
     // ---------------------------------------------------- FX pass (24 kHz): hall + huge reverbs, ping-pong delay
     const fxN = Math.ceil(N / 2);
@@ -1182,12 +1418,12 @@
     fxSrc(decim(stems.arp.L, stems.arp.R), fG(0.18, revIn));
 
     // ---------------------------------------------------- stems -> main graph, then render
-    const play0 = (name, dest) => { const s = ctx.createBufferSource(); s.buffer = stems[name].buf; s.connect(dest); s.start(0); };
+    const play0 = (name, dest) => { if (opts.solo && opts.solo !== name) return; const s = ctx.createBufferSource(); s.buffer = stems[name].buf; s.connect(dest); s.start(0); };
     play0('drum', drumBus); play0('bass', bassBus); play0('pad', padBus); play0('arp', arpBus);
     play0('lead', leadBus); play0('music', musicPre); play0('sfx', sfx); play0('sub', subBus);
 
     return fx.startRendering().then((fxBuf) => {
-      if (!opts.dry) {
+      if (!opts.dry && !opts.solo) {
         const s = ctx.createBufferSource(); s.buffer = fxBuf; // 24 kHz buffer, resampled by the source
         s.connect(F('lowpass', 10500, 0.7, mix)); s.start(0);
       }
@@ -1289,8 +1525,32 @@
     }
     return [oL, oR];
   }
-  function master(buffer) {
+  // DynamicsCompressorNode adds a fixed look-ahead delay (browser-specific): measure it with an impulse
+  function probeLatency() {
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const c = new Ctx(1, 8192, SR), b = c.createBuffer(1, 8192, SR);
+    b.getChannelData(0)[2000] = 0.01;
+    const s = c.createBufferSource(); s.buffer = b;
+    const c1 = c.createDynamicsCompressor(), c2 = c.createDynamicsCompressor();
+    s.connect(c1); c1.connect(c2); c2.connect(c.destination); s.start(0);
+    return c.startRendering().then((r) => {
+      const d = r.getChannelData(0); let k = 2000, m = 0;
+      for (let i = 0; i < d.length; i++) if (Math.abs(d[i]) > m) { m = Math.abs(d[i]); k = i; }
+      return clamp(k - 2000, 0, 4000);
+    }).catch(() => 0);
+  }
+  // hard silences + end fade, applied after latency compensation so they sit exactly on the cue grid
+  function gates(L, R) {
+    const ramp = (a, b, g0, g1) => { const i0 = Math.round(a * SR), i1 = Math.round(b * SR); for (let i = Math.max(0, i0); i < Math.min(L.length, i1); i++) { const g = g0 + (g1 - g0) * (i - i0) / (i1 - i0); L[i] *= g; R[i] *= g; } };
+    const zero = (a, b) => { for (let i = Math.max(0, Math.round(a * SR)); i < Math.min(L.length, Math.round(b * SR)); i++) { L[i] = 0; R[i] = 0; } };
+    cuesFor(L.length / SR).silences.forEach(([a, b]) => { ramp(a - 0.006, a, 1, 0); zero(a, b - 0.0015); ramp(b - 0.0015, b, 0, 1); });
+    const end = L.length / SR;
+    ramp(end - 1.0, end - 0.2, 1, 0); zero(end - 0.2, end);
+  }
+  function master(buffer, latency) {
     const L = buffer.getChannelData(0), R = buffer.getChannelData(1);
+    if (latency > 0) for (const d of [L, R]) { d.copyWithin(0, latency); d.fill(0, d.length - latency); }
+    gates(L, R);
     const ceil = Math.pow(10, CEIL_DBTP / 20);
     const l0 = integratedLUFS(L, R);
     let gain = Math.pow(10, (TARGET_LUFS - l0) / 20);
@@ -1302,7 +1562,7 @@
       res = limit(L, R, gain, ceil);
     }
     // final safety: hard ceiling on samples (never clip), and silence after 59.8 s
-    const end = Math.round(59.8 * SR);
+    const end = Math.round((L.length / SR - 0.2) * SR);
     for (let c = 0; c < 2; c++) {
       const src = res[c], dst = buffer.getChannelData(c);
       for (let i = 0; i < dst.length; i++) {
@@ -1311,7 +1571,7 @@
         dst[i] = i >= end ? 0 : v;
       }
     }
-    buffer._bvStats = { inputLUFS: l0, gain: gain };
+    buffer._bvStats = { inputLUFS: l0, gain: gain, latency: latency };
     return buffer;
   }
 
@@ -1321,7 +1581,7 @@
   let renderPromise = null;
   function render() {
     if (!renderPromise) {
-      renderPromise = build().then(master).catch((e) => { renderPromise = null; throw e; });
+      renderPromise = Promise.all([build(), probeLatency()]).then((r) => master(r[0], r[1])).catch((e) => { renderPromise = null; throw e; });
     }
     return renderPromise;
   }
@@ -1397,7 +1657,9 @@
   }
 
   const api = {
-    CUES: CUES,
+    get CUES() { return cuesFor(getDuration()); },
+    CUES60: CUES60,
+    CUES30: CUES30,
     render: render,
     wav: wav,
     enable: enable,
@@ -1405,6 +1667,7 @@
     get muted() { return muted; },
     set muted(b) { setMuted(b); },
     get enabled() { return live.enabled; },
+    _state: function () { return { playing: !!live.src, pos: live.src ? srcPos() : null, ctx: live.ctx ? live.ctx.state : null }; },
     // internal (analysis / stems): uncached render with options { only: 'music'|'sfx'|'dry' }
     _renderRaw: function (o) { return build(o); },
     _toWav: toWav,

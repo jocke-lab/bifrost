@@ -36,8 +36,9 @@
      x/y accept numbers (px) or CSS strings ('50%'); default centre of parent.
    - animText extra opts: outStyle ('rise'|'blur'|'scale'|'slam'|'fade'|'drop'|'wipe'|'type'),
      outDur, order ('ltr'|'rtl'|'center'|'edges'|'random'), chroma (px, overrides),
-     caretColor. Returns {p, q, impact, landed}: p = in-progress of the last part,
-     q = out-progress, impact = local time the text lands (use to fire shake/flash).
+     caretColor. Returns {p, q, impact, landed}: p = 0..1 progress of the whole in-animation,
+     q = 0..1 out-progress, impact = local time the text lands (slam: the hit; other styles:
+     when the last part settles) — use it to fire shake / flash / particles.
      paintText(handle, local) re-aligns the animated gradient for text that is
      not driven by animText. measureText(handle) -> {W,H,pos[]} layout metrics.
    - emitter(canvas,{rate,...}) -> {draw(ctx,local)}: continuous analytic emitter
@@ -438,9 +439,10 @@
     const stagOut = o.outStagger != null ? o.outStagger : (outStyle === 'type' ? Math.max(0.012, stagger * 0.4) : stagger * 0.5);
     const hasOut = isFinite(outAt);
     const size = h.size;
-    const impact = inAt + (style === 'slam' ? dur * SLAM_HIT : dur);
     const ranks = orderRanks(h, o.order, n);
     const maxRank = n > 1 ? Math.max.apply(null, ranks) : 0;
+    // slam: the (first) hit; everything else: when the last part has landed
+    const impact = style === 'slam' ? inAt + dur * SLAM_HIT : inAt + maxRank * stagger + (dur || 0);
     const m = measure(h);
 
     // Style switch: reset per-part caches and kit decorations. Parts that land
@@ -581,7 +583,7 @@
       cs.opacity = on ? '0.9' : '0';
     }
 
-    const pIn = dur > 0 ? clamp((local - inAt) / Math.max(1e-6, inEnd - inAt)) : (local >= inEnd ? 1 : 0);
+    const pIn = inEnd > inAt ? clamp((local - inAt) / (inEnd - inAt)) : (local >= inAt ? 1 : 0);
     const qOut = hasOut ? clamp((local - (outAt - outDur - maxRank * stagOut)) / Math.max(1e-6, outDur + maxRank * stagOut)) : 0;
     return { p: pIn, q: qOut, impact, landed: local >= impact };
   }

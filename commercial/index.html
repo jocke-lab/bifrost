@@ -60,7 +60,7 @@
 
   <!-- ── PLAYER ───────────────────────────────────────────────────────── -->
   <main class="bvp-main">
-    <section class="bvp-player" id="bvp-player" aria-label="Bifrost Vault commercial">
+    <section class="bvp-player is-loading" id="bvp-player" aria-label="Bifrost Vault commercial" aria-busy="true">
       <div class="bvp-screen" id="bvp-screen">
         <!-- film.js mounts #bv-stage in here -->
         <div id="bv-viewport"></div>
@@ -94,9 +94,9 @@
         <button class="bvp-btn" id="bvp-replay" type="button" aria-label="Replay" title="Replay">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7.5 6.5 12 11V7.5a5.5 5.5 0 1 1-5.5 5.5H4a8 8 0 1 0 8-8z"/></svg>
         </button>
-        <span class="bvp-time" id="bvp-time" aria-live="off">0:00 / 1:00</span>
+        <span class="bvp-time" id="bvp-time" aria-live="off">0:00 / 0:30</span>
 
-        <div class="bvp-scrub" id="bvp-scrub" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="60" aria-valuenow="0" aria-valuetext="0:00">
+        <div class="bvp-scrub" id="bvp-scrub" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="30" aria-valuenow="0" aria-valuetext="0:00">
           <div class="bvp-scrub-track">
             <div class="bvp-scrub-fill" id="bvp-scrub-fill"></div>
           </div>
@@ -133,7 +133,9 @@
   <!-- ── SCRIPTS (contract order; all deferred so a missing file never blocks the rest) ── -->
   <script defer src="config.js"></script>
   <script defer src="kit.js"></script>
+  <script defer src="art-fields.js"></script>
   <script defer src="art.js"></script>
+  <script defer src="app-ui.js"></script>
   <script defer src="film.js"></script>
   <!-- SCENES -->
   <script defer src="audio.js"></script>

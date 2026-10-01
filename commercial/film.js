@@ -22,6 +22,7 @@
      BV.preload(x)     x = Promise | <img> | array of those. BV.ready (and the promise
                        returned by setFormat) wait for every registered preload.
                        Every <img> inside the stage is also decoded automatically.
+                       Timeout: 120 s in render mode, 30 s on the page (then a console warning).
      BV.fx             film finish, RESET BY THE ENGINE AT THE START OF EVERY SEEK, then
                        driven by scenes inside update() (so it stays deterministic):
                          fx.flash(intensity 0..1, color='white'|'aurora'|'gold'|css)  (max wins)
@@ -39,6 +40,11 @@
      BV.scenes         registered scene defs (read-only use, e.g. audio cue timing).
      BV.clock          optional fn () => seconds; when set (e.g. by audio) the play loop
                        follows that clock instead of performance.now().
+     BV.remap(from, to, fn)   (contract "Engine additions") during [from,to) every scene is
+                       evaluated at fn(t) instead of t (visibility, local and t passed to update),
+                       e.g. callback flash-cuts that replay earlier moments. Scenes registered with
+                       `noRemap: true` always see real t. fn must be pure. Returns an unregister fn.
+                       Later registrations win where ranges overlap. BV.t stays the real time.
      Events also: 'ready', 'resize' (scale).
    ========================================================================== */
 (function () {
@@ -74,7 +80,7 @@
   let readyResolve;
   const BV = window.BV = {
     W: 1920, H: 1080, portrait: false, format: 'landscape',
-    duration: +FILM.duration || 60,
+    duration: +FILM.duration || 30,
     fps: +FILM.fps || 30,
     render: RENDER,
     t: 0, frame: 0, playing: false, scale: 1,
@@ -82,7 +88,7 @@
     root: null, world: null, params,
     clock: null,
     ready: new Promise(r => { readyResolve = r; }),
-    scene, seek, play, pause, toggle, on, off, setFormat, preload
+    scene, seek, play, pause, toggle, on, off, setFormat, preload, remap
   };
 
   function setDims(f) {
@@ -198,7 +204,9 @@
     if (!rootEl) return;
     rootEl.querySelectorAll('img').forEach(img => { if (img.src) preload(img); });
   }
-  async function settle(timeout = 12000) {
+  // Render mode must never start capturing before assets are decoded; the page gives up sooner.
+  const PRELOAD_TIMEOUT = RENDER ? 120000 : 30000;
+  async function settle(timeout = PRELOAD_TIMEOUT) {
     for (let round = 0; round < 4 && pending.length; round++) {
       const list = pending; pending = [];
       let done = false, timer = 0;
@@ -382,6 +390,27 @@
     if (tr !== last.cam) { world.style.transform = tr; last.cam = tr; }
   }
 
+  /* ── Time remapping (callback cuts) ──────────────────────────────────────── */
+  const remaps = [];
+  function remap(from, to, fn) {
+    if (typeof fn !== 'function' || !(+to > +from)) { console.warn('[BV] remap(from, to, fn) ignored: bad arguments'); return () => {}; }
+    const r = { from: +from, to: +to, fn };
+    remaps.push(r);
+    if (built) apply(BV.t);
+    return () => { const i = remaps.indexOf(r); if (i >= 0) { remaps.splice(i, 1); if (built) apply(BV.t); } };
+  }
+  function evalTime(t) {
+    for (let i = remaps.length - 1; i >= 0; i--) {
+      const r = remaps[i];
+      if (t >= r.from && t < r.to) {
+        let v = NaN;
+        try { v = +r.fn(t); } catch (e) { console.error('[BV] remap fn failed:', e); }
+        return isFinite(v) ? clamp(v, 0, BV.duration) : t;
+      }
+    }
+    return t;
+  }
+
   /* ── Time ────────────────────────────────────────────────────────────────── */
   // Pure function of t: visibility, scene updates, fx, camera.
   function apply(t) {
@@ -389,15 +418,16 @@
     BV.t = t;
     BV.frame = Math.floor(t * BV.fps + 1e-6);
     resetFx();
-    const atEnd = t >= BV.duration;
+    const te = remaps.length ? evalTime(t) : t;          // scene-evaluation time (remapped)
     for (let i = 0; i < sorted.length; i++) {
       const s = sorted[i];
       if (!s.root) continue;
+      const ts = s.def.noRemap ? t : te;
       // Visible iff start <= t < end; the final frame holds scenes that run to the end.
-      const vis = !s.broken && ((t >= s.start && t < s.end) || (atEnd && s.end >= BV.duration && t >= s.start));
+      const vis = !s.broken && ((ts >= s.start && ts < s.end) || (ts >= BV.duration && s.end >= BV.duration && ts >= s.start));
       if (vis !== s.vis) { s.root.style.display = vis ? '' : 'none'; s.vis = vis; }
       if (vis && typeof s.def.update === 'function') {
-        try { s.def.update(s.state, t - s.start, t, s.ctx); }
+        try { s.def.update(s.state, ts - s.start, ts, s.ctx); }
         catch (e) { report(s, e, 'update'); }
       }
     }

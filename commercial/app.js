@@ -354,6 +354,8 @@
   setTimeUI(BV.t);
 
   BV.ready.then(() => {
+    player.classList.remove('is-loading');
+    player.removeAttribute('aria-busy');
     setFormatUI(BV.format);
     buildTicks();
     setTimeUI(BV.t);

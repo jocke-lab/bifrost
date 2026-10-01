@@ -102,6 +102,18 @@ a{color:inherit}
 .bvp-player.is-portrait .bvp-screen{aspect-ratio:9/16}
 #bv-viewport{position:absolute;inset:0;overflow:hidden;background:#000}
 
+/* loading state (until BV.ready: fonts, art and first frame) */
+.bvp-player.is-loading .bvp-screen::before{
+  content:"";position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:radial-gradient(60% 50% at 50% 55%,rgba(77,141,255,.14),transparent 70%),#05070D;
+}
+.bvp-player.is-loading .bvp-screen::after{
+  content:"";position:absolute;left:50%;top:50%;z-index:3;width:44px;height:44px;margin:-22px 0 0 -22px;
+  border-radius:50%;border:2px solid rgba(255,255,255,.10);border-top-color:var(--cyan);border-right-color:var(--violet);
+  animation:bvp-rot .9s linear infinite;
+}
+.bvp-player.is-loading .bvp-controls{opacity:.5;pointer-events:none}
+
 /* ── 5. BIG PLAY OVERLAY ───────────────────────────────────────────────────── */
 .bvp-bigplay{
   position:absolute;inset:0;z-index:5;

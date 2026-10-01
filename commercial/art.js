@@ -25,6 +25,10 @@
    AURORA                ['#7C5CFF','#4D8DFF','#19D3FF','#46E6A6']
 
    coinSVG(id, {side:'face'|'reverse', size=1024, serial, edition:true, mint:true}) -> <svg> string
+       Field composition: BVArtFields[id].field (colour ink, clipped r<=330) masked by inkMask over the
+       polished metal, soft-light metal sheen + enamel gloss, relief -> frosted cameo + diffuse/specular
+       emboss. Optional BVArtFields[id].over(uid): markup drawn above the band (rim-breaking strikes).
+       A missing / failing illustration renders an engraved guilloche placeholder.
    coinImg(id, {side='face', size=1024, serial}) -> HTMLImageElement (raster, cached)
    mountCoin(parent, id, {size=512, side, thickness, perspective, res, tier, edges})
        -> { el, rot, front, back, size, set({x,y,s,rx,ry,rz,o,glow,glint,glintA}),
@@ -43,14 +47,18 @@
    nfcSVG({size=120, color='#46E6A6'}) -> string
    sealSVG(id, {size=240}) -> round holographic NFC seal sticker
    capsuleSVG(id|null, {size=600, layer:'full'|'back'|'front'}) -> acrylic capsule (600x600 units)
-   boxSVG({open=0..1|bool, size=800, tape=true}) -> isometric matte-black box (800x780 units; flaps fold with open)
+   boxSVG({open=0..1|bool, size=800, tape=true}) -> isometric matte-black box, aurora foam insert
+                         (800x780 units; flaps fold out with open, closed variant has the tape strip)
    labelSVG({size=520}) -> shipping label 'TRACKED · NFC-SEALED' (520x300 units)
    phoneSVG(screenMarkup?, {size=380, hole=false}) -> phone frame 380x780 units; PHONE.screen = {x,y,w,h,r}
    vaultDoorSVG({open=0, size=1000, wheel=true, glow=1}) -> circular vault door (1000x1000 units)
    vaultWheelSVG({size=1000}) -> the 8-spoke wheel alone (same 1000 box, centred) for spinning
    textSVG(str, {x,y,size,font:'sg6'|'sg7'|'mono',anchor,tracking,fill}) -> outlined text <g>
    textWidth(str, {size,font,tracking}) -> px
-   img(svg, {raster:false|true|px, w, h}) -> HTMLImageElement (vector data URI, or rasterised bitmap)
+   img(svg, {raster:false|true|px, scale, w, h}) -> HTMLImageElement. SVGs containing <filter> are
+                         rasterised to a bitmap by default (cheap to transform every frame); pass
+                         {raster:px} for a larger bitmap or {raster:false} to keep a vector <img>.
+   packImg({side, seed, size, sealed, part:'top'|'body'}) -> rasterised pack <img> (front/back/parts pre-decoded)
    svgURI(svg) -> data URI
    prepare([{id, side, size}] | promise...) -> Promise (pre-raster extra coin sizes)
    ready -> Promise: 6 faces + 6 reverses @1024 (+ heimdall @2048) + pack front/back/parts decoded.
@@ -297,7 +305,7 @@
     return s;
   }
   function frameDefs(u, M) {
-    return lg(u + '-crest', 150, 150, 850, 850, [[0, '#fff', 0.85], [0.35, '#fff', 0.15], [0.5, '#fff', 0.05], [0.68, '#fff', 0.22], [1, '#fff', 0.7]]) +
+    return lg(u + '-crest', 150, 150, 850, 850, [[0, M.hl, 0.85], [0.35, M.hl, 0.15], [0.5, M.hl, 0.05], [0.68, M.hl, 0.22], [1, M.hl, 0.6]]) +
       rg(u + '-rimshade', 500, 500, G.reed, [[0, '#000', 0], [(G.rimIn) / G.reed, '#000', 0.28], [(G.rimIn + 9) / G.reed, '#000', 0], [(G.reed - 9) / G.reed, '#000', 0], [1, '#000', 0.32]]) +
       lg(u + '-wall', 180, 160, 820, 840, [[0, '#000', 0.55], [0.45, '#000', 0.25], [0.62, ramp(M.rim, 1), 0.15], [1, ramp(M.rim, M.key === 'au' ? 0.84 : 0.97), 0.75]]) +
       blurF(u + '-b2', 2) + blurF(u + '-b6', 6) + blurF(u + '-b14', 14) + grainF(u + '-grain', 11) +
@@ -343,8 +351,8 @@
       // mint mark: lozenge with 'LI'
       const c = pc(500, 500, 396, rightMid);
       txt += '<g transform="translate(' + P(c) + ')">' +
-        '<path d="M0,-22L17,0L0,22L-17,0Z" fill="none" stroke="currentColor" stroke-width="2.6"/>' +
-        textSVG('LI', { x: 0, y: 7, size: 19, font: 'sg7', anchor: 'middle', tracking: 0.02 }) + '</g>';
+        '<path d="M0,-25L20,0L0,25L-20,0Z" fill="none" stroke="currentColor" stroke-width="2.8"/>' +
+        textSVG('LI', { x: 0.5, y: 7.6, size: 21, font: 'sg7', anchor: 'middle', tracking: 0.04 }) + '</g>';
       orn += star4.apply(null, pc(500, 500, 396, (topHalf + rightMid - 22 / 3.9) / 2 + 1).concat([7, 0.2, 90]));
       orn += star4.apply(null, pc(500, 500, 396, (180 - botHalf + rightMid + 22 / 3.9) / 2 - 1).concat([7, 0.2, 90]));
     } else {
@@ -379,9 +387,11 @@
   /* --------------------------------------------- field composition (ink on metal) */
   // fieldObj: { field(u) -> markup, inkMask(u) -> mask contents|null, relief(u) -> markup|null, over(u)? }
   // style: 'proof' (bright polished field) | 'mirror' (deep mirror, cameo frost)
-  function fieldMarkup(u, M, fo, style) {
+  function fieldMarkup(u, M, fo, style, fallback) {
     let art = '', mask = null, rel = null, over = '';
     try { art = fo.field ? fo.field(u) || '' : ''; } catch (e) { art = ''; }
+    // an illustration that fails to render falls back to the engraved placeholder
+    if (!art && fallback) return fieldMarkup(u, M, fallback, 'mirror');
     try { mask = fo.inkMask ? fo.inkMask(u) : null; } catch (e) { mask = null; }
     try { rel = fo.relief ? fo.relief(u) : null; } catch (e) { rel = null; }
     try { over = fo.over ? fo.over(u) || '' : ''; } catch (e) { over = ''; }
@@ -589,7 +599,7 @@
       frameMarkup(u, M) +
       bandMarkup(u, M, top, bottom, { edition: ed, mint: mint, topSize: topSize, topTrack: top.length > 18 ? 0.08 : 0.11 }) +
       beadMarkup(u, M) +
-      fieldMarkup(u + 'f', M, fo, style) +
+      fieldMarkup(u + 'f', M, fo, style, side === 'reverse' ? null : placeholderField(c, M)) +
       specMarkup(u, M);
     return wrapSVG(size, size, 1000, 1000, body);
   }
@@ -634,6 +644,8 @@
       return Promise.all(all).then(() => url);
     });
     RASTER.set(key, e);
+    // let the film engine wait for rasters requested while scenes build
+    try { if (window.BV && typeof window.BV.preload === 'function') window.BV.preload(e.promise); } catch (err) { /* noop */ }
     return e;
   }
   function imgFrom(e, w, h) {
@@ -667,8 +679,11 @@
     const m = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svg);
     const wm = /<svg[^>]*?width="([\d.]+)"[^>]*?height="([\d.]+)"/.exec(svg);
     const w = o.w || (wm ? +wm[1] : m ? +m[1] : 512), h = o.h || (wm ? +wm[2] : m ? +m[2] : 512);
-    if (o.raster) {
-      const scale = o.raster === true ? 1 : o.raster / w;
+    // filtered SVGs are rasterised by default (re-rasterising feTurbulence / lighting / blur every
+    // frame under an animated transform is expensive); pass {raster:false} to keep a vector <img>.
+    const auto = o.raster == null && /<filter/.test(svg);
+    if (o.raster || auto) {
+      const scale = (o.raster === true || auto) ? (o.scale || 1) : o.raster / w;
       let key = IMGCACHE.get(svg);
       if (!key) { key = 'img|' + (++IMGK); IMGCACHE.set(svg, key); }
       const e = entry(key + '|' + scale, () => svg, w * scale, h * scale);
@@ -718,10 +733,13 @@
     const sw = (TAU * r / N) + 1.2;
     const E = METALS[coin.metal] || METALS.ag;
     const edges = [];
-    function edgeBG(Me) {
-      return 'linear-gradient(90deg,' + Me.edge[0] + ' 0%,' + Me.edge[1] + ' 22%,' + Me.edge[2] + ' 50%,' + Me.edge[1] + ' 78%,' + Me.edge[0] + ' 100%)';
+    // reeded strip background, pre-lit for the strip's angle (no per-strip CSS filter)
+    function edgeBG(Me, lit) {
+      const k = 0.72 + 0.5 * lit;
+      const sh = (c) => k >= 1 ? mix(c, '#ffffff', Math.min(0.6, k - 1)) : mix(c, '#000000', 1 - k);
+      return reed + ', linear-gradient(90deg,' + sh(Me.edge[0]) + ' 0%,' + sh(Me.edge[1]) + ' 22%,' + sh(Me.edge[2]) + ' 50%,' + sh(Me.edge[1]) + ' 78%,' + sh(Me.edge[0]) + ' 100%)';
     }
-    const reed = 'repeating-linear-gradient(180deg, rgba(255,255,255,.34) 0px, rgba(255,255,255,.34) 1px, rgba(0,0,0,.36) 1.6px, rgba(0,0,0,.36) ' + n(Math.max(2.6, size / 220)) + 'px)';
+    var reed = 'repeating-linear-gradient(180deg, rgba(255,255,255,.34) 0px, rgba(255,255,255,.34) 1px, rgba(0,0,0,.36) 1.6px, rgba(0,0,0,.36) ' + n(Math.max(2.6, size / 220)) + 'px)';
     for (let i = 0; i < N; i++) {
       const a = i * 360 / N;
       const s = document.createElement('div');
@@ -729,10 +747,10 @@
       const lit = 0.5 + 0.5 * Math.cos((a - 225) * DEG);
       css(s, {
         position: 'absolute', left: n(r - t / 2) + 'px', top: n(r - sw / 2) + 'px', width: n(t) + 'px', height: n(sw) + 'px',
-        background: reed + ', ' + edgeBG(E), backfaceVisibility: 'hidden',
-        transform: 'rotateZ(' + n(a) + 'deg) translateX(' + n(r - 0.6) + 'px) rotateY(90deg)',
-        filter: 'brightness(' + n(0.72 + 0.5 * lit) + ')'
+        background: edgeBG(E, lit), backfaceVisibility: 'hidden',
+        transform: 'rotateZ(' + n(a) + 'deg) translateX(' + n(r - 0.6) + 'px) rotateY(90deg)'
       });
+      s._lit = lit;
       edges.push(s);
       rot.appendChild(s);
     }
@@ -792,7 +810,7 @@
       const nf = coinImg(c2.id, { side: 'face', size: res }), nb = coinImg(c2.id, { side: 'reverse', size: res });
       for (const [Fc, ni] of [[F, nf], [B, nb]]) { css(ni, { position: 'absolute', left: '0px', top: '0px', width: size + 'px', height: size + 'px', display: 'block' }); Fc.wrap.replaceChild(ni, Fc.im); Fc.im = ni; }
       const Me = METALS[c2.metal] || METALS.ag;
-      edges.forEach((s) => { s.style.background = reed + ', ' + edgeBG(Me); });
+      edges.forEach((s) => { s.style.background = edgeBG(Me, s._lit); });
       if (!o.tier) { tier = c2.tier; applyTier(); }
       api.front = F.im; api.back = B.im; api.id = c2.id;
       return api;
@@ -1035,12 +1053,10 @@
     let s = B.s + (o.side === 'back' ? packBack(u, o) : packFront(u, o));
     if (o.sealed === false) {
       const pts = tearLine(o.seed || 7);
-      const above = 'M0,0L' + PACK.W + ',0L' + pts.slice().reverse().map(P).join('L') + 'Z';
       const below = 'M' + pts.map(P).join('L') + 'L' + PACK.W + ',' + PACK.H + 'L0,' + PACK.H + 'Z';
       s = '<defs><clipPath id="' + u + '-bc"><path d="' + below + '"/></clipPath></defs><g clip-path="url(#' + u + '-bc)">' + s +
         '<path d="M' + pts.map(P).join('L') + 'L' + PACK.W + ',' + (PACK.tearY + 60) + 'L0,' + (PACK.tearY + 60) + 'Z" fill="#05070D" opacity=".5" filter="url(#' + u + '-b10)"/></g>' +
         '<path d="M' + pts.map(P).join('L') + '" fill="none" stroke="#FFF4DC" stroke-width="2.5" opacity=".9"/>';
-      void above;
     }
     return wrapSVG(size, size * PACK.H / PACK.W, PACK.W, PACK.H, s);
   }
@@ -1103,7 +1119,7 @@
     }
     el.appendChild(rot);
     parent && parent.appendChild(el);
-    const state = { x: 0, y: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, foil: null, foilA: 0.55, sheen: null };
+    const state = { x: 0, y: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, foil: null, foilA: 0.4, sheen: null };
     function set(p) {
       if (p) for (const k in p) if (p[k] !== undefined) state[k] = p[k];
       el.style.transform = 'translate3d(' + n(state.x) + 'px,' + n(state.y) + 'px,0) translate(-50%,-50%) scale(' + (Math.round(state.s * 10000) / 10000) + ')';
@@ -1113,7 +1129,7 @@
       for (const side of ['front', 'back']) {
         const F = faces[side];
         F.foil.style.background = packFoil(fa + (side === 'back' ? 180 : 0), { alpha: 0.9 });
-        F.foil.style.opacity = String(state.foilA);
+        F.foil.style.opacity = String(clamp(state.foilA * (side === 'back' ? 0.55 : 1), 0, 1));
         if (state.sheen == null) F.sheen.style.opacity = '0';
         else { F.sheen.style.opacity = '1'; F.band.style.transform = 'translateX(' + n(state.sheen * size * 2.2) + 'px) rotate(18deg)'; }
       }
@@ -1434,7 +1450,6 @@
     const dr = 422 - open * 6;
     s += '<circle cx="' + (cx + 5) + '" cy="' + (cy + 8) + '" r="' + n(dr) + '" fill="#000" opacity=".55" filter="url(#' + u + '-b8)"/>';
     s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + n(dr) + '" fill="url(#' + u + '-door)"/>';
-    s += conicRing(cx, cy, 0, dr, 144, (a) => { const k = 0.5 + 0.5 * Math.cos(2 * (a - LIGHT) * DEG); return k > 0.5 ? '#ffffff' : '#000000'; }, 'opacity=".0"');
     // anisotropic spun sheen: two bright lobes
     let sheen = '';
     for (let i = 0; i < 72; i++) {

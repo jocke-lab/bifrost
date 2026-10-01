@@ -312,7 +312,6 @@
       var m = FULL;
       // moon: bare silver crescent; the dark limb is printed as faint sky
       m += path(crescent(MOON.x, MOON.y, MOON.r, MOON.dx, MOON.dy, MOON.r2), 'fill="#000"');
-      m += '<circle cx="' + (MOON.x + MOON.dx) + '" cy="' + (MOON.y + MOON.dy) + '" r="' + MOON.r2 + '" fill="#000" fill-opacity=".0"/>';
       // star glints: bare metal
       STARS.forEach(function (s) {
         m += s[2] > 4 ? path(star4(s[0], s[1], s[2], 0.14, s[3] * 0.4), 'fill="#000"') : '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="' + n(s[2] * 0.42) + '" fill="#000"/>';
@@ -535,7 +534,6 @@
       m += path(SNOW.snow, 'fill="#000"');
       m += path(COUL, 'fill="none" stroke="#000" stroke-opacity=".6" stroke-width="1.8" stroke-linecap="round"');
       // silvery reflection of the snow caps, broken by ripples (translucent ink = metal glimmers through)
-      m += '<g transform="matrix(1,0,0,-0.5,0,' + n(WL * 1.5) + ')">' + path(SNOW.snow, 'fill="#000" fill-opacity=".22"') + '</g>';
       var rp = '';
       for (var y = WL + 3; y < 760; y += 4 + (y - WL) * 0.035) rp += 'M140,' + n(y) + 'H860';
       m += path(rp, 'stroke="#fff" stroke-width="1.6" fill="none"');
@@ -556,7 +554,7 @@
     }
     function relief(u) {
       var inner = path(poly(LM), 'fill-opacity=".55"') + path(poly(RM), 'fill-opacity=".55"') + path(poly(MM), 'fill-opacity=".35"') +
-        path(SNOW.snow, 'fill-opacity="1"') + path(FORE_L + FORE_R, 'fill-opacity=".45"') + path(PINES, 'fill-opacity=".5"') + cabin('#fff');
+        path(SNOW.snow, 'fill-opacity="1"') + path(FORE_L + FORE_R, 'fill-opacity=".18"') + path(PINES, 'fill-opacity=".22"') + cabin('#fff');
       return reliefWrap(u, inner, 2.5);
     }
     return { metal: 'ag', field: field, inkMask: inkMask, relief: relief };
@@ -669,7 +667,6 @@
       d += 'M' + (cx - 14) + ',' + cy + 'A14,14 0 0 1 ' + (cx + 14) + ',' + cy;
       return d;
     })();
-    var SCALES = '';
     var CLOAK = 'M556,546C600,550 640,566 662,600C680,640 686,720 690,840L588,840C594,760 590,690 580,632C574,600 566,572 556,546Z';
     var CLOAK_WIRES = (function () { var d = ''; for (var k = 0; k < 4; k++) { var x0 = 600 + k * 20; d += 'M' + P(x0 - 10, 600) + 'C' + P(x0, 680) + ' ' + P(x0 - 4, 760) + ' ' + P(x0 + 4 + k * 3, 840); } return d; })();
     var BROOCH = [604, 588];
@@ -716,7 +713,7 @@
       var wg = [[0, '#1a0c66'], [0.3, '#3a22c0'], [0.55, '#5f42f4'], [0.8, '#4f6cff'], [1, '#4D8DFF']];
       var defs = rg(u + '-wl', 430, 540, 330, wg) + rg(u + '-wr', 570, 530, 330, wg) +
         lg(u + '-frost', 0, 266, 0, 840, [[0, '#FFF8E2'], [0.45, '#F9E6AE'], [1, '#EFCF7E']]) +
-        rg(u + '-mir', SUN[0], SUN[1], 470, [[0, '#FFF6D8', 0.55], [0.26, '#FFF1C1', 0.2], [0.3, '#b07a1c', 0.1], [0.7, '#5a3405', 0.3], [1, '#3a2003', 0.55]]) +
+        rg(u + '-mir', SUN[0], SUN[1], 470, [[0, '#FFF6D8', 0.55], [0.26, '#FFF1C1', 0.2], [0.3, '#8a5a12', 0.2], [0.6, '#5a3405', 0.4], [1, '#3a2003', 0.62]]) +
         lg(u + '-cloak', 0, 540, 0, 840, [[0, '#6a4cf0'], [0.5, '#4a2fd8'], [1, '#2a168a']]) +
         rg(u + '-sheen', 500, 330, 300, [[0, '#ffffff', 0.35], [1, '#ffffff', 0]]) +
         lg(u + '-shx', 340, 0, 680, 0, [[0, '#7a4a0a', 0.55], [0.18, '#a8741c', 0.15], [0.45, '#ffffff', 0.12], [0.75, '#a8741c', 0.2], [1, '#6b3f08', 0.6]]) +
@@ -742,7 +739,7 @@
       out += GLINTS.map(function (g) { return '<circle cx="' + n(g[0]) + '" cy="' + n(g[1]) + '" r="' + n(g[2] * 0.9) + '" fill="url(#' + u + '-gl)"/>' + path(star4(g[0], g[1], g[2], 0.12, 0), 'fill="#FFFBEA"'); }).join('');
       var F = 'fill="url(#' + u + '-frost)"', O = 'fill="none" stroke="#5e3a08" stroke-width="2.6" stroke-linejoin="round"', E = 'stroke="#7a4f0e" stroke-width="1.8" fill="none" stroke-linecap="round"';
       out += path(BODY_BACK, F) + path(TORSO, 'fill="url(#' + u + '-shx)"') + path(TORSO, 'fill="url(#' + u + '-shy)"') + path(NECK, 'fill="url(#' + u + '-nsh)"') +
-        path(CHEST_LINES + SCALES, E) + path(BODY_BACK, O);
+        path(CHEST_LINES, E) + path(BODY_BACK, O);
       out += path(CLOAK, 'fill="url(#' + u + '-cloak)"') + path(CLOAK, 'fill="url(#' + u + '-shy)"') + path(CLOAK_WIRES, 'stroke="#b7a6ff" stroke-opacity=".5" stroke-width="2" fill="none"');
       out += path(ARMOUR, F) + path(GORGET_FAN, E) + path(ARMOUR, O);
       out += path(HAIR, F) + path(HAIR_LINES, E) + path(HAIR, O);
@@ -757,7 +754,7 @@
       m += wingMask(WR) + wingMask(WL);
       m += GLINTS.map(function (g) { return '<circle cx="' + n(g[0]) + '" cy="' + n(g[1]) + '" r="' + n(g[2] * 0.9) + '" fill="#fff"/>'; }).join('');
       var G = 'fill="#9a9a9a"', W = 'fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"', Wl = 'stroke="#fff" stroke-width="2.2" fill="none"';
-      m += path(BODY_BACK, G) + path(CHEST_LINES + SCALES, Wl) + path(BODY_BACK, W);
+      m += path(BODY_BACK, G) + path(CHEST_LINES, Wl) + path(BODY_BACK, W);
       m += path(CLOAK, 'fill="#fff"') + path(CLOAK_WIRES, 'stroke="#000" stroke-width="2.4" fill="none"') + path(CLOAK, 'fill="none" stroke="#000" stroke-width="3"');
       m += path(ARMOUR, G) + path(GORGET_FAN, Wl) + path(ARMOUR, W);
       m += path(HAIR, G) + path(HAIR_LINES, Wl) + path(HAIR, W);
@@ -780,19 +777,15 @@
      violet and a mint dot at its feet (the Bifrost mark); deep mirror-proof sky
      with a micro starfield; Art Deco gate architecture; god-rays. */
   var HEIMDALL = (function () {
-    var BR = { cx: 500, cy: 628, rx: 282, ry: 372, w: 58 }; // bridge half-ellipse (logo proportions)
+    var BR = { cx: 500, cy: 614, rx: 268, ry: 360, w: 60 }; // bridge half-ellipse (logo proportions)
     var DOOR = { x0: 414, x1: 586, top: 404, sill: 772 };
     function arcPath(rx, ry) {
       return 'M' + P(BR.cx - rx, BR.cy) + 'A' + n(rx) + ' ' + n(ry) + ' 0 0 1 ' + P(BR.cx + rx, BR.cy);
     }
     // gate architecture -----------------------------------------------------
-    function stepTower(x0, x1, top, steps) {
+    function stepTower(x0, x1, top) {
       // ziggurat-topped pylon from x0..x1, top y, down to the sill
-      var pts = [[x0, DOOR.sill]], st = steps || 3, inset = (x1 - x0) * 0.14;
-      for (var i = 0; i < st; i++) {
-        var y = top + (st - 1 - i) * 0; // placeholder
-      }
-      var w = x1 - x0, d = 'M' + P(x0, DOOR.sill);
+      var inset = (x1 - x0) * 0.14, d = 'M' + P(x0, DOOR.sill);
       d += 'L' + P(x0, top + 54) + 'L' + P(x0 + inset, top + 54) + 'L' + P(x0 + inset, top + 26) + 'L' + P(x0 + inset * 2, top + 26) + 'L' + P(x0 + inset * 2, top) +
         'L' + P(x1 - inset * 2, top) + 'L' + P(x1 - inset * 2, top + 26) + 'L' + P(x1 - inset, top + 26) + 'L' + P(x1 - inset, top + 54) + 'L' + P(x1, top + 54) + 'L' + P(x1, DOOR.sill) + 'Z';
       return d;
@@ -801,8 +794,8 @@
     // central gate block with a tall stepped arch opening
     var GATE = 'M404,' + DOOR.sill + 'L404,384L432,384L432,362L458,362L458,340L542,340L542,362L568,362L568,384L596,384L596,' + DOOR.sill + 'Z';
     var OPEN = 'M' + DOOR.x0 + ',' + DOOR.sill + 'L' + DOOR.x0 + ',476L432,476L432,452L452,452L452,430L472,430L472,412L528,412L528,430L548,430L548,452L568,452L568,476L' + DOOR.x1 + ',476L' + DOOR.x1 + ',' + DOOR.sill + 'Z';
-    var WALLS = 'M246,' + DOOR.sill + 'L246,560L262,560L262,546L282,546L282,560L298,560L298,546L318,546L318,560L326,560L326,' + DOOR.sill + 'Z' +
-      'M674,' + DOOR.sill + 'L674,560L682,560L682,546L702,546L702,560L718,560L718,546L738,546L738,560L754,560L754,' + DOOR.sill + 'Z';
+    var WALLS = 'M266,' + DOOR.sill + 'L266,560L276,560L276,546L294,546L294,560L308,560L308,546L326,546L326,' + DOOR.sill + 'Z' +
+      'M674,' + DOOR.sill + 'L674,546L692,546L692,560L706,560L706,546L724,546L724,560L734,560L734,' + DOOR.sill + 'Z';
     var STEPS = 'M196,' + DOOR.sill + 'H804V860H196Z';
     var ARCH_LINES = (function () {
       var d = '';
@@ -813,7 +806,7 @@
       // steps
       for (var s = 1; s < 5; s++) { var y = DOOR.sill + s * 16; d += 'M196,' + y + 'H804'; }
       // masonry on walls
-      for (var r = 0; r < 12; r++) { var y2 = 576 + r * 16; d += 'M246,' + y2 + 'H326M674,' + y2 + 'H754'; }
+      for (var r = 0; r < 12; r++) { var y2 = 576 + r * 16; d += 'M266,' + y2 + 'H326M674,' + y2 + 'H734'; }
       return d;
     })();
     // Heimdall ------------------------------------------------------------
@@ -886,14 +879,14 @@
     function inlay(x, y) { return 'M' + P(x, y - 13) + 'L' + P(x + 10, y) + 'L' + P(x, y + 13) + 'L' + P(x - 10, y) + 'Z'; }
 
     function field(u) {
-      var defs = rg(u + '-sky', 500, 690, 520, [[0, '#3a2408', 0.25], [0.35, '#1a0f05', 0.72], [0.7, '#0d0703', 0.86], [1, '#070402', 0.92]]) +
+      var defs = rg(u + '-sky', 500, 690, 520, [[0, '#3a2408', 0.3], [0.3, '#1a0f05', 0.8], [0.62, '#0b0603', 0.95], [1, '#050302', 1]]) +
         rg(u + '-aur', 500, 640, 420, [[0, '#7C5CFF', 0], [0.6, '#4D8DFF', 0.0], [0.82, '#7C5CFF', 0.22], [1, '#19D3FF', 0]]) +
-        lg(u + '-br', BR.cx - BR.rx - 30, 0, BR.cx + BR.rx + 30, 0, [[0, '#7C5CFF'], [0.36, '#4D8DFF'], [0.66, '#19D3FF'], [1, '#46E6A6']]) +
+        lg(u + '-br', BR.cx - BR.rx - 30, 0, BR.cx + BR.rx + 30, 0, [[0, '#5f3ff5'], [0.36, '#2f6cf2'], [0.66, '#08b4e8'], [1, '#18c98c']]) +
         lg(u + '-door', 0, DOOR.top, 0, DOOR.sill, [[0, '#120a3a'], [0.45, '#2a1e8a'], [0.75, '#2f7dff'], [1, '#9ff7ff']]) +
         rg(u + '-doorglow', 500, DOOR.sill, 190, [[0, '#ffffff', 0.95], [0.25, '#b9fbff', 0.7], [0.6, '#46E6A6', 0.25], [1, '#19D3FF', 0]]) +
         lg(u + '-frost', 0, 330, 0, 860, [[0, '#FFF8E2'], [0.5, '#F7E3A8'], [1, '#E2BA62']]) +
         lg(u + '-horn', 516, 526, 676, 376, [[0, '#E8D9B5'], [0.6, '#F3E2B3'], [1, '#FFF6DC']]) +
-        rg(u + '-rays', 500, 640, 480, [[0, '#FFE7A8', 0.55], [0.6, '#F2C66D', 0.22], [1, '#F2C66D', 0]]) +
+        rg(u + '-rays', 500, 640, 480, [[0, '#FFF1C1', 0.75], [0.55, '#F2C66D', 0.3], [1, '#F2C66D', 0]]) +
         blurF(u + '-b8', 8) + blurF(u + '-b3', 3);
       var out = '<defs>' + defs + '</defs>';
       // deep mirror sky + god-rays
@@ -904,10 +897,10 @@
       out += '<g fill="#FFF4DC">' + STARS.map(function (s) { return s[2] > 4.2 ? path(star4(s[0], s[1], s[2], 0.13, 0)) : '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="' + n(s[2] * 0.55) + '"/>'; }).join('') + '</g>';
       // aurora bridge: halo, enamel band, lane wires, shimmer
       var bw = BR.w;
-      out += '<path d="' + arcPath(BR.rx, BR.ry) + '" fill="none" stroke="url(#' + u + '-br)" stroke-width="' + (bw + 46) + '" stroke-opacity=".45" filter="url(#' + u + '-b8)"/>';
+      out += '<path d="' + arcPath(BR.rx, BR.ry) + '" fill="none" stroke="url(#' + u + '-br)" stroke-width="' + (bw + 40) + '" stroke-opacity=".32" filter="url(#' + u + '-b8)"/>';
       out += '<path d="' + arcPath(BR.rx, BR.ry) + '" fill="none" stroke="url(#' + u + '-br)" stroke-width="' + bw + '"/>';
       var lanes = '';
-      [[-0.375, '#7C5CFF', 0.35], [-0.125, '#ffffff', 0.1], [0.125, '#ffffff', 0.22], [0.375, '#ffffff', 0.32]].forEach(function (k) { lanes += '<path d="' + arcPath(BR.rx + k[0] * bw, BR.ry + k[0] * bw) + '" fill="none" stroke="' + k[1] + '" stroke-opacity="' + k[2] + '" stroke-width="' + (bw * 0.25) + '"/>'; });
+      [[-0.375, '#5a3df0', 0.35], [-0.125, '#ffffff', 0.04], [0.125, '#ffffff', 0.1], [0.375, '#ffffff', 0.16]].forEach(function (k) { lanes += '<path d="' + arcPath(BR.rx + k[0] * bw, BR.ry + k[0] * bw) + '" fill="none" stroke="' + k[1] + '" stroke-opacity="' + k[2] + '" stroke-width="' + (bw * 0.25) + '"/>'; });
       out += lanes;
       out += '<path d="' + arcPath(BR.rx + bw * 0.12, BR.ry + bw * 0.12) + '" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width="6" filter="url(#' + u + '-b3)"/>';
       out += '<path d="' + arcPath(BR.rx - bw * 0.38, BR.ry - bw * 0.38) + '" fill="none" stroke="#ffffff" stroke-opacity=".55" stroke-width="2" stroke-dasharray="1 9" stroke-linecap="round"/>';
@@ -921,11 +914,14 @@
       out += path(WALLS + PYL_L + PYL_R + GATE + OPEN, 'fill="none" stroke="#5e3a08" stroke-width="2.4"');
       // bridge feet: violet + mint enamel discs on gold pedestals
       FEET.forEach(function (f) {
-        out += '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="40" fill="' + f[2] + '" fill-opacity=".45" filter="url(#' + u + '-b8)"/>' +
-          '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="27" fill="' + f[2] + '"/><circle cx="' + (f[0] - 8) + '" cy="' + (f[1] - 9) + '" r="8" fill="#ffffff" fill-opacity=".45"/>';
+        out += '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="48" fill="' + f[2] + '" fill-opacity=".5" filter="url(#' + u + '-b8)"/>' +
+          '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="34" fill="' + f[2] + '"/><circle cx="' + (f[0] - 10) + '" cy="' + (f[1] - 11) + '" r="10" fill="#ffffff" fill-opacity=".45"/>';
       });
       // Heimdall
       var FR = 'url(#' + u + '-frost)', OL = '#4a2c05';
+      // aurora back-light around the silhouette where it stands in the doorway
+      out += '<defs><clipPath id="' + u + '-dc"><path d="' + OPEN + '"/></clipPath></defs><g clip-path="url(#' + u + '-dc)"><g transform="' + FIG_TF + '" filter="url(#' + u + '-b3)">' +
+        path(CAPE + TORSO_H + SKIRT + HEAD + BEARD + HELMH + CREST + BOOTS, 'fill="none" stroke="#9ffcff" stroke-width="12" stroke-opacity=".85"') + limbs('#9ffcff', 12) + '</g></g>';
       out += '<g transform="' + FIG_TF + '">';
       out += path(CAPE, 'fill="' + FR + '" stroke="' + OL + '" stroke-width="2.4"') + path(CAPE_LINES, 'stroke="#7a4f0e" stroke-width="1.6" fill="none"');
       out += limbs(OL, 5) + limbs(FR, 0);
@@ -952,7 +948,7 @@
       m += path(WALLS + PYL_L + PYL_R + GATE + OPEN, 'fill="none" stroke="#fff" stroke-width="2.8"');
       m += INLAYS.map(function (q) { return path(inlay(q[0], q[1]), 'fill="#fff" stroke="#000" stroke-width="3"'); }).join('');
       // feet discs: enamel with a bare-gold ring
-      FEET.forEach(function (f) { m += '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="27" fill="#fff" stroke="#000" stroke-width="5"/>'; });
+      FEET.forEach(function (f) { m += '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="34" fill="#fff" stroke="#000" stroke-width="5"/>'; });
       // figure: frosted gold
       m += '<g transform="' + FIG_TF + '">';
       m += path(CAPE, 'fill="#9a9a9a" stroke="#fff" stroke-width="2.8"') + path(CAPE_LINES, 'stroke="#fff" stroke-width="2" fill="none"');
@@ -968,7 +964,7 @@
       var inner = '<path d="' + arcPath(BR.rx, BR.ry) + '" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="' + BR.w + '"/>' +
         path(WALLS + PYL_L + PYL_R + GATE, 'fill-opacity=".55"') + path(STEPS, 'fill-opacity=".35"') +
         path(FIG, 'fill-opacity="1"') + path(HORN, 'fill-opacity="1"') + '<g fill="none" stroke="#fff">' + LIMBS.map(function (l) { return '<path d="' + l[0] + '" stroke-width="' + l[1] + '" stroke-linecap="round"/>'; }).join('') + '</g>' +
-        FEET.map(function (f) { return '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="27" fill-opacity=".8"/>'; }).join('');
+        FEET.map(function (f) { return '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="34" fill-opacity=".8"/>'; }).join('');
       return reliefWrap(u, inner, 2.4);
     }
     return { metal: 'au', field: field, inkMask: inkMask, relief: relief };
@@ -1015,6 +1011,16 @@
       return d;
     }
     var SCALES = scales();
+    var DIAMONDS = (function () {
+      var d = '';
+      for (var i = 8; i < NS - 8; i += 9) {
+        var a = SPINE[i - 4], b = SPINE[i + 4], c = SPINE[i], w = bodyW(i / NS) * 0.26;
+        var nx = RB.R[i][0] - RB.L[i][0], ny = RB.R[i][1] - RB.L[i][1], l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l;
+        var cx = c[0] + nx * w * 0.4, cy = c[1] + ny * w * 0.4;
+        d += poly([[a[0] + nx * w * 0.4, a[1] + ny * w * 0.4], [cx + nx * w, cy + ny * w], [b[0] + nx * w * 0.4, b[1] + ny * w * 0.4], [cx - nx * w, cy - ny * w]]);
+      }
+      return d;
+    })();
     // ventral plates along the inner edge
     function belly() {
       var band = [], d = '';
@@ -1122,6 +1128,7 @@
       out += SEGS.map(function (g) { var c = ramp(SR, g.s); return '<path d="' + g.d + '" fill="' + c + '" stroke="' + c + '" stroke-width=".8"/>'; }).join('');
       out += path(BODY, 'fill="url(#' + u + '-xs)"');
       out += path(BELLY.band, 'fill="#bfffe6" fill-opacity=".3"');
+      out += path(DIAMONDS, 'fill="#05606e" fill-opacity=".55"');
       // head
       out += '<g transform="' + HEAD_TF + '">' + path(HEAD_HORNS, 'fill="#0a8a6a"') + path(HEAD, 'fill="url(#' + u + '-hd)"') +
         '<circle cx="' + (EYE.x) + '" cy="' + EYE.y + '" r="14" fill="#19D3FF" fill-opacity=".5" filter="url(#' + u + '-b4)"/>' +
@@ -1129,7 +1136,7 @@
       return out;
     }
     function inkMask(u) {
-      var m = '<defs><clipPath id="' + u + '-inm"><circle cx="500" cy="500" r="' + (R0 - 18) + '"/></clipPath></defs><g clip-path="url(#' + u + '-inm)">' + FULL;
+      var m = FULL;
       // the sky is bare mirror silver except the faint wash; stars bare
       m += '<rect x="140" y="140" width="720" height="400" fill="#000" fill-opacity=".35"/>';
       m += path(SUNDISC, 'fill="#000"');
@@ -1141,7 +1148,8 @@
           path(SHIPD.stripes.join(''), 'fill="none" stroke="#000" stroke-width="1.4"') + path(SHIPD.hull, 'fill="none" stroke="#000" stroke-width="1.6"');
       });
       m += STARS.map(function (s) { return s[2] > 3.5 ? path(star4(s[0], s[1], s[2], 0.14, 0), 'fill="#000"') : '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="' + n(s[2] * 0.5) + '" fill="#000"/>'; }).join('');
-      m += '</g>';
+      // outside the serpent ring the field is bare mirror silver (no ids here: art.js uses this markup twice)
+      m += '<path d="M0,0H1000V1000H0Z M' + (500 - (R0 - 18)) + ',500a' + (R0 - 18) + ',' + (R0 - 18) + ' 0 1,0 ' + 2 * (R0 - 18) + ',0a' + (R0 - 18) + ',' + (R0 - 18) + ' 0 1,0 ' + (-2 * (R0 - 18)) + ',0Z" fill="#000" fill-rule="evenodd"/>';
       // serpent: enamel, with bare-silver scale wires, belly plates and outline
       m += path(SPINES, 'fill="#fff" stroke="#000" stroke-width="2"');
       m += path(BODY, 'fill="#fff"');
@@ -1289,16 +1297,6 @@
     }
     return { metal: 'au', field: field, inkMask: inkMask, relief: relief };
   })();
-
-  /* ------------------------------------------------------------ placeholders */
-  function placeholder(metal, c1, c2) {
-    return {
-      metal: metal,
-      field: function (u) { return '<defs>' + lg(u + '-p', 170, 170, 830, 830, [[0, c1], [1, c2]]) + '</defs><circle cx="500" cy="500" r="340" fill="url(#' + u + '-p)"/>'; },
-      inkMask: function () { return FULL; },
-      relief: function () { return null; }
-    };
-  }
 
   window.BVArtFields = {
     huginn: HUGINN,
