@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Bifrost Vault — Rip packs. Own silver. Trade on-chain.</title>
-  <meta name="description" content="Real art on real silver. Rip a Vault Pack, reveal your coins and their on-chain certificates, then ship them home, trade on-chain or keep them in the vault." />
+  <title>Bifrost Vault — Eye of the Unknown. Real coins. A new way to collect.</title>
+  <meta name="description" content="Eye of the Unknown: five coins in silver, edition of 50 each. Mint the one you love on Base, or open a sealed case. Keep it vaulted, list it or bring it home." />
   <meta name="theme-color" content="#05070D" />
   <meta name="color-scheme" content="dark" />
 
   <!-- Sharing -->
   <meta property="og:type" content="video.other" />
   <meta property="og:site_name" content="Bifrost Vault" />
-  <meta property="og:title" content="Bifrost Vault — Rip packs. Own silver. Trade on-chain." />
-  <meta property="og:description" content="Real art on real silver. Rip a Vault Pack, reveal your coins and their on-chain certificates, then ship them home, trade on-chain or keep them in the vault." />
+  <meta property="og:title" content="Bifrost Vault — Eye of the Unknown. Real coins. A new way to collect." />
+  <meta property="og:description" content="Eye of the Unknown: five coins in silver, edition of 50 each. Mint the one you love on Base, or open a sealed case. Keep it vaulted, list it or bring it home." />
   <meta property="og:url" content="https://bifrostvault.io/commercial" />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Bifrost Vault — Rip packs. Own silver. Trade on-chain." />
-  <meta name="twitter:description" content="Real art on real silver. Rip a Vault Pack, reveal your coins and their on-chain certificates." />
+  <meta name="twitter:title" content="Bifrost Vault — Eye of the Unknown. Real coins. A new way to collect." />
+  <meta name="twitter:description" content="Eye of the Unknown: five coins in silver. Mint the one you love, or open a sealed case." />
 
   <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
   <link rel="apple-touch-icon" href="../favicon.svg" />
@@ -27,7 +27,7 @@
   <!-- Fonts (the only external resource) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" onload="this.dataset.done='1'" onerror="this.dataset.done='1'" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" onload="this.dataset.done='1'" onerror="this.dataset.done='1'" />
 
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -133,13 +133,17 @@
   <!-- ── SCRIPTS (contract order; all deferred so a missing file never blocks the rest) ── -->
   <script defer src="config.js"></script>
   <script defer src="kit.js"></script>
-  <script defer src="art-fields.js"></script>
-  <script defer src="art.js"></script>
-  <script defer src="app-ui.js"></script>
   <script defer src="film.js"></script>
+  <script defer src="app-ui.js"></script>
   <!-- SCENES -->
-  <script defer src="scenes/00-shared.js"></script><!--TESTTAG-->
-  <script defer src="scenes/00-test.js"></script><!--TESTTAG-->
+  <script defer src="scenes/00-shared.js"></script>
+  <script defer src="scenes/01-hook.js"></script>
+  <script defer src="scenes/02-five.js"></script>
+  <script defer src="scenes/03-mint.js"></script>
+  <script defer src="scenes/04-box.js"></script>
+  <script defer src="scenes/05-decide.js"></script>
+  <script defer src="scenes/06-end.js"></script>
+  <!-- /SCENES -->
   <script defer src="audio.js"></script>
   <script defer src="play.js"></script>
   <script defer src="app.js"></script>

@@ -184,8 +184,8 @@
 
   const AURORA = ['#7C5CFF', '#4D8DFF', '#19D3FF', '#46E6A6'];
   const FONT = {
-    display: "'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
-    body: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
+    display: "'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
+    body: "'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
     mono: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
   };
 

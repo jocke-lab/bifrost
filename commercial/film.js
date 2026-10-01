@@ -535,7 +535,7 @@
     }
     const specs = [];
     ['400', '500', '600', '700'].forEach(w => {
-      specs.push(w + ' 40px "Space Grotesk"', w + ' 40px "Inter"', w + ' 40px "JetBrains Mono"');
+      specs.push(w + ' 40px "Geist"', w + ' 40px "JetBrains Mono"');
     });
     await Promise.race([Promise.all(specs.map(s => document.fonts.load(s).catch(() => null))), delay(8000)]);
     await Promise.race([document.fonts.ready, delay(3000)]);

@@ -1,79 +1,78 @@
 /* ============================================================================
    Bifrost Vault commercial — shared choreography (window.BVShared)
-   30 s hero cut ("fast, simple, real product"). One source of truth for cue
-   times, the four pulls, the phone/app placement and the end-card bridge arc,
-   so every scene agrees on where things are and when.
+   v3 "the real thing": one source of truth for cue times, the five Eye of the
+   Unknown coins, the phone placement and the sealed-case film mapping, so every
+   scene agrees on where things are and when. Mirrors SCRIPT.md.
    Pure data + geometry: no DOM, no randomness.
    ========================================================================== */
 (function () {
-  // Cue sheet (seconds). 120 BPM, one bar = 2.0 s. Mirrors SCRIPT.md.
+  // Cue sheet (seconds). 120 BPM, one bar = 2.0 s.
   const CUES = {
-    hookZero: 0.0, strike: 1.0, intoPhone: 1.7,
-    appIn: 2.0, everyPackHits: 2.4, silverOrGold: 3.0, tapRip: 3.5,
-    rip: 4.0, drag: 4.1, tear: 4.6, slowOut: 5.4,
-    pullSilver: 6.0, pullRare: 7.3, pullGold: 8.6,
-    lastCoin: 10.0, heartbeats: [10.0, 10.8], black: 11.4, legendary: 11.5, oneOf25: 12.3, engrave: 12.6, backIntoPhone: 13.4,
-    decide: [14.0, 16.0, 18.0, 20.0], vaultLine: 20.8,
-    proof: 22.0, nfcTap: 22.5, mintLog: 23.2,
-    endCard: 24.5, logo: 25.3, finePrintIn: 25.0, glint: 28.8,
-    end: 30.0
+    // 01 hook
+    hookSweep: 0.0, caughtYourEye: 0.9, hookPullBack: 1.6,
+    // 02 the five (hard cuts on the half-beats)
+    five: [2.5, 3.0, 3.5, 4.0, 4.5], fiveRow: 4.3,
+    // 03 mint the one you love
+    mint: 5.0, fallForOne: 5.2, tapCoin: 5.8, sheet: 6.4, mintIt: 7.0, tapMint: 7.2, confirmed: 8.2, certificate: 8.6,
+    // 04 or let the box choose (the client's real opening)
+    box: 10.0, anticipation: 11.4, hereItComes: 12.4, release: 12.65, latch: 13.0, freeze: 15.0,
+    rise: 15.2, clearsRim: 16.1, result: 17.0, yoursToDiscover: 17.2,
+    // 05 your coin, your call
+    decide: [20.0, 21.25, 22.5, 23.75], buybackConfirm: 24.5,
+    // 06 end card
+    end: 25.0, finePrintIn: 25.0, logo: 25.8, glint: 28.8,
+    filmEnd: 30.0
   };
 
-  // The four pulls, in reveal order. `t` = the beat the coin flips.
-  // Silver pulls are real coins from the Eye of the Unknown series (1 oz .9999 Ag, 100 minted per
-  // design, struck by CIT in Liechtenstein). The gold pulls are the Bifrost Gold concept coin.
-  // Tier assignments are placeholders until the published odds table exists.
-  const PULLS = [
-    { coin: 'silence',        tier: 'silver',    t: 6.0,  edition: 41, mintage: 100, metal: 'ag', grams: 31.10, label: 'SILVER.',    metalLine: '.9999 Ag · 31.10 g' },
-    { coin: 'ametherion',     tier: 'rare',      t: 7.3,  edition: 12, mintage: 100, metal: 'ag', grams: 31.10, label: 'RARE.',      metalLine: '.9999 Ag · 31.10 g' },
-    { coin: 'bifrost-gold-q', tier: 'gold',      t: 8.6,  edition: 19, mintage: 99,  metal: 'au', grams: 7.78,  label: 'GOLD.',      metalLine: '.9999 Au · 7.78 g' },
-    { coin: 'bifrost-gold',   tier: 'legendary', t: 11.5, edition: 7,  mintage: 25,  metal: 'au', grams: 31.10, label: 'LEGENDARY.', metalLine: '.9999 Au · 31.10 g' }
-  ];
+  // The five coins (ids match BV_CONFIG.collection.coins).
+  const ORDER = ['silence', 'ametherion', 'cycle', 'dominion', 'veritas'];
+  const coin = (id) => (window.BV_CONFIG.collection.coins.find((c) => c.id === id));
 
-  // The four decisions (scene 06), in order.
-  const CHOICES = [
-    { t: 14.0, coin: 'bifrost-gold',   action: 'ship',  status: 'SHIPPING',  super: 'SHIP IT HOME.' },
-    { t: 16.0, coin: 'ametherion',     action: 'trade', status: 'LISTED',    super: 'TRADE IT ON-CHAIN.' },
-    { t: 18.0, coin: 'silence',        action: 'sell',  status: 'SOLD BACK', super: '80% BACK. INSTANTLY.' },
-    { t: 20.0, coin: 'bifrost-gold-q', action: 'vault', status: 'VAULTED',   super: 'OR VAULT IT.' }
-  ];
+  // Who plays which part.
+  const ROLES = {
+    hook: 'silence',          // the macro iris + first full coin
+    minted: 'veritas',        // the coin chosen and minted in the app
+    mintedEdition: 7,
+    boxReveal: 'dominion',    // the coin that rises from the sealed case
+    boxEdition: 7
+  };
 
-  // The six coins on the end-card bridge, left to right.
-  const END_COINS = ['silence', 'dominion', 'cycle', 'ametherion', 'veritas', 'bifrost-gold'];
-
-  // Running metal totals (grams) after each pull: Ag 0 -> 31.10 -> 62.20 ; Au 0 -> 7.78 -> 38.88
-  function metalAt(t) {
-    let ag = 0, au = 0;
-    for (const p of PULLS) if (t >= p.t) { if (p.metal === 'ag') ag += p.grams; else au += p.grams; }
-    return { ag: Math.round(ag * 100) / 100, au: Math.round(au * 100) / 100 };
+  /* The sealed-case film (assets/box/vault-opening-hq.mp4, 1920x1080, 24 fps, 6.05 s).
+     Global time -> film time: real time 10.0-13.0 (film 0-3.0), a slow-motion lid
+     rise 13.0-15.0 (film 3.0-4.375), then the frame freezes at 4.375 s like the app. */
+  const FILM = { fps: 24, frames: 145, duration: 6.05, freeze: 4.375, rimFrac: 0.5352, w: 1920, h: 1080 };
+  function filmTime(t) {
+    if (t <= 10.0) return 0;
+    if (t <= 13.0) return t - 10.0;
+    if (t <= 15.0) return 3.0 + (t - 13.0) * (1.375 / 2.0);
+    return FILM.freeze;
   }
+  const filmFrame = (t) => Math.min(FILM.frames - 1, Math.round(filmTime(t) * FILM.fps));
 
-  /* Layout for a format. ctx = { W, H, portrait }.
-     phone: the device rect (stage px). supers: the zone for big type outside the phone.
-     bridge: end-card arc (theta 0 = left foot .. PI = right foot).
-     hero: where the Legendary lands when it bursts out of the phone (scene 05). */
+  /* Layout for a format. ctx = { W, H, portrait }. */
   function layout(ctx) {
     const P = !!ctx.portrait, W = ctx.W, H = ctx.H;
+    // Phone (scene 03): 9:19.5 device.
     const ph = P ? 1240 : 940, pw = Math.round(ph * 0.4615);
-    const pcx = P ? 540 : 700, ptop = P ? 450 : (H - ph) / 2;
+    const pcx = P ? 540 : 700, ptop = P ? 470 : (H - ph) / 2;
     const phone = { x: pcx - pw / 2, y: ptop, w: pw, h: ph, cx: pcx, cy: ptop + ph / 2, r: Math.round(pw * 0.15) };
+    // Big type zone outside the phone.
     const supers = P
-      ? { x: 64, y: 220, w: W - 128, h: 210, align: 'center' }
+      ? { x: 64, y: 220, w: W - 128, h: 230, align: 'center' }
       : { x: 1150, y: 200, w: 680, h: 680, align: 'left' };
     const safe = P ? { l: 64, r: W - 64, t: 220, b: H - 320 } : { l: W * 0.06, r: W * 0.94, t: H * 0.06, b: H * 0.94 };
-    const bridge = P ? { cx: 540, cy: 1180, rx: 400, ry: 560 } : { cx: 960, cy: 760, rx: 620, ry: 470 };
-    function bridgeAt(theta) {
-      const x = bridge.cx - bridge.rx * Math.cos(theta), y = bridge.cy - bridge.ry * Math.sin(theta);
-      const dx = bridge.rx * Math.sin(theta), dy = -bridge.ry * Math.cos(theta);
-      return { x, y, angle: Math.atan2(dy, dx) * 180 / Math.PI };
-    }
-    const bridgePath = `M ${bridge.cx - bridge.rx} ${bridge.cy} A ${bridge.rx} ${bridge.ry} 0 0 1 ${bridge.cx + bridge.rx} ${bridge.cy}`;
-    const hero = P ? { x: 540, y: 980, size: 900 } : { x: 1240, y: 540, size: 820 };
-    return { W, H, portrait: P, phone, supers, safe, bridge, bridgeAt, bridgePath, hero };
+    // The sealed-case film rect: full frame in 16:9; in 9:16 scaled 0.84 and centred low so the case fits the width.
+    const film = P
+      ? (() => { const s = 0.84, w = FILM.w * s, h = FILM.h * s; return { x: (W - w) / 2, y: 1020 - h / 2, w, h, s }; })()
+      : { x: 0, y: 0, w: W, h: H, s: 1 };
+    film.rimY = film.y + film.h * FILM.rimFrac;   // the case's front rim (where the seal glows and the coin emerges)
+    film.cx = film.x + film.w / 2;
+    // Where a hero coin floats (scenes 01, 04, 05).
+    const hero = P ? { x: 540, y: 960, size: 820 } : { x: 960, y: 520, size: 760 };
+    // The coin rising out of the case (scene 04): from the rim to its float position.
+    const rise = P ? { x: film.cx, y0: film.rimY + 40, y1: 760, size: 700 } : { x: film.cx, y0: film.rimY + 40, y1: 400, size: 600 };
+    return { W, H, portrait: P, phone, supers, safe, film, hero, rise };
   }
 
-  const TIER_COLOR = { silver: '#C9D1D9', rare: '#9A4CC9', gold: '#E9C46A', legendary: '#F2C66D' };
-  const TIER_LABEL = { silver: 'SILVER', rare: 'RARE SILVER', gold: 'GOLD', legendary: 'LEGENDARY GOLD' };
-
-  window.BVShared = { CUES, PULLS, CHOICES, END_COINS, metalAt, layout, TIER_COLOR, TIER_LABEL };
+  window.BVShared = { CUES, ORDER, coin, ROLES, FILM, filmTime, filmFrame, layout };
 })();
