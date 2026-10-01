@@ -535,7 +535,7 @@
       m += path(SNOW.snow, 'fill="#000"');
       m += path(COUL, 'fill="none" stroke="#000" stroke-opacity=".6" stroke-width="1.8" stroke-linecap="round"');
       // silvery reflection of the snow caps, broken by ripples (translucent ink = metal glimmers through)
-      m += '<g transform="matrix(1,0,0,-0.5,0,' + n(WL * 1.5) + ')">' + path(SNOW.snow, 'fill="#000" fill-opacity=".45"') + '</g>';
+      m += '<g transform="matrix(1,0,0,-0.5,0,' + n(WL * 1.5) + ')">' + path(SNOW.snow, 'fill="#000" fill-opacity=".22"') + '</g>';
       var rp = '';
       for (var y = WL + 3; y < 760; y += 4 + (y - WL) * 0.035) rp += 'M140,' + n(y) + 'H860';
       m += path(rp, 'stroke="#fff" stroke-width="1.6" fill="none"');
@@ -607,7 +607,7 @@
   }
 
   var VALKYRIE = (function () {
-    var SUN = [500, 600];
+    var SUN = [486, 386], HALO = 132;
     var WL = displayWing([424, 520], [318, 236], [214, 318], [384, 700], [176, 616], {});
     var WR = displayWing([576, 512], [690, 226], [790, 306], [630, 694], [834, 604], {});
     // ---- figure (frosted gold) ----
@@ -661,15 +661,17 @@
     // breastplate: rising-sun emblem + deco chevrons
     var CHEST_LINES = (function () {
       var cx = 532, cy = 714;
-      var d = 'M' + cx + ',' + cy + 'L' + cx + ',840M' + (cx - 40) + ',774L' + cx + ',798L' + (cx + 40) + ',774M' + (cx - 48) + ',810L' + cx + ',838L' + (cx + 48) + ',810';
+      var d = '';
+      // segmented plates curving round the torso below the emblem
+      [770, 800, 830].forEach(function (y, k) { d += 'M' + P(352, y - 22 + k * 2) + 'Q' + P(470, y + 6) + ' ' + P(592, y - 10); });
       d += 'M' + (cx - 46) + ',' + cy + 'A46,46 0 0 1 ' + (cx + 46) + ',' + cy + 'Z';
       for (var i = 0; i <= 10; i++) { var a = lerp(186, 354, i / 10) * D, p0 = pol(cx, cy, 17, a), p1 = pol(cx, cy, 42, a); d += 'M' + P(p0[0], p0[1]) + 'L' + P(p1[0], p1[1]); }
       d += 'M' + (cx - 14) + ',' + cy + 'A14,14 0 0 1 ' + (cx + 14) + ',' + cy;
-      // cloak pleats falling from a brooch on the far shoulder
-      for (var k = 0; k < 5; k++) { var x0 = 606 + k * 13; d += 'M' + P(x0, 604) + 'C' + P(x0 + 4, 680) + ' ' + P(x0 - 6, 760) + ' ' + P(x0 + 2 + k * 2, 840); }
       return d;
     })();
     var SCALES = '';
+    var CLOAK = 'M556,546C600,550 640,566 662,600C680,640 686,720 690,840L588,840C594,760 590,690 580,632C574,600 566,572 556,546Z';
+    var CLOAK_WIRES = (function () { var d = ''; for (var k = 0; k < 4; k++) { var x0 = 600 + k * 20; d += 'M' + P(x0 - 10, 600) + 'C' + P(x0, 680) + ' ' + P(x0 - 4, 760) + ' ' + P(x0 + 4 + k * 3, 840); } return d; })();
     var BROOCH = [604, 588];
     var GORGET_FAN = (function () {
       var d = 'M' + P(BROOCH[0] - 10, BROOCH[1]) + 'A10,10 0 1 0 ' + P(BROOCH[0] + 10, BROOCH[1]) + 'A10,10 0 1 0 ' + P(BROOCH[0] - 10, BROOCH[1]);
@@ -704,17 +706,18 @@
       }
       return { wedges: wedges, lines: lines };
     }
-    var RAYS = rays(30, 520, 64);
+    var RAYS = rays(HALO + 6, 560, 72);
     function wingCells(W, gid) { return W.cells.map(function (c) { return '<path d="' + c.d + '" fill="url(#' + gid + ')"/>'; }).join(''); }
     function wingMask(W) {
       return W.cells.map(function (c) { return '<path d="' + c.d + '" fill="#f4f4f4" stroke="#000" stroke-width="2.4" stroke-linejoin="round"/>'; }).join('') + path(W.bone, 'fill="#000"');
     }
 
     function field(u) {
-      var wg = [[0, '#2c1690'], [0.3, '#5a3df0'], [0.55, '#7C5CFF'], [0.8, '#5a84ff'], [1, '#4D8DFF']];
+      var wg = [[0, '#1a0c66'], [0.3, '#3a22c0'], [0.55, '#5f42f4'], [0.8, '#4f6cff'], [1, '#4D8DFF']];
       var defs = rg(u + '-wl', 430, 540, 330, wg) + rg(u + '-wr', 570, 530, 330, wg) +
         lg(u + '-frost', 0, 266, 0, 840, [[0, '#FFF8E2'], [0.45, '#F9E6AE'], [1, '#EFCF7E']]) +
-        rg(u + '-mir', SUN[0], SUN[1] - 60, 420, [[0, '#FFF1C1', 0.35], [0.35, '#b07a1c', 0.08], [0.75, '#5a3405', 0.32], [1, '#3a2003', 0.55]]) +
+        rg(u + '-mir', SUN[0], SUN[1], 470, [[0, '#FFF6D8', 0.55], [0.26, '#FFF1C1', 0.2], [0.3, '#b07a1c', 0.1], [0.7, '#5a3405', 0.3], [1, '#3a2003', 0.55]]) +
+        lg(u + '-cloak', 0, 540, 0, 840, [[0, '#6a4cf0'], [0.5, '#4a2fd8'], [1, '#2a168a']]) +
         rg(u + '-sheen', 500, 330, 300, [[0, '#ffffff', 0.35], [1, '#ffffff', 0]]) +
         lg(u + '-shx', 340, 0, 680, 0, [[0, '#7a4a0a', 0.55], [0.18, '#a8741c', 0.15], [0.45, '#ffffff', 0.12], [0.75, '#a8741c', 0.2], [1, '#6b3f08', 0.6]]) +
         lg(u + '-shy', 0, 540, 0, 840, [[0, '#ffffff', 0], [0.6, '#8a5a12', 0.1], [1, '#5a3405', 0.45]]) +
@@ -725,15 +728,22 @@
       out += '<rect x="140" y="140" width="720" height="720" fill="url(#' + u + '-mir)"/>';
       out += path(RAYS.wedges, 'fill="#FFF1C1" fill-opacity=".16"');
       out += path(RAYS.lines, 'stroke="#4a2a03" stroke-opacity=".35" stroke-width="1.2" fill="none"');
+      out += '<circle cx="' + SUN[0] + '" cy="' + SUN[1] + '" r="' + HALO + '" fill="#FFF8E6" fill-opacity=".22"/>' +
+        '<circle cx="' + SUN[0] + '" cy="' + SUN[1] + '" r="' + HALO + '" fill="none" stroke="#7a4f0e" stroke-opacity=".6" stroke-width="2"/>' +
+        '<circle cx="' + SUN[0] + '" cy="' + SUN[1] + '" r="' + (HALO - 9) + '" fill="none" stroke="#FFF6DC" stroke-width="2.4" stroke-dasharray="1.5 7" stroke-linecap="round"/>';
       out += wingCells(WR, u + '-wr') + wingCells(WL, u + '-wl');
       var sh = '';
       [WL, WR].forEach(function (W) { W.cells.forEach(function (c) { if (c.row === 0) sh += 'M' + P(lerp(c.B[0], c.T[0], 0.5), lerp(c.B[1], c.T[1], 0.5)) + 'L' + P(lerp(c.B[0], c.T[0], 0.9), lerp(c.B[1], c.T[1], 0.9)); }); });
-      out += path(sh, 'stroke="#d9e2ff" stroke-opacity=".55" stroke-width="1.5" fill="none"');
-      out += '<rect x="140" y="140" width="720" height="720" fill="url(#' + u + '-sheen)" opacity=".6"/>';
+      var hi = '';
+      [WL, WR].forEach(function (W) { W.cells.forEach(function (c) { var B2 = [lerp(c.B[0], c.T[0], 0.32), lerp(c.B[1], c.T[1], 0.32)]; hi += featherBT(B2, [lerp(c.B[0], c.T[0], 0.94), lerp(c.B[1], c.T[1], 0.94)], c.row ? 10 : 13, W.side * 0.6); }); });
+      out += path(hi, 'fill="#b8c6ff" fill-opacity=".24"');
+      out += path(sh, 'stroke="#e6ecff" stroke-opacity=".6" stroke-width="1.5" fill="none"');
+      out += '<rect x="140" y="140" width="720" height="720" fill="url(#' + u + '-sheen)" opacity=".3"/>';
       out += GLINTS.map(function (g) { return '<circle cx="' + n(g[0]) + '" cy="' + n(g[1]) + '" r="' + n(g[2] * 0.9) + '" fill="url(#' + u + '-gl)"/>' + path(star4(g[0], g[1], g[2], 0.12, 0), 'fill="#FFFBEA"'); }).join('');
       var F = 'fill="url(#' + u + '-frost)"', O = 'fill="none" stroke="#5e3a08" stroke-width="2.6" stroke-linejoin="round"', E = 'stroke="#7a4f0e" stroke-width="1.8" fill="none" stroke-linecap="round"';
       out += path(BODY_BACK, F) + path(TORSO, 'fill="url(#' + u + '-shx)"') + path(TORSO, 'fill="url(#' + u + '-shy)"') + path(NECK, 'fill="url(#' + u + '-nsh)"') +
         path(CHEST_LINES + SCALES, E) + path(BODY_BACK, O);
+      out += path(CLOAK, 'fill="url(#' + u + '-cloak)"') + path(CLOAK, 'fill="url(#' + u + '-shy)"') + path(CLOAK_WIRES, 'stroke="#b7a6ff" stroke-opacity=".5" stroke-width="2" fill="none"');
       out += path(ARMOUR, F) + path(GORGET_FAN, E) + path(ARMOUR, O);
       out += path(HAIR, F) + path(HAIR_LINES, E) + path(HAIR, O);
       out += path(BODY_FRONT, F) + path(HELM, 'fill="url(#' + u + '-hl)"') + path(HELM_LINES + FACE_LINES + HW.lines, E) + path(BODY_FRONT, O);
@@ -743,10 +753,12 @@
     }
     function inkMask(u) {
       var m = '<rect x="0" y="0" width="1000" height="1000" fill="#fff" fill-opacity=".85"/>';
+      m += path(RAYS.lines, 'stroke="#fff" stroke-width="1.6" fill="none"');
       m += wingMask(WR) + wingMask(WL);
       m += GLINTS.map(function (g) { return '<circle cx="' + n(g[0]) + '" cy="' + n(g[1]) + '" r="' + n(g[2] * 0.9) + '" fill="#fff"/>'; }).join('');
       var G = 'fill="#9a9a9a"', W = 'fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"', Wl = 'stroke="#fff" stroke-width="2.2" fill="none"';
       m += path(BODY_BACK, G) + path(CHEST_LINES + SCALES, Wl) + path(BODY_BACK, W);
+      m += path(CLOAK, 'fill="#fff"') + path(CLOAK_WIRES, 'stroke="#000" stroke-width="2.4" fill="none"') + path(CLOAK, 'fill="none" stroke="#000" stroke-width="3"');
       m += path(ARMOUR, G) + path(GORGET_FAN, Wl) + path(ARMOUR, W);
       m += path(HAIR, G) + path(HAIR_LINES, Wl) + path(HAIR, W);
       m += path(BODY_FRONT, G) + path(HELM_LINES + FACE_LINES + HW.lines, Wl) + path(BODY_FRONT, W);
@@ -755,7 +767,7 @@
     }
     function relief(u) {
       var inner = '<g fill-opacity=".3">' + WL.cells.concat(WR.cells).map(function (c) { return path(c.d); }).join('') + '</g>' +
-        path(TORSO, 'fill-opacity=".55"') + path(HAIR, 'fill-opacity=".7"') + path(NECK + FACE, 'fill-opacity=".85"') +
+        path(TORSO, 'fill-opacity=".55"') + path(CLOAK, 'fill-opacity=".45"') + path(HAIR, 'fill-opacity=".7"') + path(NECK + FACE, 'fill-opacity=".85"') +
         path(HELM + HW.d, 'fill-opacity="1"') + path(ARMOUR, 'fill-opacity=".9"');
       return reliefWrap(u, inner, 2.4);
     }
@@ -897,12 +909,12 @@
       var lanes = '';
       [[-0.375, '#7C5CFF', 0.35], [-0.125, '#ffffff', 0.1], [0.125, '#ffffff', 0.22], [0.375, '#ffffff', 0.32]].forEach(function (k) { lanes += '<path d="' + arcPath(BR.rx + k[0] * bw, BR.ry + k[0] * bw) + '" fill="none" stroke="' + k[1] + '" stroke-opacity="' + k[2] + '" stroke-width="' + (bw * 0.25) + '"/>'; });
       out += lanes;
+      out += '<path d="' + arcPath(BR.rx + bw * 0.12, BR.ry + bw * 0.12) + '" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width="6" filter="url(#' + u + '-b3)"/>';
       out += '<path d="' + arcPath(BR.rx - bw * 0.38, BR.ry - bw * 0.38) + '" fill="none" stroke="#ffffff" stroke-opacity=".55" stroke-width="2" stroke-dasharray="1 9" stroke-linecap="round"/>';
       out += SPARKS.map(function (g) { return '<circle cx="' + n(g[0]) + '" cy="' + n(g[1]) + '" r="' + n(g[2] * 1.2) + '" fill="#ffffff" fill-opacity=".35" filter="url(#' + u + '-b3)"/>' + path(star4(g[0], g[1], g[2], 0.12, 0), 'fill="#ffffff"'); }).join('');
       // gate
       out += path(WALLS + PYL_L + PYL_R + GATE + STEPS, 'fill="url(#' + u + '-frost)"');
       out += path(OPEN, 'fill="url(#' + u + '-door)"');
-      out += '<g clip-path="url(#' + u + '-oc)"></g>';
       out += '<ellipse cx="500" cy="' + DOOR.sill + '" rx="150" ry="120" fill="url(#' + u + '-doorglow)"/>';
       out += path(ARCH_LINES, 'stroke="#7a4f0e" stroke-width="1.8" fill="none"');
       out += INLAYS.map(function (q) { return '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="20" fill="' + q[2] + '" fill-opacity=".5" filter="url(#' + u + '-b3)"/>' + path(inlay(q[0], q[1]), 'fill="' + q[2] + '"'); }).join('');
@@ -1027,11 +1039,12 @@
     var SPINES = spines();
     // head (local coords: facing +x, neck at x=-50) placed at the top
     var HEAD_TF = (function () { var p = spineAt(1); var th = p[2] + 90; return 'translate(' + P(p[0], p[1]) + ') rotate(' + n(th) + ')'; })();
-    var HEAD = 'M-52,-30C-30,-34 -6,-36 14,-30C32,-25 52,-20 70,-14C80,-11 84,-6 80,-2L44,-4L16,4L46,16C60,20 66,26 60,30C40,34 14,34 -8,32C-28,30 -44,30 -56,28Z';
-    var HEAD_HORNS = 'M-20,-31C-38,-48 -62,-56 -84,-54C-66,-48 -50,-40 -38,-28Z M2,-34C-8,-52 -24,-64 -44,-70C-30,-58 -20,-46 -12,-33Z';
-    var HEAD_LINES = 'M-40,-22C-20,-24 0,-22 18,-18M-36,22C-16,24 6,24 28,22M-8,-8C-4,-2 -4,6 -8,12';
-    var FANGS = 'M50,-4L54,6L58,-3ZM64,-3L67,5L70,-2ZM34,-4L37,4L40,-4ZM44,16L47,8L50,17ZM56,21L58,13L61,22Z';
-    var EYE = { x: 14, y: -18 };
+    var HEAD = 'M-56,-32C-34,-38 -14,-42 4,-40L16,-48L26,-36C44,-32 62,-26 78,-19C88,-15 92,-9 89,-4L80,-2L50,-2L20,4L50,14L76,22C82,26 80,31 72,33C52,37 26,38 2,37C-20,36 -40,34 -58,30Z';
+    var HEAD_HORNS = 'M-24,-36C-44,-56 -70,-64 -96,-60C-74,-54 -56,-44 -42,-30Z M-2,-40C-12,-60 -30,-74 -54,-80C-38,-66 -26,-52 -18,-38Z' +
+      'M-56,-30L-70,-42L-60,-22ZM-52,26L-70,36L-50,14Z';
+    var HEAD_LINES = 'M-44,-24C-22,-28 0,-28 22,-22M-40,24C-18,27 8,28 34,26M-12,-14C-6,-6 -6,6 -12,14M74,-12L80,-10M8,-30C14,-34 22,-34 28,-30';
+    var FANGS = 'M28,-2L31,8L35,-2ZM42,-2L45,9L49,-2ZM58,-2L61,8L65,-2ZM72,-2L74,6L77,-2ZM34,8L37,-1L41,10ZM50,12L53,3L57,14ZM66,17L68,9L71,19Z';
+    var EYE = { x: 14, y: -22 };
     // ocean: rows of curling waves inside the ring
     function waveRow(y0, x0, x1, W, H, depth, seed) {
       var body = '', lines = '', foam = '', top = '', r = rng(seed || 1);
@@ -1071,22 +1084,28 @@
       return { hull: hull, mast: mast + yard, sail: sail, stripes: stripes, shields: shields };
     }
     var SHIPD = ship();
+    var SUNRAYS = (function () { var d = ''; for (var i = 0; i < 30; i++) { var a0 = lerp(-178, -2, i / 29) * D, a1 = a0 + 2.6 * D; d += poly([[500, 512], pol(500, 512, 300, a0), pol(500, 512, 300, a1)]); } return d; })();
+    var SUNDISC = 'M430,512A70,70 0 0 1 570,512Z';
     var STARS = (function () { var r = rng(3131), o = []; for (var i = 0; i < 40; i++) { var x = 250 + r() * 500, y = 260 + r() * 200; if (Math.hypot(x - 500, y - 500) > 215) continue; if (Math.abs(x - SHIP.x) < 60 && y > 380) continue; o.push([x, y, 1 + Math.pow(r(), 4) * 7]); } return o; })();
 
     function field(u) {
       var RR = R0 + 40;
-      var defs = rg(u + '-xs', 500, 500, RR, [[0, '#000', 0], [(R0 - 36) / RR, '#00283a', 0.5], [(R0 - 16) / RR, '#ffffff', 0.0], [(R0 - 2) / RR, '#ffffff', 0.32], [(R0 + 10) / RR, '#ffffff', 0.0], [(R0 + 26) / RR, '#002a30', 0.4], [1, '#001a20', 0.7]]) +
+      var defs = rg(u + '-xs', 500, 500, RR, [[0, '#000', 0], [(R0 - 36) / RR, '#00222e', 0.6], [(R0 - 18) / RR, '#00222e', 0.1], [(R0 - 4) / RR, '#ffffff', 0.22], [(R0 + 8) / RR, '#ffffff', 0.0], [(R0 + 22) / RR, '#00262c', 0.45], [1, '#001418', 0.75]]) +
         lg(u + '-sea', 0, 470, 0, 840, [[0, '#2a6cf0'], [0.4, '#163ba8'], [1, '#0a1a5c']]) +
         lg(u + '-sea2', 0, 470, 0, 840, [[0, '#4D8DFF'], [1, '#1d47c0']]) +
         lg(u + '-sky', 0, 230, 0, 520, [[0, '#0d1a4a', 0.55], [1, '#1d47c0', 0.0]]) +
         rg(u + '-eye', 0, 0, 10, [[0, '#ffffff'], [0.4, '#7ff6ff'], [1, '#19D3FF']]) +
+        '<linearGradient id="' + u + '-hd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#46E6A6"/><stop offset=".55" stop-color="#16c486"/><stop offset="1" stop-color="#0b8a66"/></linearGradient>' +
+        rg(u + '-sun', 500, 520, 240, [[0, '#ffffff', 0.0], [1, '#ffffff', 0]]) +
         blurF(u + '-b4', 4);
-      var out = '<defs>' + defs + '</defs>';
+      defs += '<clipPath id="' + u + '-in"><circle cx="500" cy="500" r="' + (R0 - 18) + '"/></clipPath>';
+      var out = '<defs>' + defs + '</defs><g clip-path="url(#' + u + '-in)">';
       // sky inside the ring: a light navy wash fading into the silver
       out += '<rect x="140" y="140" width="720" height="400" fill="url(#' + u + '-sky)"/>';
       var hl = ''; for (var y = 232; y < 520; y += 9) hl += 'M180,' + y + 'H820';
       out += path(hl, 'stroke="#0a1a5c" stroke-opacity=".2" stroke-width="1.2" fill="none"');
       out += STARS.map(function (s) { return s[2] > 3.5 ? path(star4(s[0], s[1], s[2], 0.14, 0), 'fill="#ffffff"') : ''; }).join('');
+      out += path(SUNRAYS, 'fill="#1d47c0" fill-opacity=".18"');
       // waves + ship
       var r0 = ROWS[0], r1 = ROWS[1], r2 = ROWS[2];
       out += path(r0.body, 'fill="url(#' + u + '-sea2)"') + path(r0.lines, 'stroke="#bfe0ff" stroke-opacity=".5" stroke-width="1.6" fill="none"');
@@ -1096,23 +1115,24 @@
       out += SHIPD.shields.map(function (s, k) { return '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="6.5" fill="' + (k % 2 ? '#46E6A6' : '#19D3FF') + '"/>'; }).join('');
       out += path(r1.body, 'fill="url(#' + u + '-sea)"') + path(r1.lines, 'stroke="#bfe0ff" stroke-opacity=".45" stroke-width="1.8" fill="none"');
       out += path(r2.body, 'fill="url(#' + u + '-sea)"') + path(r2.lines, 'stroke="#bfe0ff" stroke-opacity=".4" stroke-width="2.2" fill="none"');
+      out += '</g>';
       // serpent: spines, body ramp, cross shading, scales
       out += path(SPINES, 'fill="#0a8a6a"');
-      var SR = [[0, '#19D3FF'], [0.45, '#18c9b4'], [1, '#2bd88f']];
+      var SR = [[0, '#19D3FF'], [0.4, '#10bfae'], [1, '#14c784']];
       out += SEGS.map(function (g) { var c = ramp(SR, g.s); return '<path d="' + g.d + '" fill="' + c + '" stroke="' + c + '" stroke-width=".8"/>'; }).join('');
       out += path(BODY, 'fill="url(#' + u + '-xs)"');
-      out += path(BELLY.band, 'fill="#d9fff4" fill-opacity=".5"');
+      out += path(BELLY.band, 'fill="#bfffe6" fill-opacity=".3"');
       // head
-      out += '<g transform="' + HEAD_TF + '">' + path(HEAD_HORNS, 'fill="#0c8f72"') + path(HEAD, 'fill="#46E6A6"') +
-        path('M-52,-30C-30,-34 -6,-36 14,-30C32,-25 52,-20 70,-14C80,-11 84,-6 80,-2L44,-4L16,4L-56,4Z', 'fill="#ffffff" fill-opacity=".12"') +
+      out += '<g transform="' + HEAD_TF + '">' + path(HEAD_HORNS, 'fill="#0a8a6a"') + path(HEAD, 'fill="url(#' + u + '-hd)"') +
         '<circle cx="' + (EYE.x) + '" cy="' + EYE.y + '" r="14" fill="#19D3FF" fill-opacity=".5" filter="url(#' + u + '-b4)"/>' +
         '<ellipse cx="' + EYE.x + '" cy="' + EYE.y + '" rx="8" ry="6" fill="url(#' + u + '-eye)"/><ellipse cx="' + (EYE.x + 1) + '" cy="' + EYE.y + '" rx="1.6" ry="5" fill="#04202a"/></g>';
       return out;
     }
     function inkMask(u) {
-      var m = FULL;
+      var m = '<defs><clipPath id="' + u + '-inm"><circle cx="500" cy="500" r="' + (R0 - 18) + '"/></clipPath></defs><g clip-path="url(#' + u + '-inm)">' + FULL;
       // the sky is bare mirror silver except the faint wash; stars bare
       m += '<rect x="140" y="140" width="720" height="400" fill="#000" fill-opacity=".35"/>';
+      m += path(SUNDISC, 'fill="#000"');
       // waves: enamel bodies; crest foam curls and wave lines in bare silver
       ROWS.forEach(function (r, k) {
         m += path(r.body, 'fill="#fff"') + path(r.lines, 'stroke="#000" stroke-width="' + (1.6 + k * 0.3) + '" fill="none" stroke-linecap="round"') +
@@ -1121,10 +1141,11 @@
           path(SHIPD.stripes.join(''), 'fill="none" stroke="#000" stroke-width="1.4"') + path(SHIPD.hull, 'fill="none" stroke="#000" stroke-width="1.6"');
       });
       m += STARS.map(function (s) { return s[2] > 3.5 ? path(star4(s[0], s[1], s[2], 0.14, 0), 'fill="#000"') : '<circle cx="' + n(s[0]) + '" cy="' + n(s[1]) + '" r="' + n(s[2] * 0.5) + '" fill="#000"/>'; }).join('');
+      m += '</g>';
       // serpent: enamel, with bare-silver scale wires, belly plates and outline
       m += path(SPINES, 'fill="#fff" stroke="#000" stroke-width="2"');
       m += path(BODY, 'fill="#fff"');
-      m += path(SCALES, 'stroke="#000" stroke-width="1.7" fill="none" stroke-linecap="round"');
+      m += path(SCALES, 'stroke="#000" stroke-width="1.5" stroke-opacity=".6" fill="none" stroke-linecap="round"');
       m += path(BELLY.lines, 'stroke="#000" stroke-width="1.6" fill="none"');
       m += path(BODY, 'fill="none" stroke="#000" stroke-width="2.6"');
       m += '<g transform="' + HEAD_TF + '">' + path(HEAD_HORNS + HEAD, 'fill="#fff" stroke="#000" stroke-width="2.4"') + path(HEAD_LINES, 'stroke="#000" stroke-width="1.8" fill="none"') +
@@ -1137,6 +1158,136 @@
       return reliefWrap(u, inner, 2.4);
     }
     return { metal: 'ag', field: field, inkMask: inkMask, relief: relief };
+  })();
+
+  /* ====================================================================== KOI
+     Gold, guest pop-art studio (deliberately NOT Norse): two koi circling each
+     other in coral / ivory / electric-cyan enamel with heavy comic outlines,
+     Ben-Day halftone dots and a misregistered print shadow, over a mirror-gold
+     field with frosted concentric ripple rings. */
+  var KOI = (function () {
+    var C = [500, 500];
+    var INK = '#1b1035', CORAL = '#FF7A6B', IVORY = '#FFF4E2', CYAN = '#19D3FF';
+    function koiGeom(rot, seed, o) {
+      var N = 64, sp = [], th0 = (o.th0 + rot) * D, span = o.span * D;
+      for (var i = 0; i <= N; i++) {
+        var s = i / N, th = th0 + s * span, r = o.r1 + (o.r0 - o.r1) * Math.pow(1 - s, 1.6);
+        sp.push([C[0] + r * Math.cos(th), C[1] + r * Math.sin(th)]);
+      }
+      var W = o.w;
+      function wf(s) {
+        if (s < 0.08) return W * lerp(0.2, 0.3, s / 0.08);
+        if (s < 0.7) return W * lerp(0.3, 1, Math.sin((s - 0.08) / 0.62 * PI / 2));
+        var q = (s - 0.7) / 0.3; return W * Math.sqrt(Math.max(0, 1 - q * q * q * 0.98)) * lerp(1, 0.86, q);
+      }
+      var rb = ribbonPts(sp, wf);
+      var body = smooth(rb.L.concat(rb.R.slice().reverse()), true, 0.9);
+      function frame(s) { var i = Math.round(s * N), a = sp[Math.max(i - 1, 0)], b = sp[Math.min(i + 1, N)]; var dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return { p: sp[i], t: [dx / l, dy / l], n: [-dy / l, dx / l], w: wf(s) }; }
+      // tail (butterfly) at s=0
+      var f0 = frame(0.01), t = f0.t, nn = f0.n, p = f0.p;
+      function pt(a, b) { return [p[0] - t[0] * a + nn[0] * b, p[1] - t[1] * a + nn[1] * b]; }
+      var tail = 'M' + P(pt(-6, 9)[0], pt(-6, 9)[1]) + 'C' + P(pt(30, 22)[0], pt(30, 22)[1]) + ' ' + P(pt(62, 70)[0], pt(62, 70)[1]) + ' ' + P(pt(96, 62)[0], pt(96, 62)[1]) +
+        'C' + P(pt(84, 36)[0], pt(84, 36)[1]) + ' ' + P(pt(70, 14)[0], pt(70, 14)[1]) + ' ' + P(pt(56, 0)[0], pt(56, 0)[1]) +
+        'C' + P(pt(74, -16)[0], pt(74, -16)[1]) + ' ' + P(pt(92, -34)[0], pt(92, -34)[1]) + ' ' + P(pt(100, -58)[0], pt(100, -58)[1]) +
+        'C' + P(pt(64, -64)[0], pt(64, -64)[1]) + ' ' + P(pt(30, -24)[0], pt(30, -24)[1]) + ' ' + P(pt(-6, -9)[0], pt(-6, -9)[1]) + 'Z';
+      var tailRays = '';
+      for (var k = -3; k <= 3; k++) { if (!k) continue; var e = pt(lerp(70, 92, Math.abs(k) / 3), k * 18); tailRays += 'M' + P(pt(4, k * 2)[0], pt(4, k * 2)[1]) + 'Q' + P(pt(40, k * 12)[0], pt(40, k * 12)[1]) + ' ' + P(e[0], e[1]); }
+      // pectoral fins
+      var fins = '', finRays = '';
+      [1, -1].forEach(function (sd) {
+        var f = frame(0.72), b0 = [f.p[0] + f.n[0] * f.w * 0.42 * sd, f.p[1] + f.n[1] * f.w * 0.42 * sd];
+        function q(a, b) { return [b0[0] - f.t[0] * a + f.n[0] * b * sd, b0[1] - f.t[1] * a + f.n[1] * b * sd]; }
+        fins += 'M' + P(q(-10, 0)[0], q(-10, 0)[1]) + 'C' + P(q(-2, 30)[0], q(-2, 30)[1]) + ' ' + P(q(20, 52)[0], q(20, 52)[1]) + ' ' + P(q(46, 54)[0], q(46, 54)[1]) +
+          'C' + P(q(40, 36)[0], q(40, 36)[1]) + ' ' + P(q(30, 12)[0], q(30, 12)[1]) + ' ' + P(q(18, 0)[0], q(18, 0)[1]) + 'Z';
+        for (var r = 1; r <= 3; r++) { var e2 = q(lerp(4, 40, r / 3), lerp(40, 50, r / 3)); finRays += 'M' + P(q(2, 4)[0], q(2, 4)[1]) + 'L' + P(e2[0], e2[1]); }
+      });
+      // dorsal fin along the back
+      var dsp = sp.slice(Math.round(N * 0.3), Math.round(N * 0.66) + 1);
+      var drb = ribbonPts(dsp, function (s) { return 12 * Math.sin(s * PI) + 2; });
+      var dorsal = smooth(drb.L.concat(drb.R.slice().reverse()), true);
+      // eyes + barbels
+      var fe = frame(0.92), eyes = [];
+      [1, -1].forEach(function (sd) { eyes.push([fe.p[0] + fe.n[0] * fe.w * 0.4 * sd, fe.p[1] + fe.n[1] * fe.w * 0.4 * sd]); });
+      var fn = frame(1), nose = fn.p, barb = '';
+      [1, -1].forEach(function (sd) { var b = [nose[0] - fn.t[0] * 6 + fn.n[0] * 8 * sd, nose[1] - fn.t[1] * 6 + fn.n[1] * 8 * sd]; barb += 'M' + P(b[0], b[1]) + 'Q' + P(b[0] + fn.t[0] * 10 + fn.n[0] * 14 * sd, b[1] + fn.t[1] * 10 + fn.n[1] * 14 * sd) + ' ' + P(b[0] + fn.n[0] * 22 * sd - fn.t[0] * 2, b[1] + fn.n[1] * 22 * sd - fn.t[1] * 2); });
+      // patches: blobs along the spine
+      var r = rng(seed), patches = '';
+      o.patches.forEach(function (pp) {
+        var f = frame(pp[0]), c = [f.p[0] + f.n[0] * f.w * pp[1], f.p[1] + f.n[1] * f.w * pp[1]], R = f.w * pp[2];
+        var pts = [];
+        for (var j = 0; j < 9; j++) { var a = j / 9 * TAU, rr = R * (0.75 + r() * 0.45); pts.push([c[0] + Math.cos(a) * rr * 1.35, c[1] + Math.sin(a) * rr]); }
+        // orient the blob along the body
+        var ang = Math.atan2(f.t[1], f.t[0]);
+        pts = pts.map(function (q) { var dx = q[0] - c[0], dy = q[1] - c[1]; return [c[0] + dx * Math.cos(ang) - dy * Math.sin(ang), c[1] + dx * Math.sin(ang) + dy * Math.cos(ang)]; });
+        patches += smooth(pts, true);
+      });
+      // comic highlight streak
+      var hs = sp.slice(Math.round(N * 0.42), Math.round(N * 0.86));
+      var hl = ribbonPts(hs.map(function (q, i) { var f = frame(0.42 + i / hs.length * 0.44); return [q[0] + f.n[0] * f.w * 0.22, q[1] + f.n[1] * f.w * 0.22]; }), function (s) { return 7 * Math.sin(s * PI); });
+      var high = smooth(hl.L.concat(hl.R.slice().reverse()), true);
+      return { body: body, tail: tail, tailRays: tailRays, fins: fins, finRays: finRays, dorsal: dorsal, eyes: eyes, barb: barb, patches: patches, high: high };
+    }
+    var KA = koiGeom(0, 33, { th0: 152, span: 178, r0: 196, r1: 118, w: 100, patches: [[0.86, 0.1, 0.46], [0.6, -0.2, 0.5], [0.36, 0.25, 0.42], [0.16, -0.1, 0.5]] });
+    var KB = koiGeom(180, 77, { th0: 152, span: 178, r0: 196, r1: 118, w: 100, patches: [[0.9, -0.15, 0.4], [0.64, 0.25, 0.46], [0.4, -0.2, 0.52], [0.2, 0.2, 0.42]] });
+    var RINGS = [52, 84, 236, 268, 300];
+    function halftone() { // Ben-Day dots fading toward the centre
+      var d = '', step = 15;
+      for (var y = 170; y <= 830; y += step) for (var x = 170 + ((y / step) % 2) * step / 2; x <= 830; x += step) {
+        var rr = Math.hypot(x - 500, y - 500); if (rr > 318 || rr < 200) continue;
+        var t = (rr - 200) / 118, rad = lerp(0.6, 4.6, t);
+        d += 'M' + P(x - rad, y) + 'a' + n(rad) + ',' + n(rad) + ' 0 1,0 ' + n(rad * 2) + ',0a' + n(rad) + ',' + n(rad) + ' 0 1,0 ' + n(-rad * 2) + ',0';
+      }
+      return d;
+    }
+    var DOTS = halftone();
+    var BUBBLES = [[640, 282, 13], [664, 254, 8], [682, 234, 5], [340, 720, 12], [318, 746, 7], [304, 766, 4.5]];
+
+    function fishField(K, base, patch, fin, u, idx) {
+      var out = '';
+      out += path(K.tail + K.fins, 'fill="' + fin + '"') + path(K.tail + K.fins, 'fill="url(#' + u + '-fg)"') + path(K.tailRays + K.finRays, 'stroke="#ffffff" stroke-opacity=".75" stroke-width="2.4" fill="none" stroke-linecap="round"');
+      out += path(K.tail + K.fins, 'fill="none" stroke="' + INK + '" stroke-width="4.5" stroke-linejoin="round"');
+      out += path(K.body, 'fill="' + base + '"');
+      out += '<g clip-path="url(#' + u + '-kc' + idx + ')">' + path(K.patches, 'fill="' + patch + '"') + path(K.patches, 'fill="url(#' + u + '-ht' + idx + ')"') + '</g>';
+      out += path(K.dorsal, 'fill="' + fin + '" stroke="' + INK + '" stroke-width="3"');
+      out += path(K.high, 'fill="#ffffff" fill-opacity=".85"');
+      out += path(K.body, 'fill="none" stroke="' + INK + '" stroke-width="5.5" stroke-linejoin="round"');
+      out += K.eyes.map(function (e) { return '<circle cx="' + n(e[0]) + '" cy="' + n(e[1]) + '" r="6.5" fill="' + INK + '"/><circle cx="' + n(e[0] - 1.8) + '" cy="' + n(e[1] - 1.8) + '" r="2.2" fill="#fff"/>'; }).join('');
+      out += path(K.barb, 'stroke="' + INK + '" stroke-width="3" fill="none" stroke-linecap="round"');
+      return out;
+    }
+    function field(u) {
+      var defs = '<clipPath id="' + u + '-kc0"><path d="' + KA.body + '"/></clipPath><clipPath id="' + u + '-kc1"><path d="' + KB.body + '"/></clipPath>' +
+        '<pattern id="' + u + '-ht0" patternUnits="userSpaceOnUse" width="9" height="9" patternTransform="rotate(30)"><circle cx="4.5" cy="4.5" r="2.1" fill="#d94b45"/></pattern>' +
+        '<pattern id="' + u + '-ht1" patternUnits="userSpaceOnUse" width="9" height="9" patternTransform="rotate(30)"><circle cx="4.5" cy="4.5" r="2.1" fill="#0a8fd6"/></pattern>' +
+        rg(u + '-mir', 500, 500, 340, [[0, '#ffffff', 0.18], [0.5, '#7a4a08', 0.05], [1, '#5a3405', 0.35]]) +
+        '<linearGradient id="' + u + '-fg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".35"/><stop offset=".6" stop-color="#ffffff" stop-opacity="0"/></linearGradient>';
+      var out = '<defs>' + defs + '</defs>';
+      out += '<rect x="140" y="140" width="720" height="720" fill="url(#' + u + '-mir)"/>';
+      // halftone + frosted ripple rings
+      out += path(DOTS, 'fill="' + CYAN + '"');
+      out += RINGS.map(function (r, i) { return '<circle cx="500" cy="500" r="' + r + '" fill="none" stroke="#FFF6DC" stroke-width="' + (i > 1 ? 10 : 8) + '"/><circle cx="500" cy="500" r="' + (r + 5) + '" fill="none" stroke="#7a4a08" stroke-width="1.6" stroke-opacity=".7"/>'; }).join('');
+      // misregistered print shadow
+      out += '<g transform="translate(9,9)" fill="' + INK + '" fill-opacity=".85">' + path(KA.body + KA.tail + KA.fins) + path(KB.body + KB.tail + KB.fins) + '</g>';
+      out += fishField(KB, CYAN, IVORY, CORAL, u, 1);
+      out += fishField(KA, IVORY, CORAL, CYAN, u, 0);
+      out += BUBBLES.map(function (b) { return '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + b[2] + '" fill="#ffffff" fill-opacity=".9" stroke="' + INK + '" stroke-width="3.5"/><circle cx="' + (b[0] - b[2] * 0.35) + '" cy="' + (b[1] - b[2] * 0.35) + '" r="' + n(b[2] * 0.25) + '" fill="' + CYAN + '"/>'; }).join('');
+      return out;
+    }
+    function inkMask(u) {
+      var m = '<rect x="0" y="0" width="1000" height="1000" fill="#fff" fill-opacity=".55"/>';
+      m += path(DOTS, 'fill="#fff"');
+      m += RINGS.map(function (r, i) { return '<circle cx="500" cy="500" r="' + r + '" fill="none" stroke="#000" stroke-width="' + (i > 1 ? 11 : 9) + '"/><circle cx="500" cy="500" r="' + r + '" fill="none" stroke="#999" stroke-width="' + (i > 1 ? 7 : 5) + '"/>'; }).join('');
+      m += '<g transform="translate(9,9)" fill="#fff">' + path(KA.body + KA.tail + KA.fins) + path(KB.body + KB.tail + KB.fins) + '</g>';
+      m += path(KA.body + KA.tail + KA.fins + KA.dorsal + KB.body + KB.tail + KB.fins + KB.dorsal, 'fill="#fff" stroke="#fff" stroke-width="6"');
+      m += BUBBLES.map(function (b) { return '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + (b[2] + 2) + '" fill="#fff"/>'; }).join('');
+      return m;
+    }
+    function relief(u) {
+      var inner = RINGS.map(function (r) { return '<circle cx="500" cy="500" r="' + r + '" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="8"/>'; }).join('') +
+        path(KA.body + KB.body, 'fill-opacity="1"') + path(KA.tail + KA.fins + KB.tail + KB.fins, 'fill-opacity=".55"');
+      return reliefWrap(u, inner, 2.2);
+    }
+    return { metal: 'au', field: field, inkMask: inkMask, relief: relief };
   })();
 
   /* ------------------------------------------------------------ placeholders */
@@ -1155,6 +1306,6 @@
     valkyrie: VALKYRIE,
     heimdall: HEIMDALL,
     jormungandr: JORMUNGANDR,
-    koi: placeholder('au', '#FF7A6B', '#19D3FF')
+    koi: KOI
   };
 })();

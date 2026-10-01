@@ -43,7 +43,7 @@
    nfcSVG({size=120, color='#46E6A6'}) -> string
    sealSVG(id, {size=240}) -> round holographic NFC seal sticker
    capsuleSVG(id|null, {size=600, layer:'full'|'back'|'front'}) -> acrylic capsule (600x600 units)
-   boxSVG({open=false, size=800, tape=true}) -> isometric matte-black box (800x720 units)
+   boxSVG({open=0..1|bool, size=800, tape=true}) -> isometric matte-black box (800x780 units; flaps fold with open)
    labelSVG({size=520}) -> shipping label 'TRACKED · NFC-SEALED' (520x300 units)
    phoneSVG(screenMarkup?, {size=380, hole=false}) -> phone frame 380x780 units; PHONE.screen = {x,y,w,h,r}
    vaultDoorSVG({open=0, size=1000, wheel=true, glow=1}) -> circular vault door (1000x1000 units)
@@ -879,7 +879,14 @@
     const back = o.side === 'back';
     let d = '';
     d += '<clipPath id="' + u + '-clip"><path d="' + packOutline() + '"/></clipPath>';
-    d += lg(u + '-base', 0, 0, W, 0, [[0, '#0B0F1C'], [0.18, '#1A1F2E'], [0.5, '#232A3E'], [0.82, '#1A1F2E'], [1, '#0B0F1C']]);
+    d += lg(u + '-base', 0, 0, W, 0, [[0, '#070A14'], [0.2, '#141A2A'], [0.5, '#1A2133'], [0.8, '#141A2A'], [1, '#070A14']]);
+    const hk = back ? 0.42 : 1;
+    d += rg(u + '-portal', W / 2, H * 0.42, 220, [[0, '#FFFFFF', 0.55], [0.35, '#BFF4FF', 0.22], [1, '#7C5CFF', 0]]);
+    d += '<mask id="' + u + '-holo" maskUnits="userSpaceOnUse" x="0" y="0" width="' + W + '" height="' + H + '">' +
+      '<rect width="' + W + '" height="' + H + '" fill="url(#' + u + '-holoG)"/></mask>' +
+      lg(u + '-holoG', 0, 0, W, H, [[0, '#fff', 0.95 * hk], [0.16, '#fff', 0.5 * hk], [0.3, '#fff', 0.95 * hk], [0.44, '#fff', 0.42 * hk], [0.6, '#fff', 0.85 * hk], [0.78, '#fff', 0.38 * hk], [1, '#fff', 0.9 * hk]]);
+    d += back ? rg(u + '-pocket', W / 2, H * 0.52, W * 0.9, [[0, '#05070D', 0.62], [0.7, '#05070D', 0.5], [1, '#05070D', 0.2]])
+      : rg(u + '-pocket', W / 2, 760, 380, [[0, '#05070D', 0.55], [0.6, '#05070D', 0.3], [1, '#05070D', 0]], ' gradientTransform="translate(' + W / 2 + ' 760) scale(1.3 .55) translate(' + -W / 2 + ' -760)"');
     d += lg(u + '-diag', 0, 0, W, H, [[0, '#7C5CFF', 0.0], [0.25, '#7C5CFF', 0.35], [0.45, '#19D3FF', 0.2], [0.62, '#46E6A6', 0.32], [0.8, '#4D8DFF', 0.18], [1, '#7C5CFF', 0.3]]);
     d += rg(u + '-pillow', W / 2, H * 0.48, W * 0.85, [[0, '#fff', 0.1], [0.55, '#000', 0], [1, '#000', 0.55]], ' gradientTransform="translate(' + W / 2 + ' ' + H * 0.48 + ') scale(1 1.5) translate(' + -W / 2 + ' ' + -H * 0.48 + ')"');
     d += lg(u + '-edgeL', 0, 0, W, 0, [[0, '#000', 0.55], [0.06, '#000', 0.0], [0.94, '#000', 0], [1, '#000', 0.6]]);
@@ -890,7 +897,7 @@
     d += '<pattern id="' + u + '-grate" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-24)"><rect width="6" height="2" fill="#fff" opacity=".07"/></pattern>';
     d += '<filter id="' + u + '-glit" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="1" seed="' + seed + '" result="t"/>' +
       '<feColorMatrix in="t" type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0" result="w"/>' +
-      '<feComponentTransfer in="t" result="a"><feFuncA type="table" tableValues="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 1"/></feComponentTransfer>' +
+      '<feComponentTransfer in="t" result="a"><feFuncA type="table" tableValues="0 0 0 0 0 0 0 0 0 0 0 0 0.15 0.6 1"/></feComponentTransfer>' +
       '<feComposite in="w" in2="a" operator="in"/></filter>';
     d += '<filter id="' + u + '-glit2" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".55" numOctaves="2" seed="' + (seed + 5) + '"/>' +
       '<feColorMatrix type="hueRotate" values="40"/><feColorMatrix type="saturate" values="3"/></filter>';
@@ -899,7 +906,7 @@
     d += '<filter id="' + u + '-emb" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="3" result="b"/>' +
       '<feSpecularLighting in="b" surfaceScale="6" specularConstant="1.15" specularExponent="22" lighting-color="#ffffff" result="s"><feDistantLight azimuth="235" elevation="42"/></feSpecularLighting>' +
       '<feComposite in="s" in2="SourceAlpha" operator="in" result="sp"/>' +
-      '<feDiffuseLighting in="b" surfaceScale="6" diffuseConstant="' + (0.5 / Math.sin(48 * DEG)).toFixed(3) + '" lighting-color="#fff" result="df"><feDistantLight azimuth="235" elevation="48"/></feDiffuseLighting>' +
+      '<feDiffuseLighting in="b" surfaceScale="6" diffuseConstant="' + (1 / Math.sin(48 * DEG)).toFixed(3) + '" lighting-color="#fff" result="df"><feDistantLight azimuth="235" elevation="48"/></feDiffuseLighting>' +
       '<feComposite in="df" in2="SourceAlpha" operator="in" result="dfa"/>' +
       '<feBlend in="dfa" in2="SourceGraphic" mode="multiply" result="sh"/>' +
       '<feComposite in="sh" in2="SourceAlpha" operator="in" result="sh2"/>' +
@@ -911,12 +918,15 @@
     let s = '<defs>' + d + '</defs><g clip-path="url(#' + u + '-clip)">';
     // base foil
     s += '<rect width="' + W + '" height="' + H + '" fill="url(#' + u + '-base)"/>';
-    s += foilWedges(W / 2, H * 0.4, 1300, 96, (o.foil || 0) + seed * 13, back ? 0.32 : 0.55);
-    s += '<rect width="' + W + '" height="' + H + '" fill="#0B0F1C" opacity="' + (back ? 0.5 : 0.26) + '"/>';
-    s += '<rect width="' + W + '" height="' + H + '" fill="url(#' + u + '-diag)" style="mix-blend-mode:screen"/>';
+    // holographic foil: vivid conic loop, revealed in diagonal light swaths (holo mask)
+    s += '<g mask="url(#' + u + '-holo)">' + foilWedges(W / 2, H * 0.42, 1300, 120, (o.foil || 0) + seed * 13, 1) + '</g>';
+    s += '<rect width="' + W + '" height="' + H + '" fill="url(#' + u + '-diag)" style="mix-blend-mode:screen" opacity=".55"/>';
+    // legibility pocket behind the print
+    s += '<rect width="' + W + '" height="' + H + '" fill="url(#' + u + '-pocket)"/>';
+    if (!back) s += '<ellipse cx="' + W / 2 + '" cy="' + n(H * 0.42) + '" rx="220" ry="200" fill="url(#' + u + '-portal)" style="mix-blend-mode:screen"/>';
     s += '<rect width="' + W + '" height="' + H + '" filter="url(#' + u + '-glit2)" opacity=".16" style="mix-blend-mode:overlay"/>';
     s += '<rect width="' + W + '" height="' + H + '" fill="url(#' + u + '-grate)" style="mix-blend-mode:screen"/>';
-    s += '<rect width="' + W + '" height="' + H + '" filter="url(#' + u + '-glit)" opacity="' + (back ? 0.35 : 0.75) + '" style="mix-blend-mode:screen"/>';
+    s += '<rect width="' + W + '" height="' + H + '" filter="url(#' + u + '-glit)" opacity="' + (back ? 0.45 : 1) + '" style="mix-blend-mode:screen"/>';
     // pillow shading + edges + sheen
     s += '<rect width="' + W + '" height="' + H + '" fill="url(#' + u + '-pillow)"/>';
     s += '<rect width="' + W + '" height="' + H + '" fill="url(#' + u + '-edgeL)"/>';
@@ -954,10 +964,11 @@
     s += '<circle cx="' + W / 2 + '" cy="470" r="268" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="2"/>';
     s += '<circle cx="' + W / 2 + '" cy="470" r="284" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="10"/>';
     // glow behind the arc
-    s += '<path d="' + arcMarkD(W / 2, 560, 440, 250) + '" fill="none" stroke="url(#' + u + '-au)" stroke-width="70" stroke-linecap="round" opacity=".55" filter="url(#' + u + '-b24)"/>';
+    s += '<defs>' + lg(u + '-arcG', W / 2 - 250, 0, W / 2 + 250, 0, auroraStops(1)) + '</defs>';
+    s += '<path d="' + arcMarkD(W / 2, 560, 440, 250) + '" fill="none" stroke="url(#' + u + '-arcG)" stroke-width="70" stroke-linecap="round" opacity=".6" filter="url(#' + u + '-b24)"/>';
     // embossed arc mark
     s += '<g filter="url(#' + u + '-drop)"><g filter="url(#' + u + '-emb)">' +
-      '<path d="' + arcMarkD(W / 2, 560, 440, 250) + '" fill="none" stroke="url(#' + u + '-au)" stroke-width="54" stroke-linecap="round"/>' +
+      '<path d="' + arcMarkD(W / 2, 560, 440, 250) + '" fill="none" stroke="url(#' + u + '-arcG)" stroke-width="54" stroke-linecap="round"/>' +
       '<circle cx="' + (W / 2 - 220) + '" cy="560" r="40" fill="#7C5CFF"/><circle cx="' + (W / 2 + 220) + '" cy="560" r="40" fill="#46E6A6"/></g></g>';
     // VAULT PACK
     const tw = 0.2;
@@ -973,44 +984,47 @@
   function packBack(u, o) {
     const { W, H, crimp } = PACK;
     let s = '';
-    s += '<g transform="translate(' + (W / 2 - 150) + ',118) scale(0.3)">' + logoSVG({ size: 1000 }).replace(/^<svg[^>]*>|<\/svg>$/g, '') + '</g>';
-    s += textSVG('VAULT PACK · SERIES 01', { x: W / 2 + 0.24 * 20 / 2, y: 228, size: 20, font: 'mono', anchor: 'middle', tracking: 0.24, fill: '#B8BFCC' });
-    s += textSVG('4 COINS · REAL SILVER & GOLD', { x: W / 2 + 0.1 * 34 / 2, y: 300, size: 34, font: 'sg7', anchor: 'middle', tracking: 0.1, fill: '#EAF2F8' });
-    // tier ladder (bottom = silver, top = legendary)
+    s += '<g transform="translate(' + (W / 2 - 165) + ',108) scale(0.33)">' + logoSVG({ size: 1000 }).replace(/^<svg[^>]*>|<\/svg>$/g, '') + '</g>';
+    s += textSVG('VAULT PACK · SERIES 01', { x: W / 2 + 0.24 * 20 / 2, y: 222, size: 20, font: 'mono', anchor: 'middle', tracking: 0.24, fill: '#B8BFCC' });
+    s += textSVG('4 COINS · REAL SILVER & GOLD', { x: W / 2 + 0.08 * 36 / 2, y: 290, size: 36, font: 'sg7', anchor: 'middle', tracking: 0.08, fill: '#FFFFFF' });
+    // tier ladder (top = legendary, bottom = silver)
     const tiers = [
       { k: 'legendary', l: 'LEGENDARY GOLD', m: 'AU', metal: 'au' },
       { k: 'gold', l: 'GOLD', m: 'AU', metal: 'au' },
       { k: 'rare', l: 'RARE SILVER', m: 'AG', metal: 'ag' },
       { k: 'silver', l: 'SILVER', m: 'AG', metal: 'ag' }
     ];
-    let defs = '<linearGradient id="' + u + '-lgf" x1="0" y1="0" x2="1" y2="1">' + st([[0, '#FFF1C1'], [0.4, '#F2C66D'], [0.75, '#D9A441'], [1, '#B8862B']]) + '</linearGradient>';
-    defs += rgo(u + '-cag', [[0, '#FFFFFF'], [0.5, '#C9D1D9'], [1, '#5B6670']], .35, .3, .8);
-    defs += rgo(u + '-cau', [[0, '#FFF1C1'], [0.5, '#F2C66D'], [1, '#8A5A12']], .35, .3, .8);
+    let defs = lgo(u + '-lgf', 0, 0, 1, 1, [[0, '#FFF1C1'], [0.4, '#F2C66D'], [0.75, '#D9A441'], [1, '#B8862B']]);
+    defs += rgo(u + '-cag', [[0, '#FFFFFF'], [0.5, '#C9D1D9'], [1, '#5B6670']], 0.35, 0.3, 0.8);
+    defs += rgo(u + '-cau', [[0, '#FFF1C1'], [0.5, '#F2C66D'], [1, '#8A5A12']], 0.35, 0.3, 0.8);
+    defs += lg(u + '-rail', 0, 340, 0, 760, [[0, '#46E6A6'], [0.35, '#19D3FF'], [0.7, '#4D8DFF'], [1, '#7C5CFF']]);
     s += '<defs>' + defs + '</defs>';
-    const x0 = 110, cw = W - 220, ch = 104, gap = 22, y0 = 360;
-    s += '<line x1="' + (x0 - 34) + '" y1="' + (y0 + 20) + '" x2="' + (x0 - 34) + '" y2="' + (y0 + 4 * ch + 3 * gap - 20) + '" stroke="url(#' + u + '-au)" stroke-width="4" stroke-linecap="round" opacity=".8"/>';
+    const x0 = 118, cw = W - 200, ch = 96, gap = 20, y0 = 336;
+    s += '<line x1="' + (x0 - 40) + '" y1="' + (y0 + 14) + '" x2="' + (x0 - 40) + '" y2="' + (y0 + 4 * ch + 3 * gap - 14) + '" stroke="url(#' + u + '-rail)" stroke-width="4" stroke-linecap="round"/>';
     tiers.forEach((tr, i) => {
       const y = y0 + i * (ch + gap), Rr = RARITY[tr.k];
       const leg = tr.k === 'legendary';
-      s += '<circle cx="' + (x0 - 34) + '" cy="' + (y + ch / 2) + '" r="7" fill="' + Rr.color + '"/>';
-      s += '<rect x="' + x0 + '" y="' + y + '" width="' + cw + '" height="' + ch + '" rx="22" fill="' + (leg ? 'url(#' + u + '-lgf)' : '#0B0F1A') + '" fill-opacity="' + (leg ? 1 : 0.72) + '" stroke="' + (leg ? 'url(#' + u + '-au)' : Rr.color) + '" stroke-width="' + (leg ? 6 : 3) + '"/>';
+      s += '<circle cx="' + (x0 - 40) + '" cy="' + (y + ch / 2) + '" r="8" fill="' + Rr.color + '" stroke="#05070D" stroke-width="3"/>';
+      if (leg) s += '<rect x="' + (x0 - 6) + '" y="' + (y - 6) + '" width="' + (cw + 12) + '" height="' + (ch + 12) + '" rx="26" fill="url(#' + u + '-au)" opacity=".55" filter="url(#' + u + '-b10)"/>';
+      s += '<rect x="' + x0 + '" y="' + y + '" width="' + cw + '" height="' + ch + '" rx="22" fill="' + (leg ? 'url(#' + u + '-lgf)' : '#0B0F1A') + '" fill-opacity="' + (leg ? 1 : 0.78) + '" stroke="' + (leg ? 'url(#' + u + '-au)' : Rr.color) + '" stroke-width="' + (leg ? 6 : 3) + '"/>';
       if (!leg) s += '<rect x="' + x0 + '" y="' + y + '" width="' + cw + '" height="' + ch + '" rx="22" fill="' + Rr.color + '" opacity=".1"/>';
-      // metal coin icon
-      s += '<circle cx="' + (x0 + 56) + '" cy="' + (y + ch / 2) + '" r="30" fill="url(#' + u + (tr.metal === 'ag' ? '-cag' : '-cau') + ')" stroke="' + (leg ? '#8A5A12' : '#000') + '" stroke-opacity=".4" stroke-width="2"/>';
-      s += '<circle cx="' + (x0 + 56) + '" cy="' + (y + ch / 2) + '" r="21" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2"/>';
-      s += textSVG(tr.l, { x: x0 + 108, y: y + ch / 2 + 12, size: 34, font: 'sg7', tracking: 0.06, fill: leg ? '#2A1A03' : Rr.color });
-      s += textSVG(tr.m, { x: x0 + cw - 30, y: y + ch / 2 + 9, size: 24, font: 'mono', anchor: 'end', tracking: 0.1, fill: leg ? '#4A2E07' : '#B8BFCC' });
+      s += '<circle cx="' + (x0 + 52) + '" cy="' + (y + ch / 2) + '" r="28" fill="url(#' + u + (tr.metal === 'ag' ? '-cag' : '-cau') + ')" stroke="' + (leg ? '#8A5A12' : '#000') + '" stroke-opacity=".45" stroke-width="2"/>';
+      s += '<circle cx="' + (x0 + 52) + '" cy="' + (y + ch / 2) + '" r="20" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="2"/>';
+      s += textSVG(tr.l, { x: x0 + 100, y: y + ch / 2 + 12, size: 33, font: 'sg7', tracking: 0.05, fill: leg ? '#2A1A03' : Rr.color });
+      s += textSVG(tr.m, { x: x0 + cw - 28, y: y + ch / 2 + 9, size: 24, font: 'mono', anchor: 'end', tracking: 0.1, fill: leg ? '#4A2E07' : '#B8BFCC' });
     });
-    const yb = y0 + 4 * ch + 3 * gap;
-    s += textSVG('ODDS PUBLISHED FOR EVERY DROP', { x: W / 2 + 0.16 * 24 / 2, y: yb + 72, size: 24, font: 'mono', anchor: 'middle', tracking: 0.16, fill: '#EAF2F8' });
-    s += textSVG('EVERY PACK CONTAINS REAL PRECIOUS METAL', { x: W / 2 + 0.16 * 16 / 2, y: yb + 112, size: 16, font: 'mono', anchor: 'middle', tracking: 0.16, fill: '#8AA4BC' });
-    // barcode + 18+
+    const yb = y0 + 4 * ch + 3 * gap;   // 800
+    s += '<rect x="' + (W / 2 - 120) + '" y="' + (yb + 26) + '" width="240" height="2" fill="url(#' + u + '-au)"/>';
+    s += textSVG('ODDS PUBLISHED FOR EVERY DROP', { x: W / 2 + 0.14 * 25 / 2, y: yb + 70, size: 25, font: 'mono', anchor: 'middle', tracking: 0.14, fill: '#FFFFFF' });
+    s += textSVG('EVERY PACK CONTAINS REAL PRECIOUS METAL', { x: W / 2 + 0.14 * 16 / 2, y: yb + 104, size: 16, font: 'mono', anchor: 'middle', tracking: 0.14, fill: '#8AA4BC' });
+    // bottom row: 18+ chip, domain, barcode
+    const by = H - crimp - 26;   // baseline zone bottom
+    s += '<g transform="translate(56,' + (by - 54) + ')"><rect width="80" height="48" rx="12" fill="#05070D" fill-opacity=".5" stroke="#EAF2F8" stroke-width="3"/>' + textSVG('18+', { x: 40, y: 34, size: 27, font: 'sg7', anchor: 'middle', fill: '#EAF2F8' }) + '</g>';
+    s += textSVG('bifrostvault.io', { x: 156, y: by - 20, size: 21, font: 'sg6', tracking: 0.03, fill: '#B8BFCC' });
     const R = rng(91);
-    let bc = '', bx = W / 2 + 40;
-    while (bx < W - 64) { const w = 1.5 + Math.floor(R() * 4) * 1.6; bc += '<rect x="' + n(bx) + '" y="' + (H - crimp - 112) + '" width="' + n(w) + '" height="62" fill="#EAF2F8"/>'; bx += w + 2 + Math.floor(R() * 3) * 2; }
-    s += '<rect x="' + (W / 2 + 26) + '" y="' + (H - crimp - 124) + '" width="' + (W / 2 - 74) + '" height="86" rx="8" fill="#05070D" opacity=".55"/>' + bc;
-    s += '<g transform="translate(64,' + (H - crimp - 112) + ')"><rect width="84" height="50" rx="12" fill="none" stroke="#EAF2F8" stroke-width="3"/>' + textSVG('18+', { x: 42, y: 35, size: 28, font: 'sg7', anchor: 'middle', fill: '#EAF2F8' }) + '</g>';
-    s += textSVG('bifrostvault.io', { x: 168, y: H - crimp - 78, size: 20, font: 'sg6', tracking: 0.04, fill: '#B8BFCC' });
+    let bc = '', bx = W - 236;
+    while (bx < W - 64) { const w = 1.5 + Math.floor(R() * 4) * 1.6; bc += '<rect x="' + n(bx) + '" y="' + (by - 58) + '" width="' + n(w) + '" height="50" fill="#0A1019"/>'; bx += w + 2 + Math.floor(R() * 3) * 2; }
+    s += '<rect x="' + (W - 252) + '" y="' + (by - 70) + '" width="204" height="74" rx="8" fill="#F4F7FA"/>' + bc;
     return s;
   }
   function packSVG(o) {
@@ -1234,7 +1248,7 @@
     front += '<path d="M' + P(pc(cx, cy, 283, -122)) + 'A283,283 0 0,1 ' + P(pc(cx, cy, 283, -28)) + '" fill="none" stroke="url(#' + u + '-hl)" stroke-width="9" stroke-linecap="round"/>';
     front += '<path d="M' + P(pc(cx, cy, 250, -100)) + 'A250,250 0 0,1 ' + P(pc(cx, cy, 250, -60)) + '" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="5" stroke-linecap="round" filter="url(#' + u + '-b4)"/>';
     front += '<path d="M' + P(pc(cx, cy, 283, 120)) + 'A283,283 0 0,1 ' + P(pc(cx, cy, 283, 150)) + '" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="4" stroke-linecap="round"/>';
-    front += '<ellipse cx="220" cy="190" rx="120" ry="44" transform="rotate(-38 220 190)" fill="#fff" opacity=".07"/>';
+    front += '<ellipse cx="205" cy="175" rx="110" ry="34" transform="rotate(-40 205 175)" fill="url(#' + u + '-hl)" opacity=".12" filter="url(#' + u + '-b12)"/>';
     let s = '<defs>' + d + '</defs>';
     if (layer !== 'front') s += back + coin;
     if (layer !== 'back') s += front;
@@ -1244,78 +1258,81 @@
   /* ====================================================================== box */
   function boxSVG(o) {
     o = o || {};
-    const open = o.open === true ? 1 : +(o.open || 0);
+    const k = clamp(o.open === true ? 1 : +(o.open || 0), 0, 1);
     const u = nid('x');
-    const W = 800, H = 720, size = o.size || 800;
-    // isometric box: top face rhombus centred (400,250); half-diagonals
-    const cx = 400, cy = 250, ax = 300, ay = 150, h = 230;
+    const W = 800, H = 780, size = o.size || 800;
+    // isometric box (2:1). Top face corners: T back, R right, B front, L left; body height h
+    const cx = 400, cy = 300, ax = 300, ay = 150, h = 230, fv = 150, dI = 54;
     const T = [cx, cy - ay], R = [cx + ax, cy], B = [cx, cy + ay], L = [cx - ax, cy];
-    const dn = (p) => [p[0], p[1] + h];
-    let d = lg(u + '-l', 0, 0, 0, H, [[0, '#1B2130'], [1, '#0B0E16']]) +
-      lg(u + '-r', 0, 0, 0, H, [[0, '#121722'], [1, '#05070D']]) +
-      lg(u + '-t', 100, 100, 700, 400, [[0, '#2A3142'], [1, '#141925']]) +
+    const add = (p, v, m) => [p[0] + v[0] * (m == null ? 1 : m), p[1] + v[1] * (m == null ? 1 : m)];
+    const dn = (p, d) => [p[0], p[1] + (d == null ? h : d)];
+    const quad = (a, b2, c, d2) => 'M' + P(a) + 'L' + P(b2) + 'L' + P(c) + 'L' + P(d2) + 'Z';
+    let d = lg(u + '-l', 0, 250, 0, 650, [[0, '#1E2433'], [1, '#0C0F18']]) +
+      lg(u + '-r', 0, 250, 0, 650, [[0, '#141925'], [1, '#06080E']]) +
+      lg(u + '-t', 100, 100, 700, 400, [[0, '#2C3345'], [1, '#161B27']]) +
+      lg(u + '-fi', 0, 0, 0, 1, [[0, '#262D3F'], [1, '#151A26']]) +
       lg(u + '-au', 100, 0, 700, 0, auroraStops(1)) +
-      lgo(u + '-tape', 0, 0, 1, 0, [[0, '#C9D1D9', 0.35], [0.5, '#F4F7FA', 0.55], [1, '#C9D1D9', 0.35]]) +
-      '<filter id="' + u + '-m" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="4"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".1"/></feComponentTransfer></filter>' +
-      blurF(u + '-b20', 20, 40) + blurF(u + '-b6', 6);
+      '<filter id="' + u + '-m" x="0" y="0" width="' + W + '" height="' + H + '" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="4"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0" intercept=".09"/></feComponentTransfer><feComposite in2="SourceAlpha" operator="in"/></filter>' +
+      '<clipPath id="' + u + '-top"><path d="' + quad(T, R, B, L) + '"/></clipPath>' +
+      blurF(u + '-b20', 20, 40) + blurF(u + '-b6', 6) + blurF(u + '-b14', 14, 40);
     let s = '<defs>' + d + '</defs>';
-    // floor shadow
-    s += '<ellipse cx="' + cx + '" cy="' + (cy + h + 120) + '" rx="360" ry="70" fill="#000" opacity=".55" filter="url(#' + u + '-b20)"/>';
-    // side faces
-    s += '<path d="M' + P(L) + 'L' + P(B) + 'L' + P(dn(B)) + 'L' + P(dn(L)) + 'Z" fill="url(#' + u + '-l)"/>';
-    s += '<path d="M' + P(B) + 'L' + P(R) + 'L' + P(dn(R)) + 'L' + P(dn(B)) + 'Z" fill="url(#' + u + '-r)"/>';
-    s += '<path d="M' + P(L) + 'L' + P(B) + 'L' + P(dn(B)) + 'L' + P(dn(L)) + 'ZM' + P(B) + 'L' + P(R) + 'L' + P(dn(R)) + 'L' + P(dn(B)) + 'Z" filter="url(#' + u + '-m)"/>';
-    // edge highlights
-    s += '<path d="M' + P(B) + 'L' + P(dn(B)) + '" stroke="#fff" stroke-opacity=".16" stroke-width="2"/>';
-    s += '<path d="M' + P(L) + 'L' + P(B) + 'L' + P(R) + '" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="2"/>';
-    // embossed mark on right face (skewed onto the iso plane)
-    const mk = markInner(u + 'k', { sw: 10 });
-    s += '<g transform="matrix(' + n(ax / 300) + ',' + n(-ay / 300) + ',0,1,' + n(B[0] + 60) + ',' + n(B[1] + 120) + ') scale(1.2)" opacity=".85">' + mk + '</g>';
-    s += '<g transform="matrix(' + n(ax / 300) + ',' + n(-ay / 300) + ',0,1,' + n(B[0] + 190) + ',' + n(B[1] + 56) + ')">' + textSVG('bifrost', { x: 0, y: 0, size: 34, font: 'sg6', fill: '#C9D1D9', attrs: 'opacity=".65"' }) + '</g>';
-    if (open <= 0) {
-      // closed lid with seam + tape strip
-      s += '<path d="M' + P(T) + 'L' + P(R) + 'L' + P(B) + 'L' + P(L) + 'Z" fill="url(#' + u + '-t)"/>';
-      s += '<path d="M' + P(T) + 'L' + P(R) + 'L' + P(B) + 'L' + P(L) + 'Z" filter="url(#' + u + '-m)"/>';
+    s += '<ellipse cx="' + cx + '" cy="' + (cy + h + 110) + '" rx="380" ry="70" fill="#000" opacity=".6" filter="url(#' + u + '-b20)"/>';
+    // flap geometry: offset of the free edge for opening angle th (0 = closed flat, pointing inward)
+    const flap = (e1, e2, inward, th, fill) => {
+      const t = th * DEG, off = [Math.cos(t) * inward[0], Math.cos(t) * inward[1] - Math.sin(t) * fv];
+      return '<path d="' + quad(e1, e2, add(e2, off), add(e1, off)) + '" fill="' + fill + '"/>' +
+        '<path d="' + quad(e1, e2, add(e2, off), add(e1, off)) + '" filter="url(#' + u + '-m)"/>' +
+        '<path d="M' + P(add(e1, off)) + 'L' + P(add(e2, off)) + '" stroke="#fff" stroke-opacity=".22" stroke-width="2"/>';
+    };
+    const inLT = [ax / 2, ay / 2], inTR = [-ax / 2, ay / 2], inLB = [ax / 2, -ay / 2], inBR = [-ax / 2, -ay / 2];
+    if (k > 0) {
+      // back flaps stand up behind the opening
+      s += flap(L, T, inLT, 118 * k, '#202738') + flap(T, R, inTR, 118 * k, '#1A2030');
+    }
+    // body faces
+    s += '<path d="' + quad(L, B, dn(B), dn(L)) + '" fill="url(#' + u + '-l)"/>';
+    s += '<path d="' + quad(B, R, dn(R), dn(B)) + '" fill="url(#' + u + '-r)"/>';
+    s += '<path d="' + quad(L, B, dn(B), dn(L)) + quad(B, R, dn(R), dn(B)) + '" filter="url(#' + u + '-m)"/>';
+    s += '<path d="M' + P(B) + 'L' + P(dn(B)) + '" stroke="#fff" stroke-opacity=".14" stroke-width="2"/>';
+    // embossed mark + wordmark on the right face (affine onto the iso plane)
+    const mat = 'matrix(' + n(ax / 300) + ',' + n(-ay / 300) + ',0,1,' + n(B[0]) + ',' + n(B[1]) + ')';
+    s += '<g transform="' + mat + '"><g transform="translate(46,92) scale(.6)" opacity=".9">' + markInner(u + 'k', { sw: 11 }) + '</g>' +
+      textSVG('bifrost', { x: 126, y: 146, size: 46, font: 'sg6', fill: '#C9D1D9', attrs: 'opacity=".7"' }) +
+      textSVG('VAULT', { x: 128, y: 172, size: 15, font: 'sg6', tracking: 0.4, fill: '#8AA4BC', attrs: 'opacity=".75"' }) + '</g>';
+    if (k <= 0) {
+      s += '<path d="' + quad(T, R, B, L) + '" fill="url(#' + u + '-t)"/>';
+      s += '<path d="' + quad(T, R, B, L) + '" filter="url(#' + u + '-m)"/>';
       const m1 = [(T[0] + L[0]) / 2, (T[1] + L[1]) / 2], m2 = [(R[0] + B[0]) / 2, (R[1] + B[1]) / 2];
-      s += '<path d="M' + P(m1) + 'L' + P(m2) + '" stroke="#000" stroke-opacity=".7" stroke-width="3"/>';
+      s += '<path d="M' + P(m1) + 'L' + P(m2) + '" stroke="#000" stroke-opacity=".75" stroke-width="3"/>';
       if (o.tape !== false) {
-        const tw = 34, off = (p, k) => [p[0] + k * ax / Math.hypot(ax, ay) * 0.0 - k * 0.5, p[1] - k * 0.5 * 0 + k];
-        const a1 = [m1[0] + tw * 0.5, m1[1] - tw * 0.25], a2 = [m2[0] + tw * 0.5, m2[1] - tw * 0.25], b1 = [m1[0] - tw * 0.5, m1[1] + tw * 0.25], b2 = [m2[0] - tw * 0.5, m2[1] + tw * 0.25];
-        void off;
-        s += '<path d="M' + P(a1) + 'L' + P(a2) + 'L' + P(b2) + 'L' + P(b1) + 'Z" fill="#C9D1D9" opacity=".22"/>';
-        s += '<path d="M' + P(a1) + 'L' + P(a2) + '" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>';
-        s += '<path d="M' + P(m2) + 'L' + P([m2[0], m2[1] + 90]) + '" stroke="#C9D1D9" stroke-opacity=".25" stroke-width="' + tw * 0.9 + '"/>';
+        const L2 = Math.hypot(ax, ay), pv = [ax / L2, -ay / L2], tw = 40;
+        const a1 = add(m1, pv, tw / 2), a2 = add(m2, pv, tw / 2), b1 = add(m1, pv, -tw / 2), b2 = add(m2, pv, -tw / 2);
+        s += '<path d="' + quad(a1, a2, b2, b1) + '" fill="#C9D1D9" opacity=".2"/>';
+        s += '<path d="M' + P(a1) + 'L' + P(a2) + 'M' + P(b1) + 'L' + P(b2) + '" stroke="#fff" stroke-opacity=".28" stroke-width="1.5"/>';
+        // tape runs over the edge and down the front-right face
+        s += '<path d="' + quad(a2, b2, dn(b2, 70), dn(a2, 70)) + '" fill="#C9D1D9" opacity=".16"/>';
       }
     } else {
-      // open: inner cavity + aurora foam insert + flaps folded out
-      const k = clamp(open, 0, 1);
-      const inset = 26;
-      const Ti = [T[0], T[1] + inset * 0.5], Ri = [R[0] - inset, R[1]], Bi = [B[0], B[1] - inset * 0.5], Li = [L[0] + inset, L[1]];
-      s += '<path d="M' + P(T) + 'L' + P(R) + 'L' + P(B) + 'L' + P(L) + 'Z" fill="#05070D"/>';
-      // inner walls
-      s += '<path d="M' + P(L) + 'L' + P(T) + 'L' + P([T[0], T[1] + 110]) + 'L' + P([L[0] + 20, L[1] + 90]) + 'Z" fill="#0E1320"/>';
-      s += '<path d="M' + P(T) + 'L' + P(R) + 'L' + P([R[0] - 20, R[1] + 90]) + 'L' + P([T[0], T[1] + 110]) + 'Z" fill="#0A0E18"/>';
-      // foam insert surface with aurora lining
-      const fT = [T[0], T[1] + 110], fR = [R[0] - 20, R[1] + 90], fB = [B[0], B[1] + 70], fL = [L[0] + 20, L[1] + 90];
-      void Ti; void Ri; void Bi; void Li;
-      s += '<path d="M' + P(fT) + 'L' + P(fR) + 'L' + P(fB) + 'L' + P(fL) + 'Z" fill="#141A28"/>';
-      s += '<path d="M' + P(fT) + 'L' + P(fR) + 'L' + P(fB) + 'L' + P(fL) + 'Z" fill="none" stroke="url(#' + u + '-au)" stroke-width="5" opacity=".9"/>';
-      s += '<path d="M' + P(fT) + 'L' + P(fR) + 'L' + P(fB) + 'L' + P(fL) + 'Z" fill="none" stroke="url(#' + u + '-au)" stroke-width="22" opacity=".35" filter="url(#' + u + '-b6)"/>';
-      // capsule slot (iso ellipse)
-      const sc = [(fT[0] + fB[0]) / 2, (fT[1] + fB[1]) / 2];
-      s += '<ellipse cx="' + n(sc[0]) + '" cy="' + n(sc[1]) + '" rx="150" ry="75" fill="#05070D"/>';
-      s += '<ellipse cx="' + n(sc[0]) + '" cy="' + n(sc[1]) + '" rx="150" ry="75" fill="none" stroke="url(#' + u + '-au)" stroke-width="4"/>';
-      s += '<ellipse cx="' + n(sc[0]) + '" cy="' + n(sc[1]) + '" rx="150" ry="75" fill="none" stroke="url(#' + u + '-au)" stroke-width="18" opacity=".4" filter="url(#' + u + '-b6)"/>';
-      // flaps (folded outward by k)
-      const fl = (a, b, dir) => {
-        const ex = [dir[0] * 120 * k, dir[1] * 120 * k - 60 * k];
-        return '<path d="M' + P(a) + 'L' + P(b) + 'L' + P([b[0] + ex[0], b[1] + ex[1]]) + 'L' + P([a[0] + ex[0], a[1] + ex[1]]) + 'Z" fill="#1B2130" stroke="#fff" stroke-opacity=".12"/>';
-      };
-      s = s.replace('<!--flaps-->', '');
-      s += fl(L, T, [-0.6, -0.5]) + fl(T, R, [0.6, -0.5]);
-      s += fl(B, L, [-0.7, 0.35]) + fl(R, B, [0.7, 0.35]);
-      s += '<path d="M' + P(L) + 'L' + P(B) + 'L' + P(R) + '" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="2"/>';
+      // opening: interior clipped to the top rhombus
+      s += '<g clip-path="url(#' + u + '-top)"><path d="' + quad(T, R, B, L) + '" fill="#05070D"/>' +
+        '<path d="' + quad(L, T, dn(T, dI), dn(L, dI)) + '" fill="#121827"/>' +
+        '<path d="' + quad(T, R, dn(R, dI), dn(T, dI)) + '" fill="#0C111C"/>' +
+        '<path d="' + quad(dn(T, dI), dn(R, dI), dn(B, dI), dn(L, dI)) + '" fill="#161C2B"/>' +
+        '<path d="' + quad(dn(T, dI), dn(R, dI), dn(B, dI), dn(L, dI)) + '" filter="url(#' + u + '-m)"/>';
+      // aurora-lined foam: glowing lining along the inner walls + capsule slot
+      s += '<path d="M' + P(dn(L, dI)) + 'L' + P(dn(T, dI)) + 'L' + P(dn(R, dI)) + '" fill="none" stroke="url(#' + u + '-au)" stroke-width="5"/>' +
+        '<path d="M' + P(dn(L, dI)) + 'L' + P(dn(T, dI)) + 'L' + P(dn(R, dI)) + '" fill="none" stroke="url(#' + u + '-au)" stroke-width="26" opacity=".45" filter="url(#' + u + '-b14)"/>';
+      const sc = [cx, cy + dI];
+      s += '<ellipse cx="' + n(sc[0]) + '" cy="' + n(sc[1] + 10) + '" rx="150" ry="75" fill="#020308"/>' +
+        '<ellipse cx="' + n(sc[0]) + '" cy="' + n(sc[1]) + '" rx="150" ry="75" fill="#05070D"/>' +
+        '<ellipse cx="' + n(sc[0]) + '" cy="' + n(sc[1]) + '" rx="150" ry="75" fill="none" stroke="url(#' + u + '-au)" stroke-width="18" opacity=".55" filter="url(#' + u + '-b6)"/>' +
+        '<ellipse cx="' + n(sc[0]) + '" cy="' + n(sc[1]) + '" rx="150" ry="75" fill="none" stroke="url(#' + u + '-au)" stroke-width="4"/></g>';
+      // rim edges
+      s += '<path d="M' + P(L) + 'L' + P(B) + 'L' + P(R) + '" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="2"/>';
+      // front flaps fold outward and down over the front faces
+      s += flap(L, B, inLB, 196 * k, '#2A3245') + flap(B, R, inBR, 196 * k, '#212839');
     }
+    s += '<path d="M' + P(L) + 'L' + P(B) + 'L' + P(R) + '" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="2"/>';
     return wrapSVG(size, size * H / W, W, H, s);
   }
   function labelSVG(o) {
@@ -1402,8 +1419,8 @@
       wheelDefs(u);
     let s = '<defs>' + d + '</defs>';
     // aurora light leaking around the seam
-    const gi = clamp(glow * (0.45 + 0.55 * open), 0, 1.5);
-    s += '<circle cx="' + cx + '" cy="' + cy + '" r="430" fill="none" stroke="url(#' + u + '-au)" stroke-width="' + n(40 + 60 * open) + '" opacity="' + n(0.75 * gi) + '" filter="url(#' + u + '-b30)"/>';
+    const gi = clamp(glow * (0.6 + 0.4 * open), 0, 1.5);
+    s += '<circle cx="' + cx + '" cy="' + cy + '" r="432" fill="none" stroke="url(#' + u + '-au)" stroke-width="' + n(46 + 60 * open) + '" opacity="' + n(clamp(0.85 * gi, 0, 1)) + '" filter="url(#' + u + '-b30)"/>';
     // frame (wall ring)
     s += '<path d="' + ringPath(cx, cy, 432, 500) + '" fill-rule="evenodd" fill="url(#' + u + '-frame)"/>';
     s += conicRing(cx, cy, 446, 492, 120, (a) => ramp(ST.rim, 0.32 + 0.22 * Math.cos(2 * (a - LIGHT) * DEG) + 0.12 * Math.cos((a - LIGHT) * DEG)), 'opacity=".9"');

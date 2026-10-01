@@ -88,6 +88,8 @@
       return Promise.resolve(false);
     }
     soundBusy = true; renderSound();
+    // Never spin forever: release the busy state after 20 s (a late enable still turns sound on).
+    const guard = setTimeout(() => { if (soundBusy) { soundBusy = false; renderSound(); console.warn('[app] sound is taking long to start'); } }, 20000);
     let p;
     try { p = Promise.resolve(A.enable()); } catch (e) { p = Promise.reject(e); }
     return p.then(() => {
@@ -98,7 +100,7 @@
       console.warn('[app] sound unavailable:', e);
       soundOn = false;
       return false;
-    }).then(r => { soundBusy = false; renderSound(); return r; });
+    }).then(r => { clearTimeout(guard); soundBusy = false; renderSound(); return r; });
   }
   function toggleSound() { if (!soundBusy) setSound(!soundOn); }
 

@@ -97,7 +97,6 @@
       x2 = x1; x1 = x; y2 = y1; y1 = y; return y;
     };
   }
-
   // band-limited saw (polyBLEP)
   function blepSaw(p, dt) {
     let v = 2 * p - 1;
@@ -105,280 +104,269 @@
     else if (p > 1 - dt) { const x = (p - 1) / dt; v -= x * x + x + x + 1; }
     return v;
   }
-  // biquad with re-computable coefficients (state kept across updates)
+  // biquad with re-computable coefficients (state kept across updates): 'lp' | 'hp' | 'bp'
   function jsBiquadState(prev, type, f, q) {
     const st = prev || { x1: 0, x2: 0, y1: 0, y2: 0 };
     const w0 = 2 * Math.PI * Math.min(f, SR * 0.45) / SR, cw = Math.cos(w0), al = Math.sin(w0) / (2 * q), a0 = 1 + al;
-    st.b0 = (1 - cw) / 2 / a0; st.b1 = (1 - cw) / a0; st.b2 = st.b0; st.a1 = -2 * cw / a0; st.a2 = (1 - al) / a0;
+    if (type === 'hp') { st.b0 = (1 + cw) / 2 / a0; st.b1 = -(1 + cw) / a0; st.b2 = st.b0; }
+    else if (type === 'bp') { st.b0 = al / a0; st.b1 = 0; st.b2 = -al / a0; }
+    else { st.b0 = (1 - cw) / 2 / a0; st.b1 = (1 - cw) / a0; st.b2 = st.b0; }
+    st.a1 = -2 * cw / a0; st.a2 = (1 - al) / a0;
     if (!st.run) st.run = function (x) {
       const y = st.b0 * x + st.b1 * st.x1 + st.b2 * st.x2 - st.a1 * st.y1 - st.a2 * st.y2;
       st.x2 = st.x1; st.x1 = x; st.y2 = st.y1; st.y1 = y; return y;
     };
     return st;
   }
+  const TAU = 2 * Math.PI;
+  const FX_SR = 24000; // reverbs + delay run in a half-rate FX context (their returns are dark anyway)
 
   // =====================================================================
   //  SCORE BUILDER
+  //  Every voice is synthesised in JS (seeded) and mixed into a handful of stem
+  //  buffers; the stems then run through the WebAudio bus graph (sidechain duck,
+  //  saturation, automated filters, reverbs/delay, glue compressor, limiter) in
+  //  an OfflineAudioContext. This keeps the live node count tiny, so the whole
+  //  minute renders in a few seconds.
   // =====================================================================
   function build(opts) {
     opts = opts || {};
     const dur = getDuration();
+    const END = dur;
+    const N = Math.round(SR * dur);
     const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    const ctx = new Ctx(2, Math.round(SR * dur), SR);
+    const ctx = new Ctx(2, N, SR);
     const rnd = mulberry32(2026);
     const rr = (a, b) => a + (b - a) * rnd();
-    const END = dur;
+    const T = (t) => Math.round(t * SR);
 
-    // ---------------------------------------------------- node helpers
-    function G(v, dest) { const g = ctx.createGain(); g.gain.value = v == null ? 1 : v; if (dest) g.connect(dest); return g; }
-    function F(type, f, q, dest) { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = q == null ? 0.707 : q; if (dest) n.connect(dest); return n; }
-    function PAN(p, dest) { const n = ctx.createStereoPanner(); n.pan.value = p; if (dest) n.connect(dest); return n; }
-    function OSC(type, f, t0, t1, dest) {
-      const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, Math.max(0, t0));
-      if (dest) o.connect(dest); o.start(Math.max(0, t0)); o.stop(Math.min(END, Math.max(t0 + 0.01, t1))); return o;
+    // ---------------------------------------------------- JS buffer helpers
+    function mk(seconds, chans, fill) {
+      const n = Math.max(2, Math.round(seconds * SR));
+      if (chans === 1) { const d = new Float32Array(n); fill(d, 0, n); return d; }
+      const L = new Float32Array(n), R = new Float32Array(n); fill(L, 0, n); fill(R, 1, n); return [L, R];
     }
-    function SRC(b, t0, dest, rate, offset, len) {
-      const s = ctx.createBufferSource(); s.buffer = b;
-      if (rate) s.playbackRate.setValueAtTime(rate, t0);
-      if (dest) s.connect(dest);
-      if (len != null) s.start(t0, offset || 0, len); else s.start(t0, offset || 0);
-      return s;
-    }
-    function shaper(drive, dest) {
-      const w = ctx.createWaveShaper(), n = 2048, c = new Float32Array(n), k = Math.tanh(drive);
-      for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(drive * x) / k; }
-      w.curve = c; w.oversample = '2x'; if (dest) w.connect(dest); return w;
-    }
-    function send(node, amt, target) { if (amt > 0) { const g = G(amt, target); node.connect(g); } }
-    // Output strip: returns an input GainNode -> [panner] -> dest, with reverb/delay sends post-pan
-    function strip(dest, o) {
-      o = o || {};
-      const g = ctx.createGain();
-      let node = g;
-      if (o.pan != null) {
-        const p = ctx.createStereoPanner();
-        if (Array.isArray(o.pan)) {
-          p.pan.setValueAtTime(o.pan[0], o.pan[2]); p.pan.linearRampToValueAtTime(o.pan[1], o.pan[3]);
-        } else p.pan.value = o.pan;
-        g.connect(p); node = p;
-      }
-      node.connect(dest);
-      send(node, o.rev || 0, revIn); send(node, o.huge || 0, hugeIn); send(node, o.dly || 0, dlyIn);
-      return g;
-    }
-    // envelope: linear attack to peak, exponential-ish decay (decay = time to about -40 dB)
-    function perc(param, t, peak, a, decay) {
-      param.setValueAtTime(0, t); param.linearRampToValueAtTime(peak, t + a);
-      param.setTargetAtTime(0, t + a, Math.max(0.001, decay / 4.6));
-    }
-    function sustain(param, t0, t1, peak, a, r) {
-      param.setValueAtTime(0, t0); param.linearRampToValueAtTime(peak, t0 + a);
-      param.setValueAtTime(peak, Math.max(t0 + a, t1)); param.linearRampToValueAtTime(0, Math.max(t0 + a, t1) + r);
-    }
-    function buf(seconds, chans, fill) {
-      const n = Math.max(2, Math.round(seconds * SR)); const b = ctx.createBuffer(chans, n, SR);
-      for (let c = 0; c < chans; c++) fill(b.getChannelData(c), c, n);
-      return b;
-    }
-
     const memo = new Map();
     function cached(key, seconds, chans, fill) {
       let b = memo.get(key);
-      if (!b) { b = buf(seconds, chans, fill); memo.set(key, b); }
+      if (!b) { b = mk(seconds, chans, fill); memo.set(key, b); }
       return b;
     }
+    const env1 = (tt, a, tau) => (tt < a ? tt / a : Math.exp(-(tt - a) / tau)); // linear attack, exp decay
 
-    // ---------------------------------------------------- JS-synth buffers
-    const noiseB = buf(6, 2, (d) => { for (let i = 0; i < d.length; i++) d[i] = rnd() * 2 - 1; });
-    const clickB = buf(0.008, 1, (d) => {
+    // ---------------------------------------------------- stems
+    const stems = {};
+    function stem(name, chans, seconds) {
+      const n = seconds ? Math.min(N, Math.round(seconds * SR)) : N;
+      const b = ctx.createBuffer(chans, n, SR);
+      stems[name] = { buf: b, L: b.getChannelData(0), R: chans > 1 ? b.getChannelData(1) : null, n: n };
+    }
+    ['drum', 'pad', 'arp', 'lead', 'sfx'].forEach((s) => stem(s, 2));
+    stem('bass', 1); stem('sub', 1); stem('music', 1, 3.0);
+    const sendRev = new Float32Array(N), sendHuge = new Float32Array(N), sendDly = new Float32Array(N);
+
+    // mix a mono (Float32Array) or stereo ([L, R]) source into a stem, StereoPanner-style panning,
+    // pan may be a number, null (no pan law) or [p0, p1, t0, t1] (linear pan ramp, absolute seconds)
+    function mixIn(name, src, t, g, o) {
+      o = o || {};
+      const S = stems[name], st = T(t);
+      const stereoSrc = Array.isArray(src);
+      const sL = stereoSrc ? src[0] : src, sR = stereoSrc ? src[1] : src;
+      let n = sL.length;
+      if (o.len != null) n = Math.min(n, Math.max(0, Math.round(o.len * SR)));
+      n = Math.min(n, S.n - st);
+      if (n <= 0) return;
+      const pan = o.pan, panDyn = Array.isArray(pan);
+      let gl = 1, gr = 1, xl = 0, xr = 0;
+      const setPan = (p) => {
+        if (p == null) { gl = gr = 1; xl = xr = 0; return; }
+        p = clamp(p, -1, 1);
+        if (!stereoSrc) { const x = (p + 1) / 2; gl = Math.cos(x * Math.PI / 2); gr = Math.sin(x * Math.PI / 2); xl = xr = 0; }
+        else if (p <= 0) { const x = p + 1; gl = 1; xl = Math.cos(x * Math.PI / 2); gr = Math.sin(x * Math.PI / 2); xr = 0; }
+        else { gl = Math.cos(p * Math.PI / 2); xl = 0; gr = 1; xr = Math.sin(p * Math.PI / 2); }
+      };
+      setPan(panDyn ? pan[0] : pan);
+      const rv = o.rev || 0, hg = o.huge || 0, dl = o.dly || 0, anySend = rv || hg || dl;
+      const L = S.L, R = S.R;
+      for (let i = 0; i < n; i++) {
+        const j = st + i; if (j < 0) continue;
+        if (panDyn && (i & 63) === 0) {
+          const u = clamp((t + i / SR - pan[2]) / Math.max(1e-6, pan[3] - pan[2]), 0, 1);
+          setPan(pan[0] + (pan[1] - pan[0]) * u);
+        }
+        const a = sL[i] * g, b = sR[i] * g;
+        if (R) { L[j] += a * gl + b * xl; R[j] += b * gr + a * xr; }
+        else L[j] += stereoSrc ? (a + b) * 0.5 : a;
+        if (anySend) {
+          const m = stereoSrc ? (a + b) * 0.5 : a;
+          if (rv) sendRev[j] += m * rv;
+          if (hg) sendHuge[j] += m * hg;
+          if (dl) sendDly[j] += m * dl;
+        }
+      }
+    }
+    // variable-rate playback (tape stop, scratch, half-speed crash): rate(tt) per output sample
+    function varispeed(src, outSec, rateFn) {
+      const n = Math.round(outSec * SR), out = new Float32Array(n); let pos = 0;
+      for (let i = 0; i < n; i++) {
+        const k = Math.floor(pos); if (k + 1 >= src.length) break;
+        const f = pos - k; out[i] = src[k] * (1 - f) + src[k + 1] * f;
+        pos += rateFn(i / SR);
+      }
+      return out;
+    }
+    const pw = (a, b, u) => a * Math.pow(b / a, clamp(u, 0, 1)); // exponential interpolation
+
+    // ---------------------------------------------------- source material (seeded)
+    const noise = mk(6, 2, (d) => { for (let i = 0; i < d.length; i++) d[i] = rnd() * 2 - 1; });
+    const NL = noise[0].length;
+    const clickB = mk(0.008, 1, (d) => {
       const hp = jsBiquad('hp', 3000, 0.7);
       for (let i = 0; i < d.length; i++) d[i] = hp((i < 2 ? 1 : 0) + (rnd() * 2 - 1) * Math.exp(-i / (0.0008 * SR)) * 0.7);
     });
     function hatBuf(decay) {
-      return buf(decay * 1.6, 1, (d) => {
+      return mk(decay * 1.6, 1, (d) => {
         const fr = [263, 400, 421, 474, 587, 845].map((f) => f * 1.55), ph = fr.map(() => rnd());
         const h1 = jsBiquad('hp', 7200, 0.9), h2 = jsBiquad('hp', 7200, 0.9), bp = jsBiquad('bp', 10500, 0.6);
         for (let i = 0; i < d.length; i++) {
           const t = i / SR; let s = 0;
           for (let k = 0; k < 6; k++) s += ((ph[k] + fr[k] * t) % 1) < 0.5 ? 1 : -1;
           s = s / 6 * 0.8 + (rnd() * 2 - 1) * 0.5;
-          const e = Math.exp(-t / (decay / 4.6)) * Math.min(1, t / 0.0006);
-          d[i] = h2(h1(bp(s))) * e * 1.6;
+          d[i] = h2(h1(bp(s))) * Math.exp(-t / (decay / 4.6)) * Math.min(1, t / 0.0006) * 1.6;
         }
       });
     }
     const hatC = hatBuf(0.055), hatO = hatBuf(0.32);
-    const clapB = buf(0.4, 2, (d, c) => {
+    const clapB = mk(0.4, 2, (d, c) => {
       const bp = jsBiquad('bp', 1350 + c * 120, 1.4), hp = jsBiquad('hp', 2500, 0.7);
       for (let i = 0; i < d.length; i++) {
-        const t = i / SR; const n = rnd() * 2 - 1;
+        const t = i / SR, n = rnd() * 2 - 1;
         let e = 0;
         for (let k = 0; k < 3; k++) { const tk = t - k * 0.0105; if (tk >= 0) e = Math.max(e, Math.exp(-tk / 0.0035)); }
         if (t > 0.021) e = Math.max(e, 0.75 * Math.exp(-(t - 0.021) / 0.07));
-        const body = Math.sin(2 * Math.PI * 185 * t) * Math.exp(-t / 0.045) * 0.55;
-        d[i] = bp(n) * e * 2.2 + hp(n) * Math.exp(-t / 0.03) * 0.35 + body;
+        d[i] = bp(n) * e * 2.2 + hp(n) * Math.exp(-t / 0.03) * 0.35 + Math.sin(TAU * 185 * t) * Math.exp(-t / 0.045) * 0.55;
       }
     });
-    const crashB = buf(2.8, 2, (d) => {
-      const P = 36, fr = [], ph = [], am = [];
-      for (let k = 0; k < P; k++) { fr.push(rr(3200, 13500)); ph.push(rnd() * 6.283); am.push(rr(0.3, 1)); }
+    const crashB = mk(2.8, 2, (d) => {
+      const fr = [], ph = [], am = [];
+      for (let k = 0; k < 12; k++) { fr.push(rr(3200, 13500)); ph.push(rnd() * TAU); am.push(rr(0.3, 1)); }
       const hp = jsBiquad('hp', 2600, 0.6), hp2 = jsBiquad('hp', 900, 0.6);
       for (let i = 0; i < d.length; i++) {
         const t = i / SR; let s = 0;
-        if (i % 2 === 0 || true) for (let k = 0; k < P; k += 3) s += am[k] * Math.sin(ph[k] + 6.283 * fr[k] * t);
+        for (let k = 0; k < 12; k++) s += am[k] * Math.sin(ph[k] + TAU * fr[k] * t);
         const e = Math.exp(-t / 0.75) * (0.55 + 0.45 * Math.exp(-t / 0.08)) * Math.min(1, t / 0.0015);
         d[i] = (hp(rnd() * 2 - 1) * 0.9 + hp2(s * 0.09)) * e;
       }
     });
-    function reversed(b, seconds) {
-      const n = Math.min(b.length, Math.round(seconds * SR));
-      return buf(n / SR, b.numberOfChannels, (d, c) => {
-        const s = b.getChannelData(c);
-        for (let i = 0; i < d.length; i++) d[i] = s[n - 1 - i] * Math.min(1, (d.length - i) / (0.004 * SR));
+    const crashHalf = [0, 1].map((c) => varispeed(crashB[c], 5.5, () => 0.5));
+    const revCrashB = (function () {
+      const n = Math.round(1.6 * SR);
+      return [0, 1].map((c) => {
+        const s = crashB[c], d = new Float32Array(n);
+        for (let i = 0; i < n; i++) d[i] = s[n - 1 - i] * Math.min(1, (n - i) / (0.004 * SR));
+        return d;
       });
-    }
-    const revCrashB = reversed(crashB, 1.6);
-
-    // impulse responses (seeded noise, exponential decay, progressive darkening, decorrelated L/R)
-    function irBuf(seconds, rt60, pre, brightHz, darkHz) {
-      return buf(seconds, 2, (d, c) => {
-        const tau = rt60 / 6.91; let y = 0, y2 = 0;
-        const preN = Math.round(pre * SR);
-        for (let i = 0; i < d.length; i++) {
-          if (i < preN) { d[i] = 0; continue; }
-          const t = (i - preN) / SR;
-          const fc = darkHz + (brightHz - darkHz) * Math.exp(-t / (rt60 * 0.3));
-          const a = 1 - Math.exp(-2 * Math.PI * fc / SR);
-          y += a * ((rnd() * 2 - 1) - y); y2 += a * (y - y2);
-          let er = 0;
-          if (t < 0.09 && rnd() < 0.004) er = (rnd() * 2 - 1) * 2.5;
-          d[i] = (y2 * 1.6 + er) * Math.exp(-t / tau) * Math.min(1, t / 0.006);
-        }
-      });
-    }
-    const irHall = irBuf(2.7, 2.3, 0.018, 9000, 1800);
-    const irHuge = irBuf(4.2, 3.8, 0.03, 7000, 1200);
-
+    })();
     // Chiptune segment (0..2.95 s): 4-bit, 8 kHz sample-and-hold, D minor
-    const chipB = buf(2.95, 1, (d) => {
+    const chipB = mk(2.95, 1, (d) => {
       const LEAD = [74, 77, 81, 86, 81, 77, 74, 81, 72, 76, 79, 84, 81, 79, 77, 76];
       const STAB = [62, 65, 69, 74];
       let pl = 0, pb = 0, held = 0, lfsr = 1;
       const ps = STAB.map(() => 0);
       for (let i = 0; i < d.length; i++) {
         const t = i / SR, step = Math.floor(t / 0.125), lt = t - step * 0.125;
-        // lead: 25% pulse, staccato
         pl += mtof(LEAD[step % 16]) / SR;
         let s = ((pl % 1) < 0.25 ? 1 : -1) * 0.16 * (lt < 0.095 ? Math.exp(-lt / 0.12) : 0);
-        // bass: 8th-note octave triangle on D
         const b8 = Math.floor(t / 0.25); pb += mtof(b8 % 2 ? 50 : 38) / SR;
-        const tri = 1 - 4 * Math.abs((pb % 1) - 0.5);
-        s += tri * 0.22 * ((t - b8 * 0.25) < 0.2 ? 1 : 0);
-        // gated 8-bit stab on each word slam (0, .5, 1, 1.5)
+        s += (1 - 4 * Math.abs((pb % 1) - 0.5)) * 0.22 * ((t - b8 * 0.25) < 0.2 ? 1 : 0);
         const k = Math.floor(t / 0.5), st = t - k * 0.5;
-        if (k < 4 && st < 0.17) {
+        if (k < 4 && st < 0.17) { // gated 8-bit stab on each word slam
           const gate = (st % 0.034) < 0.022 ? 1 : 0, blip = 1 + 0.6 * Math.exp(-st / 0.008);
-          for (let j = 0; j < 4; j++) { ps[j] += mtof(STAB[j] + (k % 2 ? 0 : 0)) * blip / SR; s += ((ps[j] % 1) < 0.5 ? 1 : -1) * 0.1 * gate * Math.exp(-st / 0.2); }
+          for (let j = 0; j < 4; j++) { ps[j] += mtof(STAB[j]) * blip / SR; s += ((ps[j] % 1) < 0.5 ? 1 : -1) * 0.1 * gate * Math.exp(-st / 0.2); }
         }
-        // chip noise drum on the off-beats
-        const e8 = t - Math.floor(t / 0.25) * 0.25;
-        if (i % 8 === 0) { const bit = ((lfsr >> 0) ^ (lfsr >> 1)) & 1; lfsr = (lfsr >> 1) | (bit << 14); }
-        const odd = Math.floor(t / 0.25) % 2 === 1;
+        const e8 = t - Math.floor(t / 0.25) * 0.25, odd = Math.floor(t / 0.25) % 2 === 1;
+        if (i % 8 === 0) { const bit = (lfsr ^ (lfsr >> 1)) & 1; lfsr = (lfsr >> 1) | (bit << 14); }
         s += ((lfsr & 1) ? 1 : -1) * (odd ? 0.1 : 0.04) * Math.exp(-e8 / (odd ? 0.05 : 0.015));
-        // chip kick on the beats
         const eb = t - Math.floor(t / 0.5) * 0.5;
-        s += Math.sin(2 * Math.PI * (60 * eb + 900 * 0.012 * (1 - Math.exp(-eb / 0.012)))) * 0.3 * Math.exp(-eb / 0.08);
-        // sample & hold (8 kHz) + 4-bit quantise
+        s += Math.sin(TAU * (60 * eb + 900 * 0.012 * (1 - Math.exp(-eb / 0.012)))) * 0.3 * Math.exp(-eb / 0.08);
         if (i % 6 === 0) held = Math.round(clamp(s, -1, 1) * 7) / 7;
         d[i] = held;
       }
     });
-    // vinyl-scratch source (voice-ish grit, played with a wobbling playbackRate)
-    const scratchB = buf(0.4, 1, (d) => {
+    const scratchB = mk(0.6, 1, (d) => {
       const bp = jsBiquad('bp', 1400, 1.1); let p = 0;
       for (let i = 0; i < d.length; i++) { p += 190 / SR; d[i] = bp(((p % 1) * 2 - 1) * 0.6 + (rnd() * 2 - 1) * 0.5) * 2.2; }
     });
-    // foil crinkle grains: density(u) 0..1 over the buffer
     function crinkleBuf(seconds, dens, flick) {
-      return buf(seconds, 2, (d) => {
+      return mk(seconds, 2, (d) => {
         const hp = jsBiquad('hp', 2200, 0.7), bp = jsBiquad('bp', 5200, 0.8);
         let e = 0, amp = 0, sign = 1;
         for (let i = 0; i < d.length; i++) {
           const u = i / d.length, t = i / SR;
           if (rnd() < dens(u) * 0.004) { e = 1; amp = rr(0.2, 1); sign = rnd() < 0.5 ? -1 : 1; }
           e *= 0.93;
-          const f = flick ? (0.65 + 0.35 * Math.sin(2 * Math.PI * 12 * t)) : 1;
+          const f = flick ? (0.65 + 0.35 * Math.sin(TAU * 12 * t)) : 1;
           d[i] = bp(hp((rnd() * 2 - 1) * e * amp * sign)) * 3.2 * f;
         }
       });
     }
     const crinkleSweep = crinkleBuf(0.7, (u) => Math.sin(Math.PI * u) * 0.9, false);
     const crinkleRise = crinkleBuf(1.55, (u) => 0.25 + 1.6 * u * u, true);
-    // tear crackle: 40 ms grains rising 2 -> 9 kHz over 0.36 s + rip texture
-    const tearB = buf(0.42, 2, (d, c) => {
-      const grains = [];
-      for (let g = 0; g < 11; g++) grains.push({ t0: g * 0.03 + rr(0, 0.012), f: 2000 * Math.pow(4.5, g / 10) * rr(0.85, 1.15), a: rr(0.5, 1) });
-      const filt = grains.map((g) => jsBiquad('bp', g.f, 1.6));
-      const hp = jsBiquad('hp', 1500, 0.7);
-      let am = 0;
-      for (let i = 0; i < d.length; i++) {
-        const t = i / SR; let s = 0;
-        for (let g = 0; g < grains.length; g++) {
-          const tl = t - grains[g].t0;
-          const n = rnd() * 2 - 1;
-          const y = filt[g](tl >= 0 && tl < 0.04 ? n : 0);
-          if (tl >= 0 && tl < 0.06) s += y * grains[g].a * Math.sin(Math.PI * Math.min(1, tl / 0.04));
+    const tearB = mk(0.42, 2, () => {});
+    (function () { // tear crackle: 40 ms grains rising 2 -> 9 kHz + rip texture
+      for (let c = 0; c < 2; c++) {
+        const d = tearB[c], grains = [];
+        for (let g = 0; g < 11; g++) grains.push({ t0: g * 0.03 + rr(0, 0.012), f: 2000 * Math.pow(4.5, g / 10) * rr(0.85, 1.15), a: rr(0.5, 1) });
+        const filt = grains.map((g) => jsBiquad('bp', g.f, 1.6)), hp = jsBiquad('hp', 1500, 0.7);
+        let am = 0;
+        for (let i = 0; i < d.length; i++) {
+          const t = i / SR; let s = 0;
+          for (let g = 0; g < grains.length; g++) {
+            const tl = t - grains[g].t0, y = filt[g](tl >= 0 && tl < 0.04 ? rnd() * 2 - 1 : 0);
+            if (tl >= 0 && tl < 0.06) s += y * grains[g].a * Math.sin(Math.PI * Math.min(1, tl / 0.04));
+          }
+          if (rnd() < 0.02) am = rr(0.3, 1);
+          am *= 0.995;
+          s += hp(rnd() * 2 - 1) * am * 0.6 * Math.exp(-t / 0.2);
+          d[i] = s * 1.4;
         }
-        if (rnd() < 0.02) am = rr(0.3, 1);
-        am *= 0.995;
-        s += hp(rnd() * 2 - 1) * am * 0.6 * Math.exp(-t / 0.2);
-        d[i] = s * 1.4;
       }
-    });
-    // engraving crackle + cutting sizzle (0.62 s)
-    const engraveB = buf(0.62, 1, (d) => {
-      const hp = jsBiquad('hp', 4200, 0.7), bp = jsBiquad('bp', 6800, 6);
-      let e = 0;
+    })();
+    const engraveB = mk(0.62, 1, (d) => {
+      const hp = jsBiquad('hp', 4200, 0.7), bp = jsBiquad('bp', 6800, 6); let e = 0;
       for (let i = 0; i < d.length; i++) {
         const u = i / d.length;
         if (rnd() < 0.012) e = rr(0.4, 1);
         e *= 0.9;
-        const n = rnd() * 2 - 1;
-        const jit = 0.6 + 0.4 * Math.sin(i * 0.013) * Math.sin(i * 0.0021);
+        const n = rnd() * 2 - 1, jit = 0.6 + 0.4 * Math.sin(i * 0.013) * Math.sin(i * 0.0021);
         d[i] = (hp(n * e) * 1.4 + bp(n) * 1.1 * jit) * Math.sin(Math.PI * u) * 1.2;
       }
     });
-    // tape zip: AM noise, rate rising 45 -> 140 Hz (echoes the rip)
-    const zipB = buf(0.34, 1, (d) => {
+    const zipB = mk(0.34, 1, (d) => {
       const bp = jsBiquad('bp', 2600, 0.9); let ph = 0;
       for (let i = 0; i < d.length; i++) {
         const u = i / d.length; ph += (45 + 95 * u) / SR;
-        const am = Math.pow(0.5 + 0.5 * Math.sin(2 * Math.PI * ph), 3);
-        d[i] = bp(rnd() * 2 - 1) * am * Math.sin(Math.PI * Math.min(1, u * 1.15)) * 2.6;
+        d[i] = bp(rnd() * 2 - 1) * Math.pow(0.5 + 0.5 * Math.sin(TAU * ph), 3) * Math.sin(Math.PI * Math.min(1, u * 1.15)) * 2.6;
       }
     });
-    // label-printer chatter (stepper ticks + motor buzz, printing in bursts)
-    const printerB = buf(0.82, 1, (d) => {
+    const printerB = mk(0.82, 1, (d) => {
       const hp = jsBiquad('hp', 1800, 0.8), bp = jsBiquad('bp', 900, 3); let p = 0, e = 0, next = 0;
       for (let i = 0; i < d.length; i++) {
-        const t = i / SR; const burst = (t % 0.16) < 0.11 ? 1 : 0.1;
+        const t = i / SR, burst = (t % 0.16) < 0.11 ? 1 : 0.1;
         if (i >= next) { e = burst; next = i + Math.round(SR / rr(48, 62)); }
         e *= 0.86; p += 96 / SR;
-        const buzz = ((p % 1) < 0.5 ? 1 : -1) * 0.18 * burst;
-        d[i] = hp((rnd() * 2 - 1) * e) * 0.9 + bp(buzz) * 1.4;
+        d[i] = hp((rnd() * 2 - 1) * e) * 0.9 + bp(((p % 1) < 0.5 ? 1 : -1) * 0.18 * burst) * 1.4;
       }
     });
-    // Shepard riser (octave-spaced sines under a Gaussian log-frequency window)
-    function shepardBuf(seconds, octPerSec) {
-      return buf(seconds, 2, (d, c) => {
-        const NO = 7, base = 46.25, ph = new Float64Array(NO); const det = c ? 1.004 : 1;
+    function shepardBuf(seconds, octPerSec) { // Shepard riser: octave-spaced tones under a Gaussian window
+      return mk(seconds, 2, (d, c) => {
+        const NO = 7, base = 46.25, ph = new Float64Array(NO), det = c ? 1.004 : 1;
         for (let i = 0; i < d.length; i++) {
           const t = i / SR, u = i / d.length, p = octPerSec * t; let s = 0;
           for (let k = 0; k < NO; k++) {
-            const lp = (k + p) % NO, f = base * Math.pow(2, lp) * det;
-            ph[k] += f / SR;
+            const lp = (k + p) % NO; ph[k] += base * Math.pow(2, lp) * det / SR;
             const w = Math.exp(-Math.pow(lp - NO * 0.55, 2) / (2 * 1.25 * 1.25));
-            s += w * (Math.sin(2 * Math.PI * ph[k]) + 0.25 * Math.sin(4 * Math.PI * ph[k]));
+            s += w * (Math.sin(TAU * ph[k]) + 0.25 * Math.sin(2 * TAU * ph[k]));
           }
           d[i] = s * 0.32 * (0.15 + 0.85 * u * u) * Math.min(1, u * 20);
         }
@@ -386,25 +374,26 @@
     }
     const shep1 = shepardBuf(1.5, 0.9), shep2 = shepardBuf(1.93, 1.0);
 
-    // ---------------------------------------------------------- the graph
-    const out = G(1);                      // final, gated (silences)
-    out.connect(ctx.destination);
+    // ---------------------------------------------------------- main bus graph
+    const out = ctx.createGain(); out.connect(ctx.destination);            // gated (silences)
     const lim = ctx.createDynamicsCompressor();
     lim.threshold.value = -3.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
     const glue = ctx.createDynamicsCompressor();
     glue.threshold.value = -17; glue.knee.value = 8; glue.ratio.value = 2.4; glue.attack.value = 0.012; glue.release.value = 0.2;
-    const mix = G(0.62);
-    mix.connect(glue); glue.connect(lim); lim.connect(G(1, out));
-
-    const sfxIn = G(opts.only === 'music' ? 0 : 1, mix);
-    const sfx = G(1, sfxIn);
+    const G = (v, dest) => { const g = ctx.createGain(); g.gain.value = v; if (dest) g.connect(dest); return g; };
+    const F = (type, f, q, dest) => { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = q; if (dest) n.connect(dest); return n; };
+    function shaper(drive, dest) {
+      const w = ctx.createWaveShaper(), n = 2048, c = new Float32Array(n), k = Math.tanh(drive);
+      for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(drive * x) / k; }
+      w.curve = c; w.oversample = '2x'; if (dest) w.connect(dest); return w;
+    }
+    const mix = G(0.62); mix.connect(glue); glue.connect(lim); lim.connect(out);
+    const sfx = G(1, mix);
     const subBus = G(1); subBus.connect(shaper(1.4, sfx));
-    const musicGate = G(opts.only === 'sfx' ? 0 : 1, mix);
-    const musicOut = G(1, musicGate);
+    const musicOut = G(1, mix);
     const musicLP = F('lowpass', 20000, 0.8, musicOut);
     const musicPre = G(1, musicLP);
     const duck = G(1, musicPre);
-    duck.gain.setValueAtTime(1, 0);
     const drumLP = F('lowpass', 20000, 0.9, musicPre);
     const drumBus = G(0.9); drumBus.connect(shaper(1.25, drumLP));
     const bassLP = F('lowpass', 650, 0.7, duck);
@@ -412,294 +401,273 @@
     const padLP = F('lowpass', 2200, 0.6, duck);
     const padBus = G(1, padLP);
     const arpBus = G(1, duck);
-    const hornBus = G(1, musicOut);
-    const choirBus = G(1, musicOut);
-    const hatBusL = PAN(-0.28, drumBus), hatBusR = PAN(0.28, drumBus);
+    const leadBus = G(1, musicOut); // horns + choir (not filtered by the music-bus sweeps)
+    const padAuto = [];             // pad lowpass automation, replayed in the FX context
+    const padLPset = (m, v, t) => { padAuto.push([m, v, t]); padLP.frequency[m](v, t); };
+    duck.gain.setValueAtTime(1, 0);
 
-    // reverbs + ping-pong delay (returns go straight to the mix)
-    const hall = ctx.createConvolver(); hall.buffer = irHall; hall.connect(G(opts.only === 'dry' ? 0 : 0.95, mix));
-    const hugeC = ctx.createConvolver(); hugeC.buffer = irHuge; hugeC.connect(G(opts.only === 'dry' ? 0 : 0.9, mix));
-    const revIn = F('highpass', 220, 0.7, hall);
-    const hugeIn = F('highpass', 160, 0.7, hugeC);
-    const dlyIn = G(1);
-    const dL = ctx.createDelay(1.0), dR = ctx.createDelay(1.0);
-    dL.delayTime.value = 0.375; dR.delayTime.value = 0.375;
-    const dlyRet = G(0.55, mix); send(dlyRet, 0.25, revIn);
-    dlyIn.connect(dL); dL.connect(PAN(-0.85, dlyRet)); dL.connect(dR); dR.connect(PAN(0.85, dlyRet));
-    const fbLP = F('lowpass', 3800, 0.6); dR.connect(fbLP); fbLP.connect(G(0.36, dL));
-
-    // ---------------------------------------------------------- lazy event queue
-    // Nodes are created just-in-time while the OfflineAudioContext is suspended every
-    // 0.5 s, so the live graph only ever holds the voices that are (about to be) sounding.
-    let Q = [], qi = 0, horizon = -1, seq = 0, dirty = false;
-    function at(t, fn) {
-      if (t < horizon) { fn(); return; }
-      Q.push({ t: t, i: seq++, fn: fn }); dirty = true;
-    }
-    function flush(until) {
-      horizon = until;
-      for (;;) {
-        if (dirty) { Q = Q.slice(qi).sort((a, b) => a.t - b.t || a.i - b.i); qi = 0; dirty = false; }
-        if (qi < Q.length && Q[qi].t < until) { const e = Q[qi++]; e.fn(); } else break;
-      }
-    }
-    function lazy(fn, start) {
-      return function () { const a = arguments; at(start ? start(a) : a[0], () => fn.apply(null, a)); };
-    }
-
-    // ---------------------------------------------------------- instruments
-    function kick_(t, v, o) {
+    // ---------------------------------------------------------- instruments (JS synthesis -> stems)
+    function kick(t, v, o) {
       v = v == null ? 1 : v; o = o || {};
       const f1 = o.f1 || 54, f2 = o.f2 || 43, dec = o.dec || 0.5;
       const b = cached('kick' + f1 + '/' + f2 + '/' + dec, dec + 0.15, 1, (d) => {
-        const cd = clickB.getChannelData(0), tau = dec / 4.6; let ph = 0;
+        const tau = dec / 4.6; let ph = 0;
         for (let i = 0; i < d.length; i++) {
-          const t = i / SR;
-          const f = t < 0.065 ? 190 * Math.pow(f1 / 190, t / 0.065) : f1 * Math.pow(f2 / f1, Math.min(1, (t - 0.065) / 0.335));
-          ph += f / SR;
-          const env = t < 0.002 ? t / 0.002 : Math.exp(-(t - 0.002) / tau);
-          d[i] = Math.sin(2 * Math.PI * ph) * env * 0.95 + (i < cd.length ? cd[i] * 0.44 : 0);
+          const tt = i / SR;
+          ph += (tt < 0.065 ? pw(190, f1, tt / 0.065) : pw(f1, f2, (tt - 0.065) / 0.335)) / SR;
+          d[i] = Math.sin(TAU * ph) * env1(tt, 0.002, tau) * 0.95 + (i < clickB.length ? clickB[i] * 0.44 : 0);
         }
       });
-      SRC(b, t, G(v, drumBus));
+      mixIn('drum', b, t, v);
       if (o.duck !== false) { duck.gain.setTargetAtTime(o.depth || 0.3, t, 0.004); duck.gain.setTargetAtTime(1, t + 0.03, 0.085); }
     }
-    function clap_(t, v, o) {
-      o = o || {};
-      const g = strip(drumBus, { rev: o.rev == null ? 0.22 : o.rev, pan: o.pan || 0 }); g.gain.value = v;
-      const s = SRC(clapB, t, g, o.rate || 1); s.stop(t + 0.45);
-    }
+    function clap(t, v, o) { o = o || {}; mixIn('drum', clapB, t, v, { rev: o.rev == null ? 0.22 : o.rev, pan: o.pan || 0 }); }
     let hatN = 0;
-    function hat_(t, v, open) {
-      const g = G(v, (hatN++ % 2) ? hatBusR : hatBusL);
-      SRC(open ? hatO : hatC, t, g);
-    }
-    function crash_(t, v, o) {
+    function hat(t, v, open) { mixIn('drum', open ? hatO : hatC, t, v, { pan: (hatN++ % 2) ? 0.28 : -0.28 }); }
+    function crash(t, v, o) {
       o = o || {};
-      const g = strip(sfx, { rev: o.rev == null ? 0.3 : o.rev, huge: o.huge || 0 }); g.gain.value = v;
-      const s = SRC(crashB, t, g, o.rate || 1); s.stop(Math.min(END, t + 2.8 / (o.rate || 1)));
+      mixIn('sfx', o.rate === 0.5 ? crashHalf : crashB, t, v, { rev: o.rev == null ? 0.3 : o.rev, huge: o.huge || 0 });
     }
-    function revCymbal_(tEnd, len, v, o) {
+    function revCymbal(tEnd, len, v, o) {
       o = o || {};
-      const g = strip(sfx, { rev: 0.25, pan: o.pan == null ? 0 : o.pan }); g.gain.value = v;
-      const n = revCrashB.duration; const s = SRC(revCrashB, tEnd - len, g, 1, n - len); s.stop(o.cut || tEnd);
+      const n = revCrashB[0].length, k = n - Math.round(len * SR);
+      mixIn('sfx', [revCrashB[0].subarray(k), revCrashB[1].subarray(k)], tEnd - len, v,
+        { rev: 0.25, pan: o.pan == null ? 0 : o.pan, len: (o.cut || tEnd) - (tEnd - len) });
     }
     let last808 = null;
-    function b808_(t, midi, len, v, o) {
+    function b808(t, midi, len, v, o) {
       o = o || {};
-      const f = mtof(midi);
-      const so = OSC('sine', f, t, t + len + 0.1);
-      if (o.glideFrom != null) { so.frequency.setValueAtTime(mtof(o.glideFrom), t); so.frequency.exponentialRampToValueAtTime(f, t + (o.glide || 0.09)); }
-      else { so.frequency.setValueAtTime(f * 1.9, t); so.frequency.exponentialRampToValueAtTime(f, t + 0.035); }
-      const g = G(0, o.dest || bassBus);
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.004);
-      g.gain.setTargetAtTime(v * 0.55, t + 0.05, 0.35); g.gain.setValueAtTime(v * 0.55 * Math.exp(-(len - 0.05) / 0.35) + 0.0001, t + len);
-      g.gain.linearRampToValueAtTime(0, t + len + 0.04);
-      so.connect(g);
+      const f = mtof(midi), gl = o.glide || 0.09, ff = o.glideFrom != null ? mtof(o.glideFrom) : f * 1.9, gT = o.glideFrom != null ? gl : 0.035;
+      const d = new Float32Array(Math.round((len + 0.05) * SR)); let ph = 0;
+      for (let i = 0; i < d.length; i++) {
+        const tt = i / SR;
+        ph += pw(ff, f, tt / gT) / SR;
+        let e = tt < 0.004 ? tt / 0.004 : (tt < 0.05 ? 1 : 0.55 + 0.45 * Math.exp(-(tt - 0.05) / 0.35));
+        if (tt > len) e *= Math.max(0, 1 - (tt - len) / 0.04);
+        d[i] = Math.sin(TAU * ph) * e * v;
+      }
+      mixIn('bass', d, t, 1);
+      last808 = midi;
     }
-    function pad_(t0, t1, notes, v, o) {
+    // detuned-saw stack (polyBLEP) with sustain envelope -> mono buffer
+    function sawStack(freqs, len, a, r, o) {
+      o = o || {};
+      const n = Math.round((len + r + 0.02) * SR), d = new Float32Array(n);
+      const vo = freqs.map((f) => ({ dt: f / SR, p: rnd() }));
+      let flt = null;
+      for (let i = 0; i < n; i++) {
+        const tt = i / SR;
+        if (o.lp && (i & 31) === 0) flt = jsBiquadState(flt, 'lp', o.lp1 ? pw(o.lp, o.lp1, tt / len) : o.lp, o.q || 0.8);
+        let s = 0;
+        for (let k = 0; k < vo.length; k++) {
+          const q = vo[k]; q.p += q.dt; if (q.p >= 1) q.p -= 1;
+          s += o.wave === 'sine' ? Math.sin(TAU * q.p) : o.wave === 'tri' ? 1 - 4 * Math.abs(q.p - 0.5) : blepSaw(q.p, q.dt);
+        }
+        const e = tt < a ? tt / a : (tt < len ? 1 : Math.max(0, 1 - (tt - len) / Math.max(r, 1e-4)));
+        d[i] = (flt ? flt.run(s) : s) * e;
+      }
+      return d;
+    }
+    function pad(t0, t1, notes, v, o) {
       o = o || {};
       const a = o.a == null ? 0.12 : o.a, r = o.r == null ? 0.25 : o.r;
       [[-12, -0.8, 1], [0, 0, 0.7], [12, 0.8, 1]].forEach(([det, p, lv]) => {
-        const g = G(0, PAN(p, o.dest || padBus)); sustain(g.gain, t0, t1, v * lv, a, r);
-        notes.forEach((m) => {
-          const os = OSC('sawtooth', mtof(m), t0, t1 + r + 0.05, g);
-          os.detune.value = det + rr(-3, 3);
-        });
+        const fr = notes.map((m) => mtof(m) * Math.pow(2, (det + rr(-3, 3)) / 1200));
+        mixIn('pad', sawStack(fr, t1 - t0, a, r), t0, v * lv, { pan: p });
       });
     }
-    const padSend = G(0.22, revIn); padLP.connect(padSend);
-    const arpSend = G(0.18, revIn); arpBus.connect(arpSend);
-    function pluck_(t, midi, v, pan, o) {
+    function drone(t0, t1, midis, wave, v, a, r, o) {
+      o = o || {};
+      const fr = midis.map((m, i) => mtof(m) * Math.pow(2, ((o.det && o.det[i]) || 0) / 1200));
+      mixIn(o.dest || 'pad', sawStack(fr, t1 - t0, a, r, { wave: wave, lp: o.lp, lp1: o.lp1, q: o.q }), t0, v, {});
+    }
+    function pluck(t, midi, v, pan, o) {
       o = o || {};
       const cutA = o.cut || 4200, cutB = o.cutEnd || 500, dec = o.dec || 0.22, type = o.type || 'sawtooth';
       const b = cached(['pl', midi, cutA, cutB, dec, type].join('/'), dec * 2.2, 1, (d) => {
-        const f = mtof(midi), f2 = f * 1.004 * Math.pow(2, 7 / 1200); let p1 = 0, p2 = 0, flt = null;
-        const tau = dec * 2 / 4.6;
+        const f = mtof(midi), f2 = f * 1.004 * Math.pow(2, 7 / 1200), tau = dec * 2 / 4.6; let p1 = 0, p2 = 0, flt = null;
         for (let i = 0; i < d.length; i++) {
-          const t = i / SR;
-          if ((i & 31) === 0) flt = jsBiquadState(flt, 'lp', cutA * Math.pow(cutB / cutA, Math.min(1, t / dec)), 2.2);
+          const tt = i / SR;
+          if ((i & 31) === 0) flt = jsBiquadState(flt, 'lp', pw(cutA, cutB, tt / dec), 2.2);
           p1 = (p1 + f / SR) % 1; p2 = (p2 + f2 / SR) % 1;
-          const a = type === 'square' ? (p1 < 0.5 ? 1 : -1) : blepSaw(p1, f / SR);
-          const x = a + (p2 < 0.5 ? 1 : -1);
-          const env = t < 0.003 ? t / 0.003 : Math.exp(-(t - 0.003) / tau);
-          d[i] = flt.run(x) * env * 0.5;
+          const x = (type === 'square' ? (p1 < 0.5 ? 1 : -1) : blepSaw(p1, f / SR)) + (p2 < 0.5 ? 1 : -1);
+          d[i] = flt.run(x) * env1(tt, 0.003, tau) * 0.5;
         }
       });
-      const g = strip(arpBus, { pan: pan, dly: o.dly == null ? 0.22 : o.dly }); g.gain.value = v;
-      SRC(b, t, g);
+      mixIn('arp', b, t, v, { pan: pan, dly: o.dly == null ? 0.22 : o.dly });
     }
-    // FM glass bell (sine carrier + 3rd-harmonic FM), synthesised once per (note, shape)
+    // FM glass bell (sine carrier + 3rd-harmonic FM) — THE BIFROST CHORD voice
     function bellBuf(f, decay, ratio, index, att) {
       f = Math.min(f, 12000);
       return cached(['bell', f.toFixed(3), decay, ratio, index, att].join('/'), decay + 0.1, 1, (d) => {
         const fm = Math.min(23000, f * ratio), tauA = decay / 4.6, tauI = Math.max(0.001, decay * 0.18);
         let pc = 0, pm = 0;
         for (let i = 0; i < d.length; i++) {
-          const t = i / SR;
-          const idx = index * (0.12 + 0.88 * Math.exp(-t / tauI));
-          pm += fm / SR; pc += (f + f * idx * Math.sin(2 * Math.PI * pm)) / SR;
-          const env = t < att ? t / att : Math.exp(-(t - att) / tauA);
-          d[i] = Math.sin(2 * Math.PI * pc) * env;
+          const tt = i / SR, idx = index * (0.12 + 0.88 * Math.exp(-tt / tauI));
+          pm += fm / SR; pc += (f + f * idx * Math.sin(TAU * pm)) / SR;
+          d[i] = Math.sin(TAU * pc) * env1(tt, att, tauA);
         }
       });
     }
-    function bell_(t, f, v, pan, decay, o) {
+    function bell(t, f, v, pan, decay, o) {
       o = o || {};
-      const g = strip(o.dest || sfx, { pan: pan || 0, rev: o.rev == null ? 0.3 : o.rev, dly: o.dly || 0, huge: o.huge || 0 });
-      g.gain.value = v;
-      SRC(bellBuf(f, decay, o.ratio || 3, o.index == null ? 1.6 : o.index, o.a || 0.002), t, g);
-      return g;
+      mixIn(o.dest || 'sfx', bellBuf(f, decay, o.ratio || 3, o.index == null ? 1.6 : o.index, o.a || 0.002), t, v,
+        { pan: pan || 0, rev: o.rev == null ? 0.3 : o.rev, dly: o.dly || 0, huge: o.huge || 0 });
     }
     const RATIOS = [1, 2.76, 5.40, 8.93];
     // THE SILVER RING: inharmonic partials 1 / 2.76 / 5.40 / 8.93 x 1320 Hz, 2.5 s exponential decay
-    function silverBuf() {
-      return cached('silver', 2.7, 1, (d) => {
-        const decs = [2.5, 1.75, 1.1, 0.7], amps = [0.30, 0.17, 0.10, 0.055], cd = clickB.getChannelData(0);
-        for (let i = 0; i < d.length; i++) {
-          const t = i / SR, att = Math.min(1, t / 0.0012); let s = 0;
-          for (let k = 0; k < 4; k++) s += amps[k] * Math.sin(2 * Math.PI * 1320 * RATIOS[k] * t) * Math.exp(-t / (decs[k] / 4.6));
-          s += 0.09 * Math.sin(2 * Math.PI * 1320 * 1.0021 * t) * Math.exp(-t / (2.4 / 4.6));
-          d[i] = s * att + (i < cd.length ? cd[i] * 0.35 : 0);
-        }
-      });
-    }
-    function silverRing_(t, v, pan, o) {
+    const silverB = mk(2.7, 1, (d) => {
+      const decs = [2.5, 1.75, 1.1, 0.7], amps = [0.30, 0.17, 0.10, 0.055];
+      for (let i = 0; i < d.length; i++) {
+        const tt = i / SR; let s = 0;
+        for (let k = 0; k < 4; k++) s += amps[k] * Math.sin(TAU * 1320 * RATIOS[k] * tt) * Math.exp(-tt / (decs[k] / 4.6));
+        s += 0.09 * Math.sin(TAU * 1320 * 1.0021 * tt) * Math.exp(-tt / (2.4 / 4.6));
+        d[i] = s * Math.min(1, tt / 0.0012) + (i < clickB.length ? clickB[i] * 0.35 : 0);
+      }
+    });
+    function silverRing(t, v, pan, o) {
       o = o || {};
-      const g = strip(sfx, { pan: pan || 0, rev: o.rev == null ? 0.32 : o.rev, dly: o.dly || 0.05, huge: o.huge || 0 }); g.gain.value = v;
-      SRC(silverBuf(), t, g);
+      mixIn('sfx', silverB, t, v, { pan: pan || 0, rev: o.rev == null ? 0.32 : o.rev, dly: o.dly || 0.05, huge: o.huge || 0 });
     }
     // THE GOLD RING: same ratios on 880 Hz, softer attack, 6 kHz lowpass, 3.5 s decay
-    function goldRing_(t, v, pan, o) {
+    function goldRing(t, v, pan, o) {
       o = o || {};
       const D = o.decay || 3.5;
       const b = cached('gold' + D, D + 0.2, 1, (d) => {
         const decs = [D, D * 0.72, D * 0.48, D * 0.3], amps = [0.36, 0.2, 0.11, 0.06], lp = jsBiquad('lp', 6000, 0.7);
         for (let i = 0; i < d.length; i++) {
-          const t = i / SR, att = Math.min(1, t / 0.009); let s = 0;
-          for (let k = 0; k < 4; k++) s += amps[k] * Math.sin(2 * Math.PI * 880 * RATIOS[k] * t) * Math.exp(-t / (decs[k] / 4.6));
-          s += 0.1 * Math.sin(2 * Math.PI * 880 * 0.9986 * t) * Math.exp(-t / (D / 4.6));
-          d[i] = lp(s * att);
+          const tt = i / SR; let s = 0;
+          for (let k = 0; k < 4; k++) s += amps[k] * Math.sin(TAU * 880 * RATIOS[k] * tt) * Math.exp(-tt / (decs[k] / 4.6));
+          s += 0.1 * Math.sin(TAU * 880 * 0.9986 * tt) * Math.exp(-tt / (D / 4.6));
+          d[i] = lp(s * Math.min(1, tt / 0.009));
         }
       });
-      const g = strip(sfx, { pan: pan || 0, rev: o.rev == null ? 0.38 : o.rev, dly: o.dly || 0.05, huge: o.huge || 0 }); g.gain.value = v;
-      SRC(b, t, g);
+      mixIn('sfx', b, t, v, { pan: pan || 0, rev: o.rev == null ? 0.38 : o.rev, dly: o.dly || 0.05, huge: o.huge || 0 });
     }
-    // Gjallarhorn: detuned saw stack (polyBLEP), pitch scoop, swelling lowpass — rendered to a stereo buffer
-    function horn_(t, notes, len, v, o) {
+    // Gjallarhorn: detuned saw stack (polyBLEP), pitch scoop, swelling lowpass (stereo)
+    function horn(t, notes, len, v, o) {
       o = o || {};
       const att = o.a == null ? 0.3 : o.a, cutF = o.cut || 1200, rel = o.rel || 0.12, scoop = o.scoop == null ? 45 : o.scoop;
-      const total = len + rel * 6;
-      const b = cached(['horn', notes.join(','), len, att, cutF, rel, scoop].join('/'), total, 2, (d, c) => {
+      const b = cached(['horn', notes.join(','), len, att, cutF, rel, scoop].join('/'), len + rel * 6, 2, (d, c) => {
         const vo = [];
-        notes.forEach((m) => [-14, -5, 5, 14].forEach((dt, i) => vo.push({ f: mtof(m), d: dt, side: i % 2, p: rnd() })));
-
-        // StereoPanner(+-0.55) equal-power gains for a mono source
-        const th = (-0.55 + 1) * Math.PI / 4, near = Math.cos(th), far = Math.sin(th);
-        let flt = null; const tauC = len * 0.6 + 0.05;
+        notes.forEach((m) => [-14, -5, 5, 14].forEach((dt, i) => vo.push({ f: mtof(m), d: dt, side: i % 2, p: rnd(), dt: 0 })));
+        const th = (-0.55 + 1) * Math.PI / 4, near = Math.cos(th), far = Math.sin(th), tauC = len * 0.6 + 0.05;
+        let flt = null;
         for (let i = 0; i < d.length; i++) {
-          const t = i / SR;
+          const tt = i / SR;
           if ((i & 31) === 0) {
-            let cf;
-            if (t < att * 0.9) cf = 320 * Math.pow(cutF / 320, t / (att * 0.9));
-            else if (t < att) cf = cutF;
-            else cf = cutF * 0.65 + cutF * 0.35 * Math.exp(-(t - att) / tauC);
+            const cf = tt < att * 0.9 ? pw(320, cutF, tt / (att * 0.9)) : (tt < att ? cutF : cutF * 0.65 + cutF * 0.35 * Math.exp(-(tt - att) / tauC));
             flt = jsBiquadState(flt, 'lp', cf, 1.1);
-            const sc = Math.min(1, t / 0.11);
+            const sc = Math.min(1, tt / 0.11);
             for (let k = 0; k < vo.length; k++) vo[k].dt = vo[k].f * Math.pow(2, (vo[k].d - scoop * (1 - sc)) / 1200) / SR;
           }
           let x = 0;
           for (let k = 0; k < vo.length; k++) {
             const q = vo[k]; q.p += q.dt; if (q.p >= 1) q.p -= 1;
-            const sv = blepSaw(q.p, q.dt);
-            // channel c: voices on side 0 are panned left (-0.55), side 1 right (+0.55)
-            x += sv * ((q.side === 0) === (c === 0) ? near : far);
+            x += blepSaw(q.p, q.dt) * ((q.side === 0) === (c === 0) ? near : far);
           }
-          const env = t < att ? t / att : (t < len ? 1 : Math.exp(-(t - len) / rel));
-          d[i] = flt.run(x) * env;
+          d[i] = flt.run(x) * (tt < att ? tt / att : (tt < len ? 1 : Math.exp(-(tt - len) / rel)));
         }
-
       });
-      const g = strip(o.dest || hornBus, { rev: o.rev == null ? 0.3 : o.rev, huge: o.huge || 0 }); g.gain.value = v;
-      SRC(b, t, g);
+      mixIn('lead', b, t, v, { rev: o.rev == null ? 0.3 : o.rev, huge: o.huge || 0 });
     }
-    function choir_(t0, t1, notes, v, o) {
+    // airy formant choir 'aah' (saw voices + vibrato through two formant banks, L/R)
+    function choir(t0, t1, notes, v, o) {
       o = o || {};
-      const g = strip(choirBus, { huge: o.huge == null ? 0.55 : o.huge, rev: 0.25 });
-      sustain(g.gain, t0, t1, v, o.a || 0.35, o.r || 0.7);
-      const lfo = OSC('sine', 5.1, t0, t1 + 1.5); const lg = G(10); lfo.connect(lg);
-      const banks = [-0.6, 0.6].map((p) => {
-        const inp = G(1); const pn = PAN(p, g);
-        [[730, 7, 1], [1120, 9, 0.6], [2600, 12, 0.24], [3350, 14, 0.12]].forEach(([f, q, a]) => {
-          const bp = F('bandpass', f, q); inp.connect(bp); bp.connect(G(a * 2.4, pn));
-        });
-        return inp;
-      });
-      let k = 0;
-      notes.forEach((m) => {
-        [-11, 0, 11].forEach((d) => {
-          const os = OSC('sawtooth', mtof(m), t0, t1 + (o.r || 0.7) + 0.1, banks[k++ % 2]);
-          os.detune.value = d + rr(-4, 4); lg.connect(os.detune);
-        });
-      });
+      const a = o.a || 0.35, r = o.r || 0.7, hold = t1 - t0, n = Math.round((hold + r + 0.05) * SR);
+      const L = new Float32Array(n), R = new Float32Array(n);
+      const vo = []; let k = 0;
+      notes.forEach((m) => [-11, 0, 11].forEach((d) => vo.push({ f: mtof(m), d: d + rr(-4, 4), p: rnd(), side: k++ % 2, dt: 0 })));
+      const FORM = [[730, 7, 1], [1120, 9, 0.6], [2600, 12, 0.24], [3350, 14, 0.12]];
+      const banks = [0, 1].map(() => FORM.map(([f, q]) => jsBiquad('bp', f, q)));
+      const gN = Math.cos(0.2 * Math.PI / 2), gF = Math.sin(0.2 * Math.PI / 2);
+      for (let i = 0; i < n; i++) {
+        const tt = i / SR;
+        if ((i & 31) === 0) {
+          const vib = 10 * Math.sin(TAU * 5.1 * tt);
+          for (let j = 0; j < vo.length; j++) vo[j].dt = vo[j].f * Math.pow(2, (vo[j].d + vib) / 1200) / SR;
+        }
+        let a0 = 0, a1 = 0;
+        for (let j = 0; j < vo.length; j++) {
+          const q = vo[j]; q.p += q.dt; if (q.p >= 1) q.p -= 1;
+          const s = blepSaw(q.p, q.dt); if (q.side) a1 += s; else a0 += s;
+        }
+        let b0 = 0, b1 = 0;
+        for (let f = 0; f < 4; f++) { b0 += banks[0][f](a0) * FORM[f][2] * 2.4; b1 += banks[1][f](a1) * FORM[f][2] * 2.4; }
+        const e = (tt < a ? tt / a : (tt < hold ? 1 : Math.max(0, 1 - (tt - hold) / r))) * v;
+        L[i] = (b0 * gN + b1 * gF) * e; R[i] = (b1 * gN + b0 * gF) * e;
+      }
+      mixIn('lead', [L, R], t0, 1, { huge: o.huge == null ? 0.55 : o.huge, rev: o.rev == null ? 0.25 : o.rev });
     }
-    function whoosh_(t, d, f0, f1, v, p0, p1, o) {
+    // filtered-noise whoosh: swept filter, exponential swell/decay, pan ramp
+    function whoosh(t, d, f0, f1, v, p0, p1, o) {
       o = o || {};
-      const s = SRC(noiseB, t, null, 1, rr(0, 2.5)); s.stop(t + d + 0.05);
-      const bp = F(o.type || 'bandpass', f0, o.q || 1.1);
-      bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(f1, t + d);
-      s.connect(bp);
-      const g = strip(o.dest || sfx, { pan: [p0, p1, t, t + d], rev: o.rev == null ? 0.22 : o.rev, huge: o.huge || 0 });
-      bp.connect(g);
-      const pk = o.peak == null ? 0.65 : o.peak;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + d * pk); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      const n = Math.round(d * SR), out = new Float32Array(n), off = Math.floor(rr(0, 2.5) * SR), ch = noise[hatN++ % 2];
+      const type = o.type === 'highpass' ? 'hp' : o.type === 'lowpass' ? 'lp' : 'bp', q = o.q || 1.1, pk = o.peak == null ? 0.65 : o.peak;
+      let flt = null;
+      for (let i = 0; i < n; i++) {
+        const u = i / n;
+        if ((i & 31) === 0) flt = jsBiquadState(flt, type, pw(f0, f1, u), q);
+        const e = u < pk ? pw(1e-4, v, u / pk) : pw(v, 1e-4, (u - pk) / (1 - pk));
+        out[i] = flt.run(ch[(off + i) % NL]) * e;
+      }
+      mixIn(o.dest || 'sfx', out, t, 1, { pan: [p0, p1, t, t + d], rev: o.rev == null ? 0.22 : o.rev, huge: o.huge || 0 });
     }
-    function subDrop_(t, f0, f1, drop, v, decay) {
-      const so = OSC('sine', f0, t, t + decay + 0.2);
-      so.frequency.exponentialRampToValueAtTime(f1, t + drop);
-      const g = G(0, subBus); perc(g.gain, t, v, 0.004, decay); so.connect(g);
+    function subDrop(t, f0, f1, drop, v, decay) {
+      const d = new Float32Array(Math.round((decay + 0.2) * SR)), tau = decay / 4.6; let ph = 0;
+      for (let i = 0; i < d.length; i++) { const tt = i / SR; ph += pw(f0, f1, tt / drop) / SR; d[i] = Math.sin(TAU * ph) * env1(tt, 0.004, tau) * v; }
+      mixIn('sub', d, t, 1);
     }
-    function noiseBurst_(t, v, f0, f1, decay, o) {
+    // noise burst through a swept filter with a percussive envelope
+    function noiseBurst(t, v, f0, f1, decay, o) {
       o = o || {};
-      const s = SRC(noiseB, t, null, 1, rr(0, 3)); s.stop(t + decay + 0.1);
-      const lp = F(o.type || 'lowpass', f0, o.q || 0.8); lp.frequency.setValueAtTime(f0, t); lp.frequency.exponentialRampToValueAtTime(f1, t + decay);
-      s.connect(lp);
-      const g = strip(sfx, { pan: o.pan || 0, rev: o.rev == null ? 0.3 : o.rev, huge: o.huge || 0 }); lp.connect(g);
-      perc(g.gain, t, v, o.a || 0.002, decay);
+      const n = Math.round((decay + 0.1) * SR), out = new Float32Array(n), off = Math.floor(rr(0, 3) * SR), ch = noise[hatN++ % 2];
+      const type = o.type === 'highpass' ? 'hp' : o.type === 'bandpass' ? 'bp' : 'lp', a = o.a || 0.002, sw = o.sweep || decay, tau = decay / 4.6;
+      let flt = null;
+      for (let i = 0; i < n; i++) {
+        const tt = i / SR;
+        if ((i & 31) === 0) flt = jsBiquadState(flt, type, pw(f0, f1, tt / sw), o.q || 0.8);
+        out[i] = flt.run(ch[(off + i) % NL]) * env1(tt, a, tau) * v;
+      }
+      mixIn('sfx', out, t, 1, { pan: o.pan || 0, rev: o.rev == null ? 0.3 : o.rev, huge: o.huge || 0 });
+    }
+    function play(src, t, v, o) {
+      o = o || {};
+      mixIn(o.dest || 'sfx', src, t, v, { pan: o.pan === undefined ? 0 : o.pan, rev: o.rev || 0, huge: o.huge || 0, dly: o.dly || 0, len: o.stop ? o.stop - t : null });
     }
     function impact(t, v, o) {
       o = o || {};
       subDrop(t, o.f0 || 95, o.f1 || 33, o.drop || 0.65, v * 0.95, o.subDec || 1.8);
       noiseBurst(t, v * 0.55, 2600, 140, 0.55, { rev: 0.35, huge: o.huge == null ? 0.25 : o.huge });
       if (o.crash !== false) crash(t, v * (o.crashV || 0.55), { huge: o.huge == null ? 0.2 : o.huge });
-      kick(t, v * 0.9, { duck: true, depth: 0.15 });
+      kick(t, v * 0.9, { depth: 0.15 });
     }
-    function thud_(t, f, v, o) {
+    function thud(t, f, v, o) {
       o = o || {};
-      const so = OSC('sine', f * 2.6, t, t + 0.6);
-      so.frequency.exponentialRampToValueAtTime(f, t + 0.045);
-      const g = strip(sfx, { rev: o.rev == null ? 0.18 : o.rev, pan: o.pan || 0 }); perc(g.gain, t, v, 0.002, o.dec || 0.38); so.connect(g);
-      const so2 = OSC('triangle', f * 2, t, t + 0.3, g);
-      so2.frequency.exponentialRampToValueAtTime(f * 1.5, t + 0.1);
+      const dec = o.dec || 0.38, d = new Float32Array(Math.round((dec + 0.2) * SR)), tau = dec / 4.6; let p1 = 0, p2 = 0;
+      for (let i = 0; i < d.length; i++) {
+        const tt = i / SR;
+        p1 += pw(f * 2.6, f, tt / 0.045) / SR; p2 += pw(f * 2, f * 1.5, tt / 0.1) / SR;
+        d[i] = (Math.sin(TAU * p1) + (1 - 4 * Math.abs((p2 % 1) - 0.5))) * env1(tt, 0.002, tau) * v;
+      }
+      mixIn('sfx', d, t, 1, { pan: o.pan || 0, rev: o.rev == null ? 0.18 : o.rev });
       noiseBurst(t, v * (o.slap == null ? 0.5 : o.slap), 1600, 300, 0.09, { pan: o.pan || 0, rev: 0.15 });
-      const cg = G(v * 0.4, sfx); SRC(clickB, t, cg);
+      play(clickB, t, v * 0.4, { pan: null });
     }
-    function tick_(t, f, v, pan, d, type, o) {
+    function tick(t, f, v, pan, d, type, o) {
       o = o || {};
       type = type || 'sine';
       const a = o.a || 0.001, f1 = o.f1 || 0;
       const b = cached(['tick', f, d, type, f1, a].join('/'), d * 2 + 0.02, 1, (dd) => {
         let ph = 0; const tau = d / 4.6;
         for (let i = 0; i < dd.length; i++) {
-          const t = i / SR;
-          const fr = f1 ? f * Math.pow(f1 / f, Math.min(1, t / d)) : f;
-          ph += fr / SR; const p = ph % 1;
-          const w = type === 'square' ? (p < 0.5 ? 1 : -1) : type === 'triangle' ? 1 - 4 * Math.abs(p - 0.5) : Math.sin(2 * Math.PI * p);
-          dd[i] = w * (t < a ? t / a : Math.exp(-(t - a) / tau));
+          const tt = i / SR;
+          ph += (f1 ? pw(f, f1, tt / d) : f) / SR; const p = ph % 1;
+          const w = type === 'square' ? (p < 0.5 ? 1 : -1) : type === 'triangle' ? 1 - 4 * Math.abs(p - 0.5) : Math.sin(TAU * p);
+          dd[i] = w * env1(tt, a, tau);
         }
       });
-      const g = strip(o.dest || sfx, { pan: pan || 0, rev: o.rev || 0, dly: o.dly || 0 }); g.gain.value = v;
-      SRC(b, t, g);
+      mixIn(o.dest || 'sfx', b, t, v, { pan: pan || 0, rev: o.rev || 0, dly: o.dly || 0, huge: o.huge || 0 });
     }
     function glassTick(t, f, v, pan, o) {
       o = o || {};
@@ -711,56 +679,40 @@
       const PENT = [74, 76, 78, 81, 83];
       for (let i = 0; i < n; i++) {
         const tt = t + (o.desc ? i / n : rnd()) * span;
-        let m;
-        if (o.desc) m = PENT[(n - i) % 5] + 12 * Math.floor(lo + (hi - lo) * (1 - i / n));
-        else m = PENT[Math.floor(rnd() * 5)] + 12 * Math.floor(rr(lo, hi));
+        let m = o.desc ? PENT[(n - i) % 5] + 12 * Math.floor(lo + (hi - lo) * (1 - i / n)) : PENT[Math.floor(rnd() * 5)] + 12 * Math.floor(rr(lo, hi));
+        m = Math.min(m, 112);
         bell(tt, mtof(m), v * rr(0.5, 1), clamp((pan || 0) + rr(-0.5, 0.5), -1, 1), rr(0.25, 0.6), { ratio: 3.5, index: 0.5, rev: 0.4, dly: 0.1 });
       }
     }
-    function scratch_(t, v) {
-      const g = strip(sfx, { rev: 0.1 }); const s = SRC(scratchB, t, g, 0.5); s.stop(t + 0.2);
-      const pr = s.playbackRate; pr.setValueAtTime(0.4, t); pr.linearRampToValueAtTime(2.3, t + 0.045); pr.linearRampToValueAtTime(0.3, t + 0.09); pr.linearRampToValueAtTime(1.7, t + 0.14);
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.006); g.gain.setValueAtTime(v, t + 0.08);
-      g.gain.linearRampToValueAtTime(v * 0.15, t + 0.095); g.gain.linearRampToValueAtTime(v * 0.8, t + 0.11); g.gain.linearRampToValueAtTime(0, t + 0.17);
-    }
-    function play_(b, t, v, o) {
-      o = o || {};
-      const g = strip(o.dest || sfx, { pan: o.pan == null ? 0 : o.pan, rev: o.rev || 0, huge: o.huge || 0, dly: o.dly || 0 }); g.gain.value = v;
-      const s = SRC(b, t, g, o.rate || 1); if (o.stop) s.stop(o.stop);
-      return g;
-    }
-    function heartbeat_(t, v) {
+    // vinyl scratch: wobbling playback rate + chopped gain
+    const scratchShape = (function () {
+      const rate = [[0, 0.4], [0.045, 2.3], [0.09, 0.3], [0.14, 1.7], [1, 1.7]];
+      const gain = [[0, 0], [0.006, 1], [0.08, 1], [0.095, 0.15], [0.11, 0.8], [0.17, 0], [1, 0]];
+      const lin = (tab, x) => { for (let i = 1; i < tab.length; i++) if (x <= tab[i][0]) { const [x0, y0] = tab[i - 1], [x1, y1] = tab[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); } return tab[tab.length - 1][1]; };
+      const v = varispeed(scratchB, 0.18, (tt) => lin(rate, tt));
+      for (let i = 0; i < v.length; i++) v[i] *= lin(gain, i / SR);
+      return v;
+    })();
+    function scratch(t, v) { mixIn('sfx', scratchShape, t, v, { pan: 0, rev: 0.1 }); }
+    function heartbeat(t, v) {
       [[0, 1], [0.17, 0.62]].forEach(([dt, a]) => {
-        const tt = t + dt;
-        const so = OSC('sine', 82, tt, tt + 0.5); so.frequency.exponentialRampToValueAtTime(55, tt + 0.06);
-        const g = G(0, subBus); perc(g.gain, tt, v * a, 0.006, 0.3); so.connect(g);
-        const h = OSC('sine', 110, tt, tt + 0.3); const hg = G(0, sfx); perc(hg.gain, tt, v * a * 0.22, 0.006, 0.16); h.connect(hg);
-        noiseBurst(tt, v * a * 0.18, 420, 120, 0.1, { rev: 0.05 });
+        const tt0 = t + dt, d = new Float32Array(Math.round(0.5 * SR)), h = new Float32Array(Math.round(0.3 * SR)); let ph = 0;
+        for (let i = 0; i < d.length; i++) { const tt = i / SR; ph += pw(82, 55, tt / 0.06) / SR; d[i] = Math.sin(TAU * ph) * env1(tt, 0.006, 0.3 / 4.6) * v * a; }
+        for (let i = 0; i < h.length; i++) { const tt = i / SR; h[i] = Math.sin(TAU * 110 * tt) * env1(tt, 0.006, 0.16 / 4.6) * v * a * 0.22; }
+        mixIn('sub', d, tt0, 1); mixIn('sfx', h, tt0, 1, {});
+        noiseBurst(tt0, v * a * 0.18, 420, 120, 0.1, { rev: 0.05 });
       });
     }
-
-    // lazy wrappers (first argument = start time unless noted)
-    const kick = lazy(kick_);
-    const clap = lazy(clap_);
-    const hat = lazy(hat_);
-    const crash = lazy(crash_);
-    const revCymbal = lazy(revCymbal_, (a) => a[0] - a[1]);
-    const pad = lazy(pad_);
-    const pluck = lazy(pluck_);
-    const bell = lazy(bell_);
-    const silverRing = lazy(silverRing_);
-    const goldRing = lazy(goldRing_);
-    const horn = lazy(horn_);
-    const choir = lazy(choir_);
-    const whoosh = lazy(whoosh_);
-    const subDrop = lazy(subDrop_);
-    const noiseBurst = lazy(noiseBurst_);
-    const thud = lazy(thud_);
-    const tick = lazy(tick_);
-    const scratch = lazy(scratch_);
-    const play = lazy(play_, (a) => a[1]);
-    const heartbeat = lazy(heartbeat_);
-    const b808 = function (t, midi, len, v, o) { last808 = midi; at(t, () => b808_(t, midi, len, v, o)); };
+    function sweepTone(t0, t1, f0, f1, v, o) {
+      o = o || {};
+      const n = Math.round((t1 - t0 + 0.05) * SR), d = new Float32Array(n), L = t1 - t0; let ph = 0;
+      for (let i = 0; i < n; i++) {
+        const tt = i / SR; ph += pw(f0, f1, tt / L) / SR;
+        const e = tt < L - 0.02 ? pw(1e-4, v, tt / (L - 0.02)) : Math.max(0, v * (1 - (tt - (L - 0.02)) / 0.05));
+        d[i] = Math.sin(TAU * ph) * e;
+      }
+      mixIn('sfx', d, t0, 1, { pan: 0, rev: o.rev || 0 });
+    }
 
     // ---------------------------------------------------------- harmony
     const CH = {
@@ -774,7 +726,6 @@
       G: { pad: [59, 62, 66, 67], root: 31, arp: [71, 74, 79, 83, 86] },
       Bm: { pad: [59, 62, 66, 71], root: 35, arp: [71, 74, 78, 83, 86] }
     };
-    // section table: chord + style + pad level + pad lowpass
     const SECTIONS = [
       { t0: 4.0, t1: 6.0, ch: 'Dm', st: 'ambient', pad: 0.045, lp: 900, a: 0.6, r: 0.25 },
       { t0: 6.0, t1: 8.0, ch: 'Dm', st: 'intro', pad: 0.05, lp: 1400 },
@@ -819,22 +770,19 @@
     function forSteps(t0, t1, fn) {
       for (let s = Math.ceil(t0 / 0.125 - 1e-6); s * 0.125 < t1 - 1e-6; s++) fn(s * 0.125, ((s % 16) + 16) % 16, s);
     }
-
-    // automation: lowpass of the pads per section
-    padLP.frequency.setValueAtTime(2200, 0);
+    padLPset('setValueAtTime', 2200, 0);
     SECTIONS.forEach((S) => {
-      const ch = CH[S.ch];
-      padLP.frequency.setValueAtTime(S.lp, S.t0);
-      if (S.st === 'intro' && S.t0 === 6.0) padLP.frequency.exponentialRampToValueAtTime(2400, 10.0);
+      const ch = CH[S.ch], st = STY[S.st];
+      padLPset('setValueAtTime', S.lp, S.t0);
+      if (S.st === 'intro' && S.t0 === 6.0) padLPset('exponentialRampToValueAtTime', 2400, 10.0);
       pad(S.t0, S.t1, ch.pad, S.pad, { a: S.a, r: S.r });
-      const st = STY[S.st];
       if (!st) return;
+      const drop = S.st === 'drop' || S.st === 'drop4';
       forSteps(S.t0, S.t1, (t, i, s) => {
         if (st.k.indexOf(i) >= 0) kick(t, i === 0 ? 1 : 0.92);
-        if (st.c.indexOf(i) >= 0) clap(t, (st.cv || 0.62) * (S.st === 'drop' || S.st === 'drop4' ? 1.12 : 1));
+        if (st.c.indexOf(i) >= 0) clap(t, (st.cv || 0.62) * (drop ? 1.12 : 1));
         if (st.h === 1 || (st.h === 2 && i % 2 === 0)) {
-          const accent = (i % 4 === 2) ? 1 : (i % 2 ? 0.55 : 0.75);
-          const open = st.oh.indexOf(i) >= 0;
+          const accent = (i % 4 === 2) ? 1 : (i % 2 ? 0.55 : 0.75), open = st.oh.indexOf(i) >= 0;
           hat(t + (i % 2 ? 0.006 : 0), st.hv * accent * (open ? 0.75 : 1), open);
         }
         st.b.forEach(([bi, len]) => {
@@ -844,13 +792,12 @@
           const glide = (S.st === 'intro' && t === 6.0) ? 38 : (bi === 10 && last808 != null ? last808 + 12 : null);
           b808(t, ch.root, L, S.st === 'warm' ? 0.42 : 0.6, glide != null ? { glideFrom: glide, glide: t === 6.0 ? 0.28 : 0.07 } : {});
         });
-        // arps / comping
         const arp = st.arp;
         if (arp === 'bell16') {
           const pat = [0, 2, 1, 3, 2, 4, 3, 1];
-          const m = ch.arp[pat[s % 8]] + (s % 16 >= 8 ? 12 : 0) - (S.st === 'drop' ? 0 : 0);
+          const m = ch.arp[pat[s % 8]] + (s % 16 >= 8 ? 12 : 0);
           bell(t, mtof(m), (S.st === 'drop' ? 0.075 : 0.06) * (i % 4 === 0 ? 1.2 : 0.85), (s % 2 ? 0.45 : -0.45), 0.42,
-            { dest: arpBus, ratio: 3, index: 0.9, rev: 0.12, dly: 0.2 });
+            { dest: 'arp', ratio: 3, index: 0.9, rev: 0.12, dly: 0.2 });
         } else if (arp === 'pluck8' && i % 2 === 0) {
           const pat = [0, 2, 1, 3, 0, 2, 4, 2];
           pluck(t, ch.arp[pat[(s / 2) % 8]] - 12, 0.05, (s % 4 ? 0.35 : -0.35), { cut: 3200, dec: 0.16 });
@@ -858,13 +805,13 @@
           const pat = [0, 1, 2, 3, 4, 3, 2, 1];
           pluck(t, ch.arp[pat[s % 8]], 0.032 * (i % 4 === 0 ? 1.3 : 1), (s % 2 ? 0.5 : -0.5), { cut: 2600, dec: 0.1, type: 'square' });
         } else if (arp === 'bellHalf' && [0, 3, 6, 10, 12].indexOf(i) >= 0) {
-          bell(t, mtof(ch.arp[[0, 3, 6, 10, 12].indexOf(i)]), 0.06, (i % 2 ? 0.4 : -0.4), 0.9, { dest: arpBus, ratio: 3, index: 1.1, dly: 0.25 });
+          bell(t, mtof(ch.arp[[0, 3, 6, 10, 12].indexOf(i)]), 0.06, (i % 2 ? 0.4 : -0.4), 0.9, { dest: 'arp', ratio: 3, index: 1.1, dly: 0.25 });
         } else if (arp === 'ep' && [0, 3, 6, 10, 12].indexOf(i) >= 0) {
-          ch.pad.forEach((m, j) => bell(t + j * 0.012, mtof(m + 12), 0.035, -0.4 + j * 0.27, 1.1, { dest: arpBus, ratio: 1, index: 1.3, rev: 0.25 }));
+          ch.pad.forEach((m, j) => bell(t + j * 0.012, mtof(m + 12), 0.035, -0.4 + j * 0.27, 1.1, { dest: 'arp', ratio: 1, index: 1.3, rev: 0.25 }));
         }
       });
     });
-    // groove filter-downs & snaps (whole music bus)
+    // whole-music-bus filter sweeps & snaps
     const mlp = musicLP.frequency;
     mlp.setValueAtTime(20000, 0);
     mlp.setValueAtTime(20000, 12.25); mlp.exponentialRampToValueAtTime(800, 12.5); mlp.setValueAtTime(800, 13.4); mlp.exponentialRampToValueAtTime(20000, 13.5);
@@ -872,27 +819,29 @@
     mlp.setValueAtTime(1100, 22.0); mlp.setValueAtTime(1100, 22.98); mlp.exponentialRampToValueAtTime(20000, 23.0);
     mlp.setValueAtTime(20000, 44.95); mlp.exponentialRampToValueAtTime(650, 45.05); mlp.exponentialRampToValueAtTime(380, 45.5); mlp.setValueAtTime(20000, 46.0);
     // intro: kick/drums through a lowpass opening 300 Hz -> 3 kHz
+    drumLP.frequency.setValueAtTime(20000, 0);
     drumLP.frequency.setValueAtTime(300, 6.0); drumLP.frequency.exponentialRampToValueAtTime(3000, 9.95); drumLP.frequency.setValueAtTime(20000, 10.0);
 
     // ================================================================ SFX / CUES
-    // (1) 0-2 NFT era: chiptune + stabs + vinyl scratches, tape-stop at 2.0
-    at(0, () => {
-      const g = G(0.85, musicPre);
-      const lp = F('lowpass', 12000, 0.7, g);
-      const s = SRC(chipB, 0, lp); s.stop(2.75);
-      s.playbackRate.setValueAtTime(1, 2.0); s.playbackRate.linearRampToValueAtTime(0.03, 2.6);
-      lp.frequency.setValueAtTime(12000, 2.0); lp.frequency.exponentialRampToValueAtTime(700, 2.6);
-      g.gain.setValueAtTime(0.85, 2.4); g.gain.linearRampToValueAtTime(0, 2.62);
+    // (1) 0-2 NFT era: bitcrushed chiptune, gated stabs + vinyl scratch per word; tape-stop at 2.0
+    {
+      const tape = varispeed(chipB, 2.75, (tt) => (tt < 2.0 ? 1 : Math.max(0.03, 1 - (tt - 2.0) / 0.6 * 0.97)));
+      let flt = null;
+      for (let i = 0; i < tape.length; i++) {
+        const tt = i / SR;
+        if ((i & 31) === 0) flt = jsBiquadState(flt, 'lp', tt < 2.0 ? 12000 : pw(12000, 700, (tt - 2.0) / 0.6), 0.707);
+        tape[i] = flt.run(tape[i]) * 0.85 * (tt < 2.4 ? 1 : Math.max(0, 1 - (tt - 2.4) / 0.22));
+      }
+      mixIn('music', tape, 0, 1);
       CUES.nftSlams.forEach((t, i) => {
         scratch(t + 0.01, 0.32);
         kick(t, 0.55, { duck: false, dec: 0.25 });
         noiseBurst(t, 0.12, 6000, 1200, 0.12, { type: 'highpass', rev: 0.05, pan: i % 2 ? 0.3 : -0.3 });
       });
-      // two scale beeps (2 kHz, 60 ms) on '0.00 g'
       [2.3, 2.6].forEach((t) => { tick(t, 2000, 0.14, 0, 0.06, 'square', { a: 0.002 }); tick(t, 2000, 0.12, 0, 0.06, 'sine'); });
-    });
-    // (2/3) 3.0-4.0 reverse whoosh + pixel gather + hydraulic hiss riser; die slams
-    at(3.0, () => {
+    }
+    // (2/3) 3.0-4.0 reverse whoosh + pixel gather + hydraulic hiss; 4.0 THE STRIKE; 4.8 THE GOLD RING
+    {
       whoosh(3.0, 0.62, 500, 6000, 0.42, -0.6, 0.2, { peak: 0.95, rev: 0.3 });
       for (let i = 0; i < 26; i++) {
         const u = i / 26, t = 3.0 + 0.6 * Math.sqrt(u) + rr(0, 0.02);
@@ -900,112 +849,92 @@
       }
       whoosh(3.2, 0.8, 2500, 9000, 0.28, 0, 0, { type: 'highpass', q: 0.7, peak: 0.97, rev: 0.1 });
       whoosh(3.6, 0.4, 3000, 300, 0.35, 0, 0, { peak: 0.9, rev: 0.15 });
-      // THE STRIKE at 4.0: 40 Hz thud + metallic transient + THE SILVER RING
       subDrop(4.0, 70, 40, 0.08, 1.0, 1.5);
       kick(4.0, 0.9, { duck: false, dec: 0.6 });
       [3150, 4720, 6930, 9810, 12400].forEach((f, i) => tick(4.0, f, 0.06 / (1 + i * 0.3), (i % 2 ? 0.3 : -0.3), 0.09, 'sine', { rev: 0.2 }));
       noiseBurst(4.0, 0.4, 9000, 1500, 0.12, { type: 'highpass', rev: 0.25, huge: 0.15 });
       silverRing(4.0, 1.0, 0, { huge: 0.15 });
       sparkle(4.05, 7, 0.5, 0.05, 0, 1, 2);
-      // hydraulic release hiss as the die lifts
       whoosh(4.1, 0.5, 6000, 2500, 0.16, 0, 0, { type: 'highpass', q: 0.7, peak: 0.15, rev: 0.1 });
-      // LCD digit roll 0.00 -> 31.10 g
       for (let i = 0; i < 16; i++) tick(4.1 + i * 0.025, 3300, 0.03, 0.15, 0.008, 'square');
       tick(4.52, 1760, 0.06, 0.15, 0.08, 'sine'); tick(4.6, 2349, 0.05, 0.15, 0.1, 'sine');
-      // THE GOLD RING at 4.8
       thud(4.8, 98, 0.28, { slap: 0.3, rev: 0.2 });
       goldRing(4.8, 1.0, 0.25);
       for (let i = 0; i < 8; i++) tick(4.86 + i * 0.022, 3000, 0.022, 0.15, 0.008, 'square');
-      // gold slides off, HUGINN spins (3 decelerating turns) and whips into the pack edge
       whoosh(5.2, 0.4, 800, 2400, 0.08, 0.2, 0.8, { rev: 0.1 });
-      {
-        const s = SRC(noiseB, 5.2, null, 1, 1.3); s.stop(5.9);
-        const bp = F('bandpass', 1800, 1.6); s.connect(bp);
-        const g = strip(sfx, { rev: 0.2 }); bp.connect(g);
-        const N = 160, curve = new Float32Array(N);
-        for (let i = 0; i < N; i++) { const u = i / (N - 1); const th = 6 * Math.PI * (1 - (1 - u) * (1 - u)); curve[i] = 0.2 * Math.pow(Math.abs(Math.sin(th)), 2) * (1 - 0.6 * u) + 0.0001; }
-        g.gain.setValueCurveAtTime(curve, 5.2, 0.65);
-        bp.frequency.setValueAtTime(2600, 5.2); bp.frequency.exponentialRampToValueAtTime(900, 5.85);
+      { // HUGINN spins: 3 decelerating turns -> pulsing whoosh
+        const n = Math.round(0.65 * SR), d = new Float32Array(n), off = Math.round(1.3 * SR); let flt = null;
+        for (let i = 0; i < n; i++) {
+          const u = i / n, th = 6 * Math.PI * (1 - (1 - u) * (1 - u));
+          if ((i & 31) === 0) flt = jsBiquadState(flt, 'bp', pw(2600, 900, u), 1.6);
+          d[i] = flt.run(noise[0][off + i]) * 0.2 * Math.pow(Math.abs(Math.sin(th)), 2) * (1 - 0.6 * u);
+        }
+        mixIn('sfx', d, 5.2, 1, { rev: 0.2 });
       }
       whoosh(5.82, 0.2, 1500, 9000, 0.45, -0.3, 0.3, { peak: 0.85, rev: 0.15 });
-      // low drone under 4-6
-      const dr = G(0, padBus); sustain(dr.gain, 4.0, 5.9, 0.08, 0.5, 0.1);
-      OSC('sine', mtof(38), 4.0, 6.0, dr); OSC('triangle', mtof(50), 4.0, 6.0, G(0.3, dr));
-    });
+      drone(4.0, 5.9, [38], 'sine', 0.08, 0.5, 0.1);
+      drone(4.0, 5.9, [50], 'tri', 0.024, 0.5, 0.1);
+    }
     // (4) 6-10 intro groove sfx
-    at(5.95, () => {
+    {
       whoosh(5.95, 0.4, 600, 4000, 0.32, -0.7, 0.4, { peak: 0.25, rev: 0.25 });
       subDrop(6.0, 80, 36, 0.3, 0.55, 0.9);
       crash(6.0, 0.25);
       tick(6.2, 2349, 0.035, -0.6, 0.06, 'sine', { rev: 0.2 }); tick(6.26, 3136, 0.03, -0.6, 0.06, 'sine', { rev: 0.2 });
       [6.6, 7.6, 8.75].forEach((t) => chatPop(t, 0.07, 0.6));
-      // foil-crinkle grains panned with the pack's specular sweeps
-      [6.6, 8.9].forEach((t) => {
-        play(crinkleSweep, t - 0.1, 0.16, { pan: null, rev: 0.25 });
-        const g = strip(sfx, { pan: [-0.8, 0.8, t - 0.1, t + 0.6], rev: 0.2 }); g.gain.value = 0.2; SRC(crinkleSweep, t - 0.1, g);
+      [6.6, 8.9].forEach((t) => { // foil-crinkle grains panned with the specular sweeps
+        play(crinkleSweep, t - 0.1, 0.24, { pan: [-0.8, 0.8, t - 0.1, t + 0.6], rev: 0.2 });
         sparkle(t, 5, 0.5, 0.025, 0, 2, 3);
       });
-      // the Gjallarhorn on EVERY PACK HITS
-      horn(7.2, [38, 45, 50, 53, 57], 1.15, 0.05, { a: 0.3, cut: 1200, rev: 0.35, huge: 0.3, rel: 0.25 });
+      horn(7.2, [38, 45, 50, 53, 57], 1.15, 0.05, { a: 0.3, cut: 1200, rev: 0.35, huge: 0.3, rel: 0.25 }); // Gjallarhorn
       subDrop(7.2, 60, 37, 0.2, 0.5, 1.2);
       crash(7.2, 0.18, { huge: 0.2 });
-      // flip whip, stamp thud 'NO EMPTY PULLS', flip back
       whoosh(7.95, 0.35, 900, 5000, 0.3, 0.6, -0.6, { peak: 0.6 });
-      thud(8.4, 62, 0.75, { slap: 0.7, rev: 0.25 });
+      thud(8.4, 62, 0.75, { slap: 0.7, rev: 0.25 }); // 'NO EMPTY PULLS' stamp
       crash(8.4, 0.12);
       whoosh(9.35, 0.32, 900, 5000, 0.22, -0.6, 0.6, { peak: 0.6 });
-    });
-    // (5) 10-11.5 crinkle intensifies + Shepard riser; 11.5-12 TOTAL SILENCE
-    at(9.95, () => {
+    }
+    // (5) 10-11.5 crinkle intensifies + Shepard riser (drums out); 11.5-12 TOTAL SILENCE
+    {
       tick(10.0, 2600, 0.05, 0.5, 0.02, 'sine', { rev: 0.1 });
       play(crinkleRise, 9.95, 0.32, { pan: 0.35, rev: 0.2, stop: 11.5 });
       play(shep1, 10.0, 0.5, { rev: 0.2, stop: 11.5 });
       whoosh(10.0, 1.5, 300, 7000, 0.3, -0.2, 0.2, { peak: 0.99, q: 1.4, rev: 0.25 });
       for (let i = 0; i < 6; i++) tick(10.2 + i * 0.2, 1200 + i * 150, 0.02, -0.7, 0.03, 'sine');
-      const sw = G(0, padBus); sustain(sw.gain, 10.0, 11.47, 0.06, 1.2, 0.02);
-      OSC('sawtooth', mtof(33), 10.0, 11.5, F('lowpass', 300, 1, sw));
-    });
-    // (6) 12.0 DROP 1 — THE TEAR
-    at(12.0, () => {
+      drone(10.0, 11.47, [33], 'saw', 0.06, 1.2, 0.02, { lp: 300, q: 1 });
+    }
+    // (6) 12.0 DROP 1 — THE TEAR; (7) 12.25-13.5 slow-mo; 13.5 THE BIFROST CHORD
+    {
       const t = 12.0;
-      const s = SRC(noiseB, t, null, 1, 0.7); s.stop(t + 0.4);
-      const bp = F('bandpass', 2000, 1.4); bp.frequency.setValueAtTime(2000, t); bp.frequency.exponentialRampToValueAtTime(9000, t + 0.25);
-      s.connect(bp); const g = strip(sfx, { rev: 0.25, huge: 0.2 }); bp.connect(g); perc(g.gain, t, 0.9, 0.002, 0.35);
+      noiseBurst(t, 0.9, 2000, 9000, 0.35, { type: 'bandpass', q: 1.4, sweep: 0.25, rev: 0.25, huge: 0.2 });
       play(tearB, t, 0.9, { rev: 0.2, huge: 0.15 });
       subDrop(t, 110, 35, 0.5, 1.0, 1.6);
       kick(t, 1.0, { duck: false });
       crash(t, 0.7, { huge: 0.35 });
       noiseBurst(t, 0.4, 3000, 200, 0.4, { huge: 0.3 });
       thud(t, 55, 0.5, { slap: 0.5 });
-      // (7) slow-motion: choir + stretched crash (0.5x) into the huge reverb + slowed boom
       choir(12.25, 13.35, [50, 57, 62, 65, 69], 0.11, { a: 0.4, r: 0.25 });
       crash(12.25, 0.22, { rate: 0.5, huge: 0.6, rev: 0 });
       subDrop(12.3, 60, 30, 0.8, 0.45, 1.2);
-      { // shards shatter at 12.6 (slowed)
-        for (let i = 0; i < 12; i++) bell(12.6 + rr(0, 0.35), mtof(86 + Math.floor(rr(0, 14))) * 0.5, 0.03, rr(-0.8, 0.8), 0.9, { ratio: 2.76, index: 0.4, huge: 0.4, rev: 0 });
-      }
-      // reverse cymbal ending exactly at 13.5 + whip whoosh + THE BIFROST CHORD (D-F-A-C-E)
+      for (let i = 0; i < 12; i++) bell(12.6 + rr(0, 0.35), mtof(86 + Math.floor(rr(0, 14))) * 0.5, 0.03, rr(-0.8, 0.8), 0.9, { ratio: 2.76, index: 0.4, huge: 0.4, rev: 0 });
       revCymbal(13.5, 1.0, 0.5);
       whoosh(13.38, 0.24, 700, 7000, 0.4, -0.5, 0.5, { peak: 0.5 });
       [74, 77, 81, 84, 88].forEach((m, i) => bell(13.5 + i * 0.09, mtof(m), 0.17, -0.8 + i * 0.4, 1.2, { ratio: 3, index: 1.4, rev: 0.35, dly: 0.15, huge: 0.15 }));
       subDrop(13.5, 90, 38, 0.3, 0.5, 0.8);
       noiseBurst(13.5, 0.15, 9000, 3000, 0.6, { type: 'highpass', rev: 0.4 });
       sparkle(13.55, 14, 0.5, 0.035, 0, 2, 3);
-    });
-    // (8) 14-20 tier escalation
-    at(13.4, () => {
-      // coin rides the bridge: doppler whoosh 0.6 s before each landing
-      [[13.4, 0.3], [14.9, 0.34], [16.4, 0.4]].forEach(([t, v]) => {
-        whoosh(t, 0.6, 700, 3800, v, -0.75, 0.05, { peak: 0.85, rev: 0.2 });
-      });
+    }
+    // (8) 14-20 tier escalation (each louder and brighter)
+    {
+      [[13.4, 0.3], [14.9, 0.34], [16.4, 0.4]].forEach(([t, v]) => whoosh(t, 0.6, 700, 3800, v, -0.75, 0.05, { peak: 0.85, rev: 0.2 }));
       // SILVER 14.0: D5 ping + silver ring
       bell(14.0, mtof(74), 0.2, 0, 1.2, { ratio: 3, index: 1.2, rev: 0.3, dly: 0.15 });
       silverRing(14.0, 0.75, -0.1);
       sparkle(14.02, 5, 0.3, 0.03, 0, 2, 3);
-      whoosh(14.0, 0.25, 4000, 900, 0.18, -0.9, -0.2, { peak: 0.2 }); // banner slam
+      whoosh(14.0, 0.25, 4000, 900, 0.18, -0.9, -0.2, { peak: 0.2 });
       for (let i = 0; i < 12; i++) tick(14.2 + i * 0.028, 2900, 0.018, 0.4, 0.008, 'square');
       chatPop(14.6, 0.07); whoosh(14.6, 0.2, 2500, 900, 0.07, 0, 0.2, { peak: 0.3 });
-      // RARE 15.5: F5 + sparkle layer, +2 dB (rim leak 0.25 s before)
+      // RARE SILVER 15.5: F5 + sparkle layer, +2 dB (rim leak 0.25 s before)
       whoosh(15.2, 0.32, 3000, 9000, 0.1, 0, 0, { type: 'highpass', peak: 0.95, rev: 0.4 });
       const r2 = Math.pow(10, 2 / 20);
       bell(15.5, mtof(77), 0.2 * r2, 0, 1.3, { ratio: 3, index: 1.3, rev: 0.32, dly: 0.15 });
@@ -1026,128 +955,103 @@
       for (let i = 0; i < 14; i++) tick(17.2 + i * 0.028, 2500, 0.02, 0.4, 0.008, 'square');
       bell(17.65, mtof(93), 0.04, -0.3, 0.6, { ratio: 3.5, index: 0.6 });
       chatPop(17.6, 0.08);
-      // docking clinks into the PULLS rail
       [14.85, 16.35, 17.85].forEach((t, i) => glassTick(t, mtof(86 + i * 2), 0.05, 0.0, { dec: 0.3 }));
-      // 4th coin rides slowly while the groove filters down
-      whoosh(18.5, 1.2, 500, 2200, 0.16, -0.75, 0.0, { peak: 0.75, rev: 0.3 });
-    });
+      whoosh(18.5, 1.2, 500, 2200, 0.16, -0.75, 0.0, { peak: 0.75, rev: 0.3 }); // 4th coin rides slowly
+    }
     // (9) 20.0 hard cut: heartbeat under a Shepard riser; 21.93-22.0 silence
-    at(20.0, () => {
+    {
       CUES.heartbeats.forEach((t, i) => {
         heartbeat(t, 0.8 + 0.07 * i);
         whoosh(t, 0.5, 4000, 9000, 0.03 + 0.012 * i, 0, 0, { type: 'highpass', peak: 0.15, rev: 0.4 });
       });
       play(shep2, 20.0, 0.42, { rev: 0.2, stop: 21.93 });
-      const dr = G(0, padBus); sustain(dr.gain, 20.0, 21.9, 0.07, 1.5, 0.02);
-      const dlp = F('lowpass', 200, 1.5, dr); dlp.frequency.setValueAtTime(200, 20.0); dlp.frequency.exponentialRampToValueAtTime(900, 21.9);
-      OSC('sawtooth', mtof(33), 20.0, 21.93, dlp); OSC('sawtooth', mtof(45), 20.0, 21.93, dlp).detune.value = 6;
+      drone(20.0, 21.9, [33, 45], 'saw', 0.07, 1.5, 0.02, { lp: 200, lp1: 900, q: 1.5, det: [0, 6] });
       revCymbal(21.93, 0.9, 0.45, { cut: 21.93 });
       whoosh(20.9, 1.03, 300, 6000, 0.18, 0, 0, { peak: 0.99, q: 1.5, rev: 0.1 });
-    });
-    // (10) 22.0 DROP 2 — LEGENDARY
-    at(22.0, () => {
+    }
+    // (10) 22.0 DROP 2 — LEGENDARY; 23.0 D MAJOR lift
+    {
       const t = 22.0;
       subDrop(t, 62, 40, 0.15, 1.0, 2.4);
       impact(t, 1.0, { huge: 0.4, crashV: 0.7 });
       horn(t, [38, 45, 50, 53, 57, 62], 0.95, 0.065, { a: 0.07, cut: 1600, rev: 0.4, huge: 0.5, rel: 0.12, scoop: 35 });
       choir(t, 23.0, [50, 57, 62, 65, 69, 74], 0.12, { a: 0.12, r: 0.1, huge: 0.6 });
-      whoosh(22.2, 0.6, 1200, 8000, 0.14, -0.9, 0.9, { peak: 0.5, rev: 0.35, huge: 0.3 }); // anamorphic flare at 90deg
+      whoosh(22.2, 0.6, 1200, 8000, 0.14, -0.9, 0.9, { peak: 0.5, rev: 0.35, huge: 0.3 });
       tick(22.5, 2349, 0.05, 0, 0.6, 'sine', { rev: 0.5, f1: 4699 });
-      // 23.0 snap -> D MAJOR lift (F -> F#)
       whoosh(22.82, 0.2, 800, 8000, 0.42, 0.4, -0.4, { peak: 0.85 });
       impact(23.0, 0.65, { huge: 0.25, crashV: 0.5, subDec: 1.0 });
       horn(23.0, [38, 45, 50, 54, 57, 62, 66], 0.55, 0.06, { a: 0.03, cut: 2000, rev: 0.35, huge: 0.3, rel: 0.25, scoop: 20 });
       choir(23.0, 24.6, [50, 57, 62, 66, 69, 74], 0.075, { a: 0.05, r: 0.8, huge: 0.45 });
       goldRing(23.0, 0.95, 0, { decay: 4.0, huge: 0.2 });
       sparkle(23.0, 18, 0.8, 0.04, 0, 2, 4);
-      // '1 OF 25 · GOLD' punch
-      thud(23.2, 73, 0.45, { slap: 0.4 });
-      // engraving crackle 23.6-24.2
-      play(engraveB, 23.6, 0.22, { pan: [-0.4, 0.4, 23.6, 24.2], rev: 0.25 });
+      thud(23.2, 73, 0.45, { slap: 0.4 }); // '1 OF 25 · GOLD'
+      play(engraveB, 23.6, 0.22, { pan: [-0.4, 0.4, 23.6, 24.2], rev: 0.25 }); // engraving crackle
       bell(24.22, mtof(98), 0.045, 0.4, 0.5, { ratio: 3.5, index: 0.5 });
-      // AU odometer roll + ding
       for (let i = 0; i < 12; i++) tick(24.05 + i * 0.026, 2700, 0.018, -0.4, 0.008, 'square');
-      bell(24.4, mtof(86), 0.09, -0.4, 1.0, { ratio: 3, index: 1.2, rev: 0.35 });
-      // chat-pop storm (rate tied to the hype meter)
-      let tt = 23.1; let k = 0;
-      while (tt < 25.9) { chatPop(tt, 0.045 + 0.02 * rnd(), 0.35 + 0.4 * rnd()); tt += 0.13 - 0.07 * Math.min(1, (tt - 23.1) / 1.5) + rr(-0.02, 0.02); k++; }
-      // key-light sweep during the beauty hold
+      bell(24.4, mtof(86), 0.09, -0.4, 1.0, { ratio: 3, index: 1.2, rev: 0.35 }); // AU odometer ding
+      let tt = 23.1; // chat-pop storm, rate tied to the hype meter
+      while (tt < 25.9) { chatPop(tt, 0.045 + 0.02 * rnd(), 0.35 + 0.4 * rnd()); tt += 0.13 - 0.07 * Math.min(1, (tt - 23.1) / 1.5) + rr(-0.02, 0.02); }
       whoosh(24.7, 1.0, 3000, 9000, 0.05, -0.5, 0.5, { type: 'highpass', peak: 0.5, rev: 0.4 });
-    });
-    // (11) 26-30 data groove
-    at(25.85, () => {
+    }
+    // (11) 26-30 data groove: hash blips, mint ticks, NFC two-tone, verified chime
+    {
       whoosh(25.85, 0.26, 900, 6000, 0.38, 0.8, -0.8, { peak: 0.6 });
       for (let i = 0; i < 6; i++) tick(26.02 + i * 0.05, 3000 + i * 300, 0.03, 0.5, 0.02, 'sine', { rev: 0.15 });
-      // hash blips: square 2 kHz, 20 ms, one per hash character (40 chars/s)
       for (let i = 0; i < 12; i++) tick(26.675 + i * 0.025, 2000, 0.045, 0.45, 0.02, 'square', { a: 0.001 });
       tick(27.25, 1760, 0.05, 0.45, 0.08, 'sine'); tick(27.31, 2637, 0.045, 0.45, 0.1, 'sine');
-      // ascending D-pentatonic glass ticks per minted certificate
       [[26.3, 86], [26.8, 88], [27.0, 90], [27.2, 93]].forEach(([t, m], i) => glassTick(t, mtof(m), 0.09, -0.3 + i * 0.15, { dly: 0.15 }));
       [26.8, 27.0, 27.2].forEach((t) => whoosh(t - 0.35, 0.4, 1500, 5000, 0.06, -0.5, 0.2, { peak: 0.85 }));
       glassTick(27.45, mtof(93), 0.06, 0.45, { dec: 0.3 });
-      // capsule drop, phone swoop, NFC two-tone, verified chime
       thud(28.0, 180, 0.22, { slap: 0.3, dec: 0.15 });
       whoosh(28.05, 0.5, 600, 3500, 0.22, 0.9, 0.1, { peak: 0.8 });
       tick(28.6, 1760, 0.16, 0.1, 0.09, 'sine', { a: 0.004, rev: 0.25 });
       tick(28.71, 2349, 0.16, 0.1, 0.12, 'sine', { a: 0.004, rev: 0.25 });
       [0, 0.12, 0.24].forEach((d) => whoosh(28.6 + d, 0.3, 4000, 7000, 0.025, 0, 0, { type: 'highpass', peak: 0.3, rev: 0.3 }));
       [86, 90, 93, 98].forEach((m, i) => bell(28.86 + i * 0.05, mtof(m), 0.07, -0.2 + i * 0.15, 1.0, { ratio: 3, index: 1.0, rev: 0.4, dly: 0.15 }));
-    });
-    // (12) 30-34 half-time: stamp thuds a step higher each, vault-door clunk at 32.9
-    at(29.6, () => {
+    }
+    // (12) 30-34 half-time: four stamp thuds a step higher each, vault-door clunk at 32.9
+    {
       whoosh(29.6, 0.42, 5000, 600, 0.2, 0, 0, { peak: 0.95, rev: 0.3 });
-      whoosh(30.0, 0.6, 2000, 8000, 0.06, -0.8, 0.8, { type: 'highpass', peak: 0.5, rev: 0.4 }); // logo arc draws
+      whoosh(30.0, 0.6, 2000, 8000, 0.06, -0.8, 0.8, { type: 'highpass', peak: 0.5, rev: 0.4 });
       [30.35, 30.5, 30.65, 30.8].forEach((t, i) => tick(t, mtof(81 + [0, 2, 4, 7][i]), 0.035, [-0.6, 0.6, -0.3, 0.3][i], 0.08, 'sine', { rev: 0.3 }));
-      const STAMP = [[31.0, 55, -0.6, 1.0], [31.5, 61.7, 0.6, 0.8], [32.0, 69.3, -0.3, 0.85], [32.5, 73.4, 0.3, 0.9]];
-      STAMP.forEach(([t, f, p, v], i) => {
+      [[31.0, 55, -0.6, 1.0], [31.5, 61.7, 0.6, 0.8], [32.0, 69.3, -0.3, 0.85], [32.5, 73.4, 0.3, 0.9]].forEach(([t, f, p, v]) => {
         thud(t, f, 0.85 * v, { slap: 0.8, rev: 0.25, pan: p * 0.4 });
         bell(t, f * 8, 0.05, p * 0.4, 0.5, { ratio: 1.5, index: 0.6, rev: 0.2 });
         whoosh(t + 0.05, 0.35, 2500, 700, 0.1, 0, p, { peak: 0.35 });
       });
       sparkle(31.02, 10, 0.4, 0.04, -0.4, 2, 3);
-      // vault wheel ratchet -> clunk -> lock
       for (let i = 0; i < 7; i++) tick(32.62 + i * 0.04, 1900 + i * 60, 0.05, 0.3, 0.015, 'square', { rev: 0.1 });
-      {
-        const t = 32.9;
-        subDrop(t, 70, 42, 0.12, 0.85, 1.2);
-        [180, 287, 419, 610, 873, 1240].forEach((f, i) => {
-          const g = strip(sfx, { rev: 0.3, huge: 0.35, pan: 0.2 }); perc(g.gain, t, 0.07 / (1 + i * 0.4), 0.002, 0.7 - i * 0.07); OSC('sine', f, t, t + 0.8, g);
-        });
-        noiseBurst(t, 0.45, 1400, 200, 0.16, { rev: 0.3, huge: 0.4 });
-        const cg = G(0.6, sfx); SRC(clickB, t, cg); const cg2 = G(0.4, sfx); SRC(clickB, t + 0.045, cg2);
-        kick(t, 0.7, { duck: true, depth: 0.4 });
-        // SECURED IN LIECHTENSTEIN: deep resonant door swell + aurora shimmer
-        const hum = G(0, padBus); sustain(hum.gain, 32.95, 33.8, 0.07, 0.4, 0.3);
-        OSC('sawtooth', mtof(33), 32.95, 34.2, F('lowpass', 260, 2, hum));
-        whoosh(33.0, 1.0, 4000, 9000, 0.05, -0.6, 0.6, { type: 'highpass', peak: 0.5, rev: 0.5, huge: 0.3 });
-        sparkle(33.05, 8, 0.8, 0.03, 0, 2, 4);
-      }
-    });
-    // (13) 34-38 warm: toast tink, swipe, capsule snap, seal slap, flaps, tape zip, label printer, door chime
-    at(33.85, () => {
+      const t = 32.9; // vault-door clunk + lock
+      subDrop(t, 70, 42, 0.12, 0.85, 1.2);
+      [180, 287, 419, 610, 873, 1240].forEach((f, i) => tick(t, f, 0.07 / (1 + i * 0.4), 0.2, 0.7 - i * 0.07, 'sine', { rev: 0.3, huge: 0.35 }));
+      noiseBurst(t, 0.45, 1400, 200, 0.16, { rev: 0.3, huge: 0.4 });
+      play(clickB, t, 0.6, { pan: null }); play(clickB, t + 0.045, 0.4, { pan: null });
+      kick(t, 0.7, { depth: 0.4 });
+      drone(32.95, 33.8, [33], 'saw', 0.07, 0.4, 0.3, { lp: 260, q: 2 }); // SECURED IN LIECHTENSTEIN
+      whoosh(33.0, 1.0, 4000, 9000, 0.05, -0.6, 0.6, { type: 'highpass', peak: 0.5, rev: 0.5, huge: 0.3 });
+      sparkle(33.05, 8, 0.8, 0.03, 0, 2, 4);
+    }
+    // (13) 34-38 warm: offer tink, swipe, capsule snap, seal slap, flaps, tape zip, label printer, door chime
+    {
       whoosh(33.85, 0.26, 6000, 700, 0.32, 0, 0, { peak: 0.5 });
-      // offer tink (glass, never a cash register)
       [[3520, 0.1], [8180, 0.035]].forEach(([f, v]) => tick(34.1, f, v, 0.2, 0.28, 'sine', { rev: 0.35, dly: 0.1 }));
       whoosh(34.4, 0.3, 900, 4000, 0.2, 0.0, 0.9, { peak: 0.5 });
-      // capsule halves snap
       noiseBurst(34.6, 0.3, 2800, 2200, 0.025, { type: 'bandpass', q: 1.5, rev: 0.15 });
-      tick(34.6, 1150, 0.08, 0, 0.03, 'triangle'); const cs = G(0.4, sfx); SRC(clickB, 34.6, cs);
-      // NFC seal slap
+      tick(34.6, 1150, 0.08, 0, 0.03, 'triangle'); play(clickB, 34.6, 0.4, { pan: null });
       thud(35.0, 150, 0.32, { slap: 0.9, dec: 0.12, rev: 0.12 });
       bell(35.02, mtof(93), 0.03, 0.1, 0.4, { ratio: 3.5, index: 0.5 });
       thud(35.15, 90, 0.3, { slap: 0.4, dec: 0.2 });
       [35.3, 35.4, 35.5, 35.6].forEach((t, i) => noiseBurst(t, 0.22, 600, 150, 0.08, { rev: 0.1, pan: i % 2 ? 0.3 : -0.3 }));
       play(zipB, 35.62, 0.3, { pan: [-0.5, 0.5, 35.62, 35.95], rev: 0.15 });
       play(printerB, 35.8, 0.17, { pan: 0.15, rev: 0.1 });
-      whoosh(36.6, 0.6, 800, 2500, 0.07, -0.6, 0.6, { peak: 0.6, rev: 0.3 }); // route draws
-      // two-note door chime
+      whoosh(36.6, 0.6, 800, 2500, 0.07, -0.6, 0.6, { peak: 0.6, rev: 0.3 });
       bell(37.2, mtof(78), 0.11, -0.1, 1.4, { ratio: 1.0, index: 0.8, rev: 0.4, a: 0.004 });
       bell(37.5, mtof(74), 0.11, 0.1, 1.6, { ratio: 1.0, index: 0.8, rev: 0.4, a: 0.004 });
       thud(37.6, 120, 0.15, { slap: 0.3, dec: 0.12 });
       tick(37.8, 1760, 0.05, 0.1, 0.05, 'sine'); tick(37.86, 2349, 0.05, 0.1, 0.07, 'sine');
-    });
+    }
     // (14) 38.0 DROP 3 — brightest: horn countermelody, bids, escrow, release, royalties, confirmations
-    at(37.78, () => {
+    {
       whoosh(37.78, 0.24, 700, 8000, 0.4, -0.6, 0.6, { peak: 0.85 });
       impact(38.0, 0.7, { crashV: 0.6, subDec: 1.2 });
       crash(42.0, 0.3);
@@ -1158,66 +1062,54 @@
         [44.0, 0.5, 76], [44.5, 0.5, 73]
       ];
       MEL.forEach(([t, d, m]) => horn(t, [m - 12, m], d * 0.92, 0.042, { a: 0.04, cut: 2400, rev: 0.25, rel: 0.08, scoop: 25 }));
-      tick(38.2, 2349, 0.05, 0.5, 0.06, 'sine'); tick(38.27, 2960, 0.05, 0.5, 0.08, 'sine'); // LISTED
-      const CITY = [['Oslo', 10.75], ['Tokyo', 139.7], ['Sao Paulo', -46.6], ['Toronto', -79.4], ['Berlin', 13.4], ['Seoul', 127.0], ['Stockholm', 18.1]];
+      tick(38.2, 2349, 0.05, 0.5, 0.06, 'sine'); tick(38.27, 2960, 0.05, 0.5, 0.08, 'sine');
+      const LON = [10.75, 139.7, -46.6, -79.4, 13.4, 127.0, 18.1]; // Oslo, Tokyo, Sao Paulo, Toronto, Berlin, Seoul, Stockholm
       const PENT = [74, 76, 78, 81, 83, 86, 88];
       CUES.bids.forEach((t, i) => {
-        const pan = clamp(CITY[i][1] / 150, -0.9, 0.9);
+        const pan = clamp(LON[i] / 150, -0.9, 0.9);
         glassTick(t, mtof(PENT[i] + 12), 0.1, pan, { dec: 0.35, dly: 0.1 });
         whoosh(t, 0.25, 1500, 4000, 0.04, pan, 0.4, { peak: 0.6, rev: 0.2 });
       });
-      // escrow latch at 41.0
-      const lg = G(0.6, sfx); SRC(clickB, 41.0, lg); const lg2 = G(0.5, sfx); SRC(clickB, 41.055, lg2);
+      play(clickB, 41.0, 0.6, { pan: null }); play(clickB, 41.055, 0.5, { pan: null }); // escrow latch
       tick(41.0, 2200, 0.08, 0.3, 0.08, 'triangle'); tick(41.055, 1650, 0.1, 0.3, 0.12, 'triangle', { rev: 0.2 });
       thud(41.055, 110, 0.35, { slap: 0.4, dec: 0.15 });
       [41.25, 41.6, 42.1].forEach((t, i) => tick(t, mtof(81 + i * 2), 0.04, 0.3, 0.05, 'sine'));
-      // release two-tone A5 -> E6
       bell(42.6, 880, 0.12, 0.3, 0.8, { ratio: 3, index: 0.6, rev: 0.3 }); bell(42.72, 1318.5, 0.12, 0.3, 1.0, { ratio: 3, index: 0.6, rev: 0.3 });
-      // descending royalty sparkle
       sparkle(43.0, 12, 0.48, 0.07, 0.4, 3, 1.5, { desc: true });
       whoosh(43.4, 0.5, 900, 4000, 0.12, -0.7, 0.7, { peak: 0.6 });
       for (let i = 0; i < 8; i++) glassTick(43.62 + i * 0.19, mtof([86, 90, 93, 88, 91, 95, 93, 98][i]), 0.06, (i % 2 ? 0.6 : -0.6), { dec: 0.3, dly: 0.08 });
-    });
+    }
     // (15) 45.0 whip to centre, filtered half-bar, silence 45.5-46.0
     whoosh(44.86, 0.22, 6000, 900, 0.3, 0.5, 0, { peak: 0.5 });
-    // (16) 46.0 DROP 4 on '80%'
-    at(46.0, () => {
+    // (16) 46.0 DROP 4 on '80%': 808 + crash + cascade of 8 silver rings; meter sweep -> confirm chord; INSTANT
+    {
       const t = 46.0;
       impact(t, 1.0, { crashV: 0.75, huge: 0.3 });
       subDrop(t, 75, 37, 0.35, 0.6, 1.4);
       for (let i = 0; i < 8; i++) silverRing(t + 0.02 + i * 0.065, 0.42 * (1 - i * 0.05), (i % 2 ? 1 : -1) * (0.2 + 0.09 * i), { rev: 0.25, dly: 0.03 });
-      // ring meter fill: rising sine resolving into a confirm chord at 46.5
-      const sg = strip(sfx, { rev: 0.2 }); const so = OSC('sine', 440, t, 46.55, sg); so.frequency.exponentialRampToValueAtTime(1174.7, 46.5);
-      sg.gain.setValueAtTime(0.0001, t); sg.gain.exponentialRampToValueAtTime(0.07, 46.48); sg.gain.linearRampToValueAtTime(0, 46.53);
+      sweepTone(t, 46.5, 440, 1174.7, 0.07, { rev: 0.2 });
       [86, 90, 93, 98].forEach((m, i) => bell(46.5, mtof(m), 0.08, -0.45 + i * 0.3, 1.2, { ratio: 3, index: 1.0, rev: 0.35, dly: 0.12 }));
-      thud(46.6, 73.4, 0.85, { slap: 0.9, rev: 0.25 }); // INSTANT stamp
-      tick(47.0, 1760, 0.06, 0.2, 0.06, 'sine'); tick(47.07, 2349, 0.06, 0.2, 0.09, 'sine'); // SOLD BACK · CONFIRMED
+      thud(46.6, 73.4, 0.85, { slap: 0.9, rev: 0.25 });
+      tick(47.0, 1760, 0.06, 0.2, 0.06, 'sine'); tick(47.07, 2349, 0.06, 0.2, 0.09, 'sine');
       whoosh(47.15, 0.35, 3000, 900, 0.08, 0, 0.4, { peak: 0.4 });
       CUES.buybackTags.forEach((tt, i) => glassTick(tt, mtof([86, 88, 90, 93][i]), 0.08, -0.6 + i * 0.4, { dec: 0.35 }));
-    });
-    // (17) 50-52 double-time callback hits re-using tear / gold ring / offer tink / bid tick
-    at(50.0, () => {
-      // 50.0 tear
-      const s = SRC(noiseB, 50.0, null, 1, 2.2); s.stop(50.4);
-      const bp = F('bandpass', 2000, 1.4); bp.frequency.setValueAtTime(2000, 50.0); bp.frequency.exponentialRampToValueAtTime(9000, 50.25);
-      s.connect(bp); const g = strip(sfx, { rev: 0.25 }); bp.connect(g); perc(g.gain, 50.0, 0.65, 0.002, 0.3);
+    }
+    // (17) 50-52 double-time callback: tear / gold ring / offer tink / bid tick
+    {
+      noiseBurst(50.0, 0.65, 2000, 9000, 0.3, { type: 'bandpass', q: 1.4, sweep: 0.25, rev: 0.25 });
       play(tearB, 50.0, 0.6, { rev: 0.2 });
       impact(50.0, 0.6, { crashV: 0.4, subDec: 0.5 });
-      // 50.5 gold ring
       goldRing(50.5, 0.75, -0.3, { decay: 1.6 }); impact(50.5, 0.45, { crash: false, subDec: 0.4 });
-      // 51.0 offer tink
       [[3520, 0.12], [8180, 0.04]].forEach(([f, v]) => tick(51.0, f, v, 0.3, 0.28, 'sine', { rev: 0.35, dly: 0.1 }));
       impact(51.0, 0.45, { crash: false, subDec: 0.4 });
-      // 51.5 bid tick
       glassTick(51.5, mtof(88), 0.14, 0.5, { dec: 0.35 }); impact(51.5, 0.5, { crash: false, subDec: 0.4 });
       [50.42, 50.92, 51.42].forEach((t, i) => whoosh(t, 0.12, 900, 7000, 0.22, (i % 2 ? 0.6 : -0.6), (i % 2 ? -0.6 : 0.6), { peak: 0.8 }));
-      // snare roll + riser into 52
       for (let i = 0; i < 8; i++) clap(51.0 + i * 0.0625, 0.18 + 0.05 * i, { rev: 0.1 });
       whoosh(51.0, 1.0, 400, 9000, 0.22, 0, 0, { peak: 0.99, q: 1.3 });
       revCymbal(52.0, 0.9, 0.4);
-    });
-    // (18) 52.0 final impact + THE BIFROST CHORD (D major) L -> R + silver ring at 52.92
-    at(52.0, () => {
+    }
+    // (18) 52.0 final impact + THE BIFROST CHORD in D major panned L -> R + silver ring on the mint dot
+    {
       const t = 52.0;
       impact(t, 1.05, { crashV: 0.8, huge: 0.0, subDec: 2.4 });
       b808(t, 26, 2.6, 0.55, { glideFrom: 33, glide: 0.12 });
@@ -1227,12 +1119,10 @@
       [74, 78, 81, 86].forEach((m, i) => bell(52.4 + i * 0.1, mtof(m), 0.17, -0.85 + i * 0.57, 1.6, { ratio: 3, index: 1.4, rev: 0.4, dly: 0.12 }));
       tick(52.8, 600, 0.07, -0.7, 0.05, 'sine', { f1: 1300 }); // violet dot pop
       silverRing(52.92, 0.9, 0.7, { rev: 0.35 });
-      // single specular glint at 58.5 (dry, short — gone by 59.2)
-      bell(58.5, 4186, 0.012, 0.2, 0.5, { ratio: 2.76, index: 0.3, rev: 0, dly: 0 });
-    });
+      bell(58.5, 4186, 0.012, 0.2, 0.5, { ratio: 2.76, index: 0.3, rev: 0, dly: 0 }); // glint (dry, gone by 59.1)
+    }
 
-
-    // ---------------------------------------------------- silences (hard gates on the final bus)
+    // ---------------------------------------------------- silences (hard gates on the final bus) + end fade
     const og = out.gain;
     og.setValueAtTime(1, 0);
     CUES.silences.forEach(([a, b]) => {
@@ -1241,15 +1131,68 @@
     });
     og.setValueAtTime(1, Math.min(59.0, END - 1)); og.linearRampToValueAtTime(0, Math.min(59.8, END - 0.1));
 
-    if (opts.bare) Q = [];
-    if (opts.noRev) { hall.disconnect(); hugeC.disconnect(); }
-    const STEP = 0.5, AHEAD = 0.2;
-    flush(STEP + AHEAD);
-    for (let k = 1; k * STEP < END; k++) {
-      const T = k * STEP;
-      ctx.suspend(T).then(() => { flush(T + STEP + AHEAD); ctx.resume(); });
+    // ---------------------------------------------------- FX pass (24 kHz): hall + huge reverbs, ping-pong delay
+    const fxN = Math.ceil(N / 2);
+    const fx = new Ctx(2, fxN, FX_SR);
+    const decim = (a, b) => { // 48k -> 24k (mono-sum of a [+ b]), [1/4 1/2 1/4] anti-alias
+      const o = new Float32Array(fxN);
+      for (let k = 0; k < fxN; k++) {
+        const i = 2 * k, x0 = i > 0 ? a[i - 1] : 0, x1 = a[i] || 0, x2 = i + 1 < a.length ? a[i + 1] : 0;
+        let v = 0.25 * x0 + 0.5 * x1 + 0.25 * x2;
+        if (b) { const y0 = i > 0 ? b[i - 1] : 0, y1 = b[i] || 0, y2 = i + 1 < b.length ? b[i + 1] : 0; v = 0.5 * (v + 0.25 * y0 + 0.5 * y1 + 0.25 * y2); }
+        o[k] = v;
+      }
+      return o;
+    };
+    const fxSrc = (data, dest) => {
+      const b = fx.createBuffer(1, fxN, FX_SR); b.copyToChannel(data, 0);
+      const s = fx.createBufferSource(); s.buffer = b; s.connect(dest); s.start(0); return s;
+    };
+    function irBuf(seconds, rt60, pre, brightHz, darkHz) {
+      const n = Math.round(seconds * FX_SR), b = fx.createBuffer(2, n, FX_SR);
+      for (let c = 0; c < 2; c++) {
+        const d = b.getChannelData(c), tau = rt60 / 6.91, preN = Math.round(pre * FX_SR); let y = 0, y2 = 0;
+        for (let i = 0; i < n; i++) {
+          if (i < preN) { d[i] = 0; continue; }
+          const t = (i - preN) / FX_SR, fc = darkHz + (brightHz - darkHz) * Math.exp(-t / (rt60 * 0.3)), a = 1 - Math.exp(-TAU * fc / FX_SR);
+          y += a * ((rnd() * 2 - 1) - y); y2 += a * (y - y2);
+          const er = (t < 0.09 && rnd() < 0.008) ? (rnd() * 2 - 1) * 2.5 : 0;
+          d[i] = (y2 * 1.6 + er) * Math.exp(-t / tau) * Math.min(1, t / 0.006);
+        }
+      }
+      return b;
     }
-    return ctx.startRendering();
+    const fG = (v, dest) => { const g = fx.createGain(); g.gain.value = v; if (dest) g.connect(dest); return g; };
+    const fF = (type, f, q, dest) => { const n = fx.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = q; if (dest) n.connect(dest); return n; };
+    const fxOut = fG(1, fx.destination);
+    const hall = fx.createConvolver(); hall.buffer = irBuf(2.7, 2.3, 0.018, 9000, 1800); hall.connect(fG(0.95, fxOut));
+    const hugeC = fx.createConvolver(); hugeC.buffer = irBuf(4.2, 3.8, 0.03, 7000, 1200); hugeC.connect(fG(0.9, fxOut));
+    const revIn = fF('highpass', 220, 0.7, hall), hugeIn = fF('highpass', 160, 0.7, hugeC);
+    const dL = fx.createDelay(1.0), dR = fx.createDelay(1.0); dL.delayTime.value = 0.375; dR.delayTime.value = 0.375;
+    const dlyRet = fG(0.55, fxOut); dlyRet.connect(fG(0.25, revIn));
+    const pL = fx.createStereoPanner(); pL.pan.value = -0.85; pL.connect(dlyRet);
+    const pR = fx.createStereoPanner(); pR.pan.value = 0.85; pR.connect(dlyRet);
+    const dlyIn = fG(1, dL); dL.connect(pL); dL.connect(dR); dR.connect(pR);
+    const fbLP = fF('lowpass', 3800, 0.6); dR.connect(fbLP); fbLP.connect(fG(0.36, dL));
+    // bus-level sends: pads (post pad lowpass) and arps feed the hall
+    const fxPadLP = fF('lowpass', 2200, 0.6, fG(0.22, revIn));
+    padAuto.forEach(([m, v, t]) => fxPadLP.frequency[m](v, t));
+    fxSrc(decim(sendRev), revIn); fxSrc(decim(sendHuge), hugeIn); fxSrc(decim(sendDly), dlyIn);
+    fxSrc(decim(stems.pad.L, stems.pad.R), fxPadLP);
+    fxSrc(decim(stems.arp.L, stems.arp.R), fG(0.18, revIn));
+
+    // ---------------------------------------------------- stems -> main graph, then render
+    const play0 = (name, dest) => { const s = ctx.createBufferSource(); s.buffer = stems[name].buf; s.connect(dest); s.start(0); };
+    play0('drum', drumBus); play0('bass', bassBus); play0('pad', padBus); play0('arp', arpBus);
+    play0('lead', leadBus); play0('music', musicPre); play0('sfx', sfx); play0('sub', subBus);
+
+    return fx.startRendering().then((fxBuf) => {
+      if (!opts.dry) {
+        const s = ctx.createBufferSource(); s.buffer = fxBuf; // 24 kHz buffer, resampled by the source
+        s.connect(F('lowpass', 10500, 0.7, mix)); s.start(0);
+      }
+      return ctx.startRendering();
+    });
   }
 
   // =====================================================================

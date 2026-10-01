@@ -25,7 +25,7 @@
 
 /* ── 2. PAGE ───────────────────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box}
-html{background:var(--bg);-webkit-text-size-adjust:100%}
+html{background:var(--bg);-webkit-text-size-adjust:100%;overflow-x:hidden}
 body{
   margin:0;min-height:100vh;min-height:100svh;
   display:flex;flex-direction:column;
@@ -72,6 +72,7 @@ a{color:inherit}
 .bvp-main{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:16px;width:100%;padding:10px 24px 26px;
+  overflow-x:clip;           /* the stage glow may bleed sideways; never allow horizontal scroll */
 }
 .bvp-player{
   position:relative;isolation:isolate;container-type:inline-size;
@@ -88,9 +89,9 @@ a{color:inherit}
 .bvp-player::before{
   content:"";position:absolute;inset:-14% -12%;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(34% 46% at 18% 52%,rgba(124,92,255,.34),rgba(124,92,255,.10) 50%,transparent 74%),
-    radial-gradient(34% 46% at 50% 44%,rgba(77,141,255,.26),rgba(77,141,255,.07) 50%,transparent 74%),
-    radial-gradient(34% 46% at 82% 54%,rgba(25,211,255,.26),rgba(70,230,166,.08) 50%,transparent 74%);
+    radial-gradient(34% 46% at 18% 52%,rgba(124,92,255,.42),rgba(124,92,255,.12) 50%,transparent 74%),
+    radial-gradient(34% 46% at 50% 44%,rgba(77,141,255,.30),rgba(77,141,255,.08) 50%,transparent 74%),
+    radial-gradient(34% 46% at 82% 54%,rgba(25,211,255,.32),rgba(70,230,166,.10) 50%,transparent 74%);
 }
 .bvp-screen{
   position:relative;width:100%;aspect-ratio:16/9;
@@ -137,15 +138,15 @@ a{color:inherit}
 .bvp-bigplay.is-busy .bvp-bigplay-ring::after{animation-duration:.9s}
 
 /* ── 6. END CARD ───────────────────────────────────────────────────────────── */
+/* top-right so it never covers the film's own centred end card */
 .bvp-endcard{
-  position:absolute;inset:auto 0 0 0;z-index:4;display:flex;justify-content:center;
-  padding:0 16px 22%;pointer-events:none;
+  position:absolute;top:0;right:0;z-index:4;display:flex;justify-content:flex-end;
+  padding:clamp(10px,2cqi,20px);pointer-events:none;
 }
-.bvp-player.is-portrait .bvp-endcard{padding-bottom:30%}
 .bvp-endcard[hidden]{display:none}
 .bvp-endcard-inner{
-  display:flex;flex-wrap:wrap;gap:10px;justify-content:center;pointer-events:auto;
-  padding:10px;border-radius:999px;background:rgba(5,7,13,.55);border:1px solid var(--line);
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;pointer-events:auto;
+  padding:6px;border-radius:999px;background:rgba(5,7,13,.55);border:1px solid var(--line);
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
 }
 
@@ -164,9 +165,8 @@ a{color:inherit}
 .bvp-btn{
   position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;
   height:40px;min-width:40px;padding:0 10px;flex:none;
-  border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);
+  border-radius:12px;border:1px solid var(--line);background:rgba(10,16,25,.55);
   color:var(--t1);cursor:pointer;
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   transition:background .2s ease,border-color .2s ease,transform .15s ease;
 }
 .bvp-btn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.16)}
@@ -241,7 +241,6 @@ a{color:inherit}
 .bvp-seg{
   display:inline-flex;flex:none;padding:3px;gap:2px;height:40px;
   border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.05);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
 }
 .bvp-seg button{
   border:0;background:transparent;color:var(--t2);cursor:pointer;
