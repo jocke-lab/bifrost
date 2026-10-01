@@ -350,28 +350,43 @@
     var RM = [[516, 612], [546, 582], [572, 550], [598, 520], [622, 488], [648, 452], [672, 422], [692, 400], [714, 428], [736, 454], [756, 446], [778, 428], [798, 452], [822, 486], [846, 520], [870, 548], [870, 612]];
     var MM = [[430, 612], [462, 584], [486, 566], [503, 552], [522, 566], [548, 588], [574, 612]];
     // peaks: [peakIndex, polygon, divide base x]
-    var PEAKS = [[LM, 5, 318], [LM, 10, 404], [RM, 7, 712], [RM, 13, 790], [MM, 3, 510]];
+    var PEAKS = [[LM, 5, 318], [LM, 10, 404], [RM, 7, 712], [RM, 11, 790], [MM, 3, 510]];
+    // walk a ridge polyline from the peak (index i, direction dir) down to height y
+    function ridgeAt(M, i, dir, y) {
+      var pts = [M[i]];
+      for (var j = i + dir; j >= 0 && j < M.length; j += dir) {
+        var a = M[j - dir], b = M[j];
+        if (b[1] < a[1]) return pts; // reached a saddle: stop
+        if (b[1] >= y) { var t = (y - a[1]) / (b[1] - a[1] || 1); pts.push([lerp(a[0], b[0], t), y]); return pts; }
+        pts.push(b);
+      }
+      return pts;
+    }
     function snowPolys() {
-      var r = rng(881), out = '', ridges = '';
+      var r = rng(881), out = '', ridges = '', shade = '';
       PEAKS.forEach(function (pk, k) {
         var M = pk[0], i = pk[1], P0 = M[i];
-        var depth = k === 4 ? 0.55 : (k % 2 ? 0.42 : 0.38);
-        var Lp = M[Math.max(i - 3, 0)], A = [lerp(P0[0], Lp[0], depth), lerp(P0[1], Lp[1], depth)];
-        var Bb = [pk[2], WL], B = [lerp(P0[0], Bb[0], depth * 0.62), lerp(P0[1], Bb[1], depth * 0.62)];
-        var pts = [P0];
-        // left ridge from peak to A following the polygon
-        for (var j = i - 1; j >= 0; j--) { if (M[j][1] >= A[1]) break; pts.push(M[j]); }
-        pts.push(A);
-        var teeth = 6;
+        var frac = k === 4 ? 0.5 : (k % 2 ? 0.46 : 0.5);
+        var ySnow = P0[1] + (WL - P0[1]) * frac;
+        var left = ridgeAt(M, i, -1, ySnow), A = left[left.length - 1];
+        var Bb = [pk[2], WL];
+        var tB = (ySnow - 10 - P0[1]) / (WL - P0[1]);
+        var B = [lerp(P0[0], Bb[0], tB), lerp(P0[1], Bb[1], tB)];
+        var pts = left.slice();
+        var teeth = 7 + (k % 2) * 2;
         for (var t = 1; t < teeth; t++) {
           var q = t / teeth, x = lerp(A[0], B[0], q), y = lerp(A[1], B[1], q);
-          pts.push([x + (r() - 0.5) * 6, y + (t % 2 ? 14 + r() * 16 : -4 - r() * 6)]);
+          if (t % 2) pts.push([x - 6 - r() * 8, y + 12 + r() * 30]); // gully tongue, slanting down-slope
+          else pts.push([x + (r() - 0.5) * 4, y - 10 - r() * 16]);
         }
         pts.push(B);
         out += poly(pts);
-        ridges += 'M' + P(P0[0], P0[1]) + 'L' + P(lerp(P0[0], Bb[0], 0.75), lerp(P0[1], Bb[1], 0.75));
+        ridges += 'M' + P(P0[0], P0[1]) + 'L' + P(lerp(P0[0], Bb[0], tB * 1.05), lerp(P0[1], Bb[1], tB * 1.05));
+        // shadow facet: from the divide line to the right ridge
+        var right = ridgeAt(M, i, 1, WL);
+        shade += poly([P0].concat(right.slice(1)).concat([Bb]));
       });
-      return { snow: out, ridges: ridges };
+      return { snow: out, ridges: ridges, shade: shade };
     }
     var SNOW = snowPolys();
     // couloirs: thin snow streaks on the shadow faces
@@ -383,7 +398,7 @@
         for (var c = 0; c < 4; c++) {
           var t = 0.15 + c * 0.2 + r() * 0.05;
           var sx = lerp(P0[0], Rn[0], t), sy = lerp(P0[1], Rn[1], t) + 4;
-          var len = 26 + r() * 40;
+          var len = 14 + r() * 22;
           d += 'M' + P(sx, sy) + 'Q' + P(sx + 3, sy + len * 0.5) + ' ' + P(sx - 2 + r() * 6, sy + len);
         }
       });
@@ -438,8 +453,8 @@
         '<rect x="' + n(x + 6) + '" y="' + n(y - 30) + '" width="5" height="10" fill="' + fillBody + '"/>';
     }
     var SHORE = smooth([[300, 616], [336, 607], [372, 604], [420, 604], [452, 608], [480, 616]], false) + 'L480,618L300,618Z';
-    var FORE_L = smooth([[150, 760], [200, 752], [252, 768], [300, 790], [330, 830], [150, 840]], false) + 'Z';
-    var FORE_R = smooth([[850, 742], [790, 752], [730, 778], [690, 806], [670, 840], [850, 840]], false) + 'Z';
+    var FORE_L = smooth([[200, 712], [262, 714], [318, 732], [370, 770], [400, 840], [200, 840]], false) + 'Z';
+    var FORE_R = smooth([[800, 700], [740, 708], [680, 734], [630, 772], [606, 840], [800, 840]], false) + 'Z';
     function pinesAt(list) {
       var d = '';
       list.forEach(function (t) {
@@ -452,18 +467,18 @@
       });
       return d;
     }
-    var PINES = pinesAt([[188, 772, 96], [222, 776, 70], [250, 786, 52], [812, 752, 104], [778, 764, 74], [748, 780, 50], [282, 798, 34], [722, 796, 36]]);
+    var PINES = pinesAt([[262, 728, 104], [296, 734, 78], [326, 750, 56], [228, 722, 70], [742, 716, 112], [706, 726, 80], [674, 744, 58], [776, 712, 74], [350, 768, 30], [652, 764, 34]]);
 
     function field(u) {
       var defs = lg(u + '-sky', 0, 170, 0, WL, [[0, '#04071d'], [0.45, '#0a1038'], [0.8, '#151c5c'], [1, '#22307a']]) +
         lg(u + '-aurH', 170, 0, 830, 0, [[0, '#7C5CFF'], [0.3, '#5d7dff'], [0.55, '#19D3FF'], [0.8, '#46E6A6'], [1, '#7dffc8']]) +
         lg(u + '-fade', 0, 1, 0, 0, [[0, '#fff', 1], [0.25, '#fff', 0.8], [1, '#fff', 0]], ' gradientUnits="objectBoundingBox"').replace('gradientUnits="userSpaceOnUse" ', '') +
         rg(u + '-glow', 470, 420, 340, [[0, '#2bd8ff', 0.22], [0.5, '#6b5cff', 0.12], [1, '#7C5CFF', 0]]) +
-        lg(u + '-rock', 0, 400, 0, WL, [[0, '#1d2a72'], [0.5, '#121c55'], [1, '#0a1138']]) +
-        lg(u + '-rockF', 0, 520, 0, WL, [[0, '#3b4fae'], [1, '#1c2a74']]) +
+        lg(u + '-rock', 0, 400, 0, WL, [[0, '#24308a'], [0.45, '#141d5c'], [1, '#080d33']]) +
+        lg(u + '-rockF', 0, 540, 0, WL, [[0, '#33449a'], [1, '#18235f']]) +
         lg(u + '-water', 0, WL, 0, 830, [[0, '#101a55'], [0.5, '#0a1240'], [1, '#050922']]) +
         rg(u + '-amb', CABIN.x - 2, CABIN.y - 12, 70, [[0, '#FFD27A', 0.95], [0.25, '#FFB547', 0.5], [1, '#FF8A3D', 0]]) +
-        '<pattern id="' + u + '-hat" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(58)"><rect width="7" height="2" fill="#8ea6ff" fill-opacity=".22"/></pattern>' +
+        '<pattern id="' + u + '-hat" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(58)"><rect width="7" height="1.6" fill="#8ea6ff" fill-opacity=".13"/></pattern>' +
         blurF(u + '-b6', 6) + blurF(u + '-b2', 2);
       var maskStrips = '';
       STRIPS.forEach(function (arr, k) {
@@ -482,7 +497,7 @@
           a += '<g mask="url(#' + u + '-am' + k + ')"><rect x="140" y="140" width="720" height="' + (WL - 140) + '" fill="url(#' + u + '-aurH)" opacity="' + (k === 2 ? 0.6 : k === 1 ? 0.8 : 1) + '"/></g>';
           var bp = basePath(k, 160, 840);
           a += '<path d="' + bp + '" fill="none" stroke="url(#' + u + '-aurH)" stroke-width="' + (k === 0 ? 16 : 10) + '" stroke-opacity=".55" filter="url(#' + u + '-b6)"/>';
-          a += '<path d="' + bp + '" fill="none" stroke="#c9fff0" stroke-width="' + (k === 0 ? 2.2 : 1.4) + '" stroke-opacity="' + (k === 2 ? 0.35 : 0.8) + '"/>';
+          if (k < 2) a += '<path d="' + bp + '" fill="none" stroke="#d8fff4" stroke-width="' + (k === 0 ? 2.4 : 1.4) + '" stroke-opacity="' + (k === 0 ? 0.9 : 0.6) + '"/>';
         });
         return a;
       }
@@ -490,21 +505,24 @@
       // mountains
       out += path(poly(MM), 'fill="url(#' + u + '-rockF)"');
       out += path(poly(LM), 'fill="url(#' + u + '-rock)"') + path(poly(RM), 'fill="url(#' + u + '-rock)"');
+      out += path(SNOW.shade, 'fill="#02041a" fill-opacity=".55"');
       out += '<g fill="url(#' + u + '-hat)">' + path(poly(LM)) + path(poly(RM)) + '</g>';
       // aurora-lit rim on the left faces
       out += path(SNOW.snow, 'fill="#e8f3ff"');
       // water + reflections
       out += '<rect x="140" y="' + WL + '" width="720" height="' + (860 - WL) + '" fill="url(#' + u + '-water)"/>';
-      out += '<g transform="matrix(1,0,0,-0.55,0,' + n(WL * 1.55) + ')" opacity=".55">' + aurora() + '</g>';
+      var refA = '';
+      [0, 1].forEach(function (k) { refA += '<path d="' + basePath(k, 160, 840) + '" fill="none" stroke="url(#' + u + '-aurH)" stroke-width="' + (k ? 26 : 40) + '" stroke-opacity="' + (k ? 0.35 : 0.5) + '" filter="url(#' + u + '-b6)"/>'; });
+      out += '<g transform="matrix(1,0,0,-0.42,0,' + n(WL * 1.42) + ')" opacity=".6">' + refA + '</g>';
       out += '<g transform="matrix(1,0,0,-0.5,0,' + n(WL * 1.5) + ')" opacity=".85">' + path(poly(LM), 'fill="#070c2c"') + path(poly(RM), 'fill="#070c2c"') + path(poly(MM), 'fill="#0d1646"') + path(SNOW.snow, 'fill="#5d6fae" fill-opacity=".5"') + '</g>';
       var rip = '';
-      for (var y = WL + 4; y < 840; y += 5 + (y - WL) * 0.03) rip += 'M140,' + n(y) + 'H860';
-      out += path(rip, 'stroke="#050922" stroke-opacity=".55" stroke-width="' + 1.6 + '" fill="none"');
+      for (var y = WL + 4; y < 840; y += 4 + (y - WL) * 0.035) rip += 'M140,' + n(y) + 'H860';
+      out += path(rip, 'stroke="#050922" stroke-opacity=".45" stroke-width="1.4" fill="none"');
       // shore + cabin + glow + reflection
       out += path(SHORE, 'fill="#070b26"');
       out += '<circle cx="' + CABIN.x + '" cy="' + (CABIN.y - 12) + '" r="70" fill="url(#' + u + '-amb)"/>';
-      out += cabin('#0a0d22');
-      out += '<rect x="' + (CABIN.x - 9) + '" y="' + (CABIN.y - 11) + '" width="7" height="7" fill="#FFC861"/><rect x="' + (CABIN.x + 3) + '" y="' + (CABIN.y - 11) + '" width="6" height="11" fill="#FF9F43"/>';
+      out += '<g transform="translate(' + CABIN.x + ',' + CABIN.y + ') scale(1.3) translate(' + (-CABIN.x) + ',' + (-CABIN.y) + ')">' + cabin('#0a0d22') +
+        '<rect x="' + (CABIN.x - 9) + '" y="' + (CABIN.y - 11) + '" width="7" height="7" fill="#FFC861"/><rect x="' + (CABIN.x + 3) + '" y="' + (CABIN.y - 11) + '" width="6" height="11" fill="#FF9F43"/></g>';
       var refl = '';
       for (var j = 0; j < 14; j++) { var yy = WL + 6 + j * 5.5, w = 7 + j * 1.2 + (j % 3) * 4; refl += '<rect x="' + n(CABIN.x - 2 - w / 2) + '" y="' + n(yy) + '" width="' + n(w) + '" height="2.2" fill="#FFB547" fill-opacity="' + n(0.85 - j * 0.055) + '"/>'; }
       out += refl;
@@ -515,7 +533,12 @@
     function inkMask(u) {
       var m = FULL;
       m += path(SNOW.snow, 'fill="#000"');
-      m += path(COUL, 'fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"');
+      m += path(COUL, 'fill="none" stroke="#000" stroke-opacity=".6" stroke-width="1.8" stroke-linecap="round"');
+      // silvery reflection of the snow caps, broken by ripples (translucent ink = metal glimmers through)
+      m += '<g transform="matrix(1,0,0,-0.5,0,' + n(WL * 1.5) + ')">' + path(SNOW.snow, 'fill="#000" fill-opacity=".45"') + '</g>';
+      var rp = '';
+      for (var y = WL + 3; y < 760; y += 4 + (y - WL) * 0.035) rp += 'M140,' + n(y) + 'H860';
+      m += path(rp, 'stroke="#fff" stroke-width="1.6" fill="none"');
       m += path(SNOW.ridges, 'fill="none" stroke="#000" stroke-width="1.6" stroke-opacity=".9"');
       STARS.forEach(function (s) {
         if (s[2] > 3.4) m += path(star4(s[0], s[1], s[2], 0.14, 0), 'fill="#000"');
@@ -523,17 +546,17 @@
       });
       // mirror glints on the water
       var r = rng(77), gl = '';
-      for (var i = 0; i < 60; i++) {
-        var y = WL + 8 + Math.pow(r(), 1.4) * 150, x = 200 + r() * 600, w = 6 + r() * 26;
+      for (var i = 0; i < 26; i++) {
+        var y = WL + 8 + Math.pow(r(), 1.6) * 110, x = 250 + r() * 500, w = 6 + r() * 20;
         if (Math.abs(x - CABIN.x) < 30) continue;
         gl += 'M' + P(x, y) + 'h' + n(w);
       }
-      m += path(gl, 'stroke="#000" stroke-width="1.6" stroke-opacity=".8" fill="none" stroke-linecap="round"');
+      m += path(gl, 'stroke="#000" stroke-width="1.4" stroke-opacity=".6" fill="none" stroke-linecap="round"');
       return m;
     }
     function relief(u) {
       var inner = path(poly(LM), 'fill-opacity=".55"') + path(poly(RM), 'fill-opacity=".55"') + path(poly(MM), 'fill-opacity=".35"') +
-        path(SNOW.snow, 'fill-opacity="1"') + path(FORE_L + FORE_R, 'fill-opacity=".7"') + path(PINES, 'fill-opacity=".8"') + cabin('#fff');
+        path(SNOW.snow, 'fill-opacity="1"') + path(FORE_L + FORE_R, 'fill-opacity=".45"') + path(PINES, 'fill-opacity=".5"') + cabin('#fff');
       return reliefWrap(u, inner, 2.5);
     }
     return { metal: 'ag', field: field, inkMask: inkMask, relief: relief };
