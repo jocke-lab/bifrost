@@ -1,0 +1,14 @@
+<svg viewBox="0 0 232 56" width="232" height="56" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bifrost Vault">
+  <!-- Compact shared lockup for sign-in: the existing coin-and-bridge mark. -->
+  <defs>
+    <linearGradient id="bfl" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#67DCEA" />
+      <stop offset="50%" stop-color="#7793FF" />
+      <stop offset="100%" stop-color="#855CFF" />
+    </linearGradient>
+  </defs>
+  <circle cx="28" cy="28" r="21" fill="none" stroke="#E6B45A" stroke-width="4" />
+  <path d="M6 42 Q28 4 50 21" fill="none" stroke="url(#bfl)" stroke-width="5" stroke-linecap="round" />
+  <text x="66" y="27" fill="#F4F3F8" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="23" font-weight="800" letter-spacing="3">BIFROST</text>
+  <text x="67" y="46" fill="#BAA9E5" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="12" font-weight="600" letter-spacing="5">VAULT.IO</text>
+</svg>

@@ -9,3 +9,10 @@ Thumbs.db
 .claude/launch.json
 
 .vercel
+
+# commercial renders: stills/frames/previews never committed (final MP4s + posters are)
+commercial/dist/*.png
+commercial/dist/frames/
+commercial/dist/stills/
+commercial/dist/*-preview.mp4
+commercial/dist/.*.partial-*.mp4

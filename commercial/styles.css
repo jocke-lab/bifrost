@@ -1,0 +1,370 @@
+@font-face{font-family:'Geist';src:url('assets/fonts/geist-500.ttf') format('truetype');font-weight:400 600;font-style:normal;font-display:block}
+@font-face{font-family:'Geist';src:url('assets/fonts/geist-700.ttf') format('truetype');font-weight:700 900;font-style:normal;font-display:block}
+/* ============================================================================
+   styles.css — Bifrost Vault commercial page
+   Obsidian page, aurora glow behind the stage, auto-hiding glass controls,
+   gradient CTA. The film itself is styled by the scenes (kit.js injects its
+   own kinetic-type classes); this file never styles anything inside #bv-stage.
+   Render mode (html.bv-render): black page, stage at 0,0, no UI at all.
+   ========================================================================== */
+
+/* ── 1. TOKENS ─────────────────────────────────────────────────────────────── */
+:root{
+  /* Bifrost Vault brand — Aurora Noir (bifrost-platform docs/BRAND-SOCIAL-KIT, AURORA-NOIR) */
+  --bg:#080A12; --bg2:#090B12; --panel:#0E1120; --line:rgba(255,255,255,.08);
+  --t1:#F6F7FC; --t2:#B4BFD1; --t3:#7D879A;
+  --violet:#855CFF; --violet-lt:#B29AFF; --lavender:#BAA9E5; --azure:#7793FF; --cyan:#67DCEA; --mint:#67DCEA;
+  --gold-accent:#E6B45A;
+  --aurora:linear-gradient(115deg,#67DCEA,#7793FF 50%,#855CFF);
+  --silver-hi:#F4F7FA; --silver:#C9D1D9; --silver-mid:#9AA5B1; --silver-lo:#5B6670; --champagne:#E8D9B5; --gold:#F2C66D;
+
+  --f-display:'Geist',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  --f-body:'Geist',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --radius:18px;
+  --chrome:200px;            /* vertical room reserved for header + controls + fine print */
+  color-scheme:dark;
+}
+
+/* ── 2. PAGE ───────────────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%;overflow-x:hidden}
+body{
+  margin:0;min-height:100vh;min-height:100svh;
+  display:flex;flex-direction:column;
+  background:var(--bg);color:var(--t1);
+  font-family:var(--f-body);font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  overflow-x:hidden;
+}
+button{font:inherit;color:inherit}
+a{color:inherit}
+
+.bvp-ambient{
+  /* static, filter-free gradients: free to composite while the film plays */
+  position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(42% 38% at 30% 42%,rgba(124,92,255,.15),rgba(124,92,255,.05) 45%,transparent 72%),
+    radial-gradient(38% 34% at 70% 54%,rgba(25,211,255,.11),rgba(25,211,255,.035) 45%,transparent 72%),
+    radial-gradient(34% 30% at 52% 76%,rgba(70,230,166,.07),transparent 72%),
+    radial-gradient(70% 60% at 50% 50%,rgba(77,141,255,.05),transparent 78%);
+}
+
+/* ── 3. HEADER ─────────────────────────────────────────────────────────────── */
+.bvp-head{
+  display:flex;align-items:center;gap:14px;
+  width:100%;max-width:1680px;margin:0 auto;
+  padding:18px 28px 6px;
+}
+.bvp-brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none}
+.bvp-mark{width:34px;height:31px;flex:none}
+.bvp-word{display:inline-flex;align-items:baseline;gap:8px;line-height:1}
+.bvp-word b{font-family:var(--f-display);font-weight:600;font-size:21px;letter-spacing:-.01em}
+.bvp-word span{font-family:var(--f-display);font-weight:600;font-size:11px;letter-spacing:.34em;color:var(--t2)}
+.bvp-head-tag{
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--t3);
+  padding:5px 10px;border:1px solid var(--line);border-radius:999px;
+}
+.bvp-head-link{
+  margin-left:auto;font-family:var(--f-mono);font-size:12.5px;letter-spacing:.06em;color:var(--t2);
+  text-decoration:none;padding:6px 2px;
+}
+.bvp-head-link:hover{color:var(--t1)}
+
+/* ── 4. MAIN + PLAYER ──────────────────────────────────────────────────────── */
+.bvp-main{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;width:100%;padding:10px 24px 26px;
+  overflow-x:clip;           /* the stage glow may bleed sideways; never allow horizontal scroll */
+}
+.bvp-player{
+  position:relative;isolation:isolate;container-type:inline-size;
+  width:min(100%, calc((100vh - var(--chrome)) * 16 / 9), 1600px);
+  width:min(100%, calc((100svh - var(--chrome)) * 16 / 9), 1600px);
+  min-width:min(100%, 280px);
+}
+.bvp-player.is-portrait{
+  width:min(100%, calc((100vh - var(--chrome)) * 9 / 16));
+  width:min(100%, calc((100svh - var(--chrome)) * 9 / 16));
+  min-width:min(100%, 260px);
+}
+/* aurora glow behind the stage (gradients only — no filter, so it costs nothing per frame) */
+.bvp-player::before{
+  content:"";position:absolute;inset:-14% -12%;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(34% 46% at 18% 52%,rgba(124,92,255,.42),rgba(124,92,255,.12) 50%,transparent 74%),
+    radial-gradient(34% 46% at 50% 44%,rgba(77,141,255,.30),rgba(77,141,255,.08) 50%,transparent 74%),
+    radial-gradient(34% 46% at 82% 54%,rgba(25,211,255,.32),rgba(70,230,166,.10) 50%,transparent 74%);
+}
+.bvp-screen{
+  position:relative;width:100%;aspect-ratio:16/9;
+  border-radius:var(--radius);overflow:hidden;background:#000;
+  box-shadow:0 0 0 1px var(--line),0 40px 120px -30px rgba(0,0,0,.85),0 0 60px -10px rgba(77,141,255,.18);
+  cursor:pointer;
+}
+.bvp-player.is-portrait .bvp-screen{aspect-ratio:9/16}
+#bv-viewport{
+  position:absolute;inset:0;overflow:hidden;background:#000;
+  /* overflow+radius alone does not clip the composited stage layers in every Chrome build
+     (square / bleeding corners); an explicit rounded clip does */
+  border-radius:inherit;clip-path:inset(0 round var(--radius));
+}
+
+/* loading state (until BV.ready: fonts, art and first frame) */
+.bvp-player.is-loading .bvp-screen::before{
+  content:"";position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:radial-gradient(60% 50% at 50% 55%,rgba(77,141,255,.14),transparent 70%),#05070D;
+}
+.bvp-player.is-loading .bvp-screen::after{
+  content:"";position:absolute;left:50%;top:50%;z-index:3;width:44px;height:44px;margin:-22px 0 0 -22px;
+  border-radius:50%;border:2px solid rgba(255,255,255,.10);border-top-color:var(--cyan);border-right-color:var(--violet);
+  animation:bvp-rot .9s linear infinite;
+}
+.bvp-player.is-loading .bvp-controls{opacity:.5;pointer-events:none}
+
+/* ── 5. BIG PLAY OVERLAY ───────────────────────────────────────────────────── */
+.bvp-bigplay{
+  position:absolute;inset:0;z-index:5;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  border:0;padding:0;margin:0;cursor:pointer;
+  background:radial-gradient(ellipse at 50% 50%,rgba(5,7,13,.18),rgba(5,7,13,.62));
+  transition:opacity .35s ease;
+}
+.bvp-bigplay[hidden]{display:none}
+.bvp-bigplay-ring{
+  position:relative;display:grid;place-items:center;
+  width:clamp(68px,12cqi,116px);height:clamp(68px,12cqi,116px);border-radius:50%;
+  background:linear-gradient(rgba(10,16,25,.72),rgba(10,16,25,.72)) padding-box,var(--aurora) border-box;
+  border:2px solid transparent;
+  box-shadow:0 0 40px rgba(77,141,255,.45),0 0 90px rgba(124,92,255,.25);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  transition:transform .25s ease,box-shadow .25s ease;
+}
+.bvp-bigplay-ring::after{
+  content:"";position:absolute;inset:-10px;border-radius:50%;
+  border:1px solid rgba(25,211,255,.45);opacity:0;
+  animation:bvp-pulse 2.4s ease-out infinite;
+}
+@keyframes bvp-pulse{0%{transform:scale(.92);opacity:.8}100%{transform:scale(1.35);opacity:0}}
+.bvp-bigplay-ring svg{width:42%;height:42%;fill:var(--t1);margin-left:6%}
+.bvp-bigplay-label{
+  font-family:var(--f-display);font-weight:600;font-size:clamp(14px,2.2cqi,20px);letter-spacing:.01em;
+  padding:8px 16px;border-radius:999px;background:rgba(5,7,13,.55);border:1px solid var(--line);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+.bvp-bigplay:hover .bvp-bigplay-ring{transform:scale(1.06);box-shadow:0 0 54px rgba(77,141,255,.6),0 0 120px rgba(124,92,255,.35)}
+.bvp-bigplay:focus-visible{outline:none}
+.bvp-bigplay:focus-visible .bvp-bigplay-ring{outline:2px solid var(--cyan);outline-offset:6px}
+.bvp-bigplay.is-busy .bvp-bigplay-ring::after{animation-duration:.9s}
+
+/* ── 6. END CARD ───────────────────────────────────────────────────────────── */
+/* top-right so it never covers the film's own centred end card */
+.bvp-endcard{
+  position:absolute;top:0;right:0;z-index:4;display:flex;justify-content:flex-end;
+  padding:clamp(10px,2cqi,20px);pointer-events:none;
+}
+.bvp-endcard[hidden]{display:none}
+.bvp-endcard-inner{
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;pointer-events:auto;
+  padding:6px;border-radius:999px;background:rgba(5,7,13,.55);border:1px solid var(--line);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+
+/* ── 7. CONTROLS ───────────────────────────────────────────────────────────── */
+.bvp-controls{
+  position:absolute;left:0;right:0;bottom:0;z-index:6;
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
+  padding:48px 16px 14px;border-radius:0 0 var(--radius) var(--radius);
+  background:linear-gradient(to top,rgba(5,7,13,.92) 0%,rgba(5,7,13,.55) 55%,rgba(5,7,13,0) 100%);
+  /* keep the CTA glow inside the picture's rounded bottom corners (top left open for the scrub tip) */
+  clip-path:inset(-200px 0 0 0 round 0 0 var(--radius) var(--radius));
+  transition:opacity .35s ease;
+}
+.bvp-player.is-idle .bvp-controls{opacity:0;pointer-events:none}
+.bvp-player.is-idle .bvp-screen{cursor:none}
+.bvp-controls:has(:focus-visible){opacity:1!important;pointer-events:auto!important}
+
+.bvp-btn{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:40px;min-width:40px;padding:0 10px;flex:none;
+  border-radius:12px;border:1px solid var(--line);background:rgba(10,16,25,.55);
+  color:var(--t1);cursor:pointer;
+  transition:background .2s ease,border-color .2s ease,transform .15s ease;
+}
+.bvp-btn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.16)}
+.bvp-btn:active{transform:scale(.96)}
+.bvp-btn:focus-visible,.bvp-seg button:focus-visible,.bvp-cta:focus-visible,.bvp-scrub:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.bvp-btn svg{width:20px;height:20px;fill:currentColor;flex:none}
+.bvp-btn:disabled{opacity:.4;cursor:not-allowed}
+.bvp-btn--wide{padding:0 16px;font-family:var(--f-display);font-weight:600;font-size:14.5px}
+
+/* icon state swaps */
+#bvp-play .i-pause,.bvp-player.is-playing #bvp-play .i-play{display:none}
+.bvp-player.is-playing #bvp-play .i-pause{display:block}
+#bvp-sound .i-snd-on,#bvp-sound .bvp-spin,.bvp-player.is-sound #bvp-sound .i-snd-off{display:none}
+.bvp-player.is-sound #bvp-sound .i-snd-on{display:block}
+.bvp-player.is-sound-busy #bvp-sound svg{display:none}
+.bvp-player.is-sound-busy #bvp-sound .bvp-spin{display:block}
+.bvp-player.is-sound #bvp-sound{color:var(--cyan)}
+#bvp-full .i-exit,.bvp-player.is-full #bvp-full .i-full{display:none}
+.bvp-player.is-full #bvp-full .i-exit{display:block}
+
+.bvp-spin{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.18);border-top-color:var(--cyan);
+  animation:bvp-rot .8s linear infinite;
+}
+@keyframes bvp-rot{to{transform:rotate(360deg)}}
+
+.bvp-time{
+  flex:none;min-width:84px;
+  font-family:var(--f-mono);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--t2);letter-spacing:.02em;
+}
+
+/* scrubber */
+.bvp-scrub{
+  position:relative;flex:1 1 180px;min-width:120px;height:30px;cursor:pointer;touch-action:none;
+  display:flex;align-items:center;border-radius:8px;
+}
+.bvp-scrub-track{
+  position:relative;width:100%;height:4px;border-radius:4px;background:rgba(255,255,255,.14);overflow:hidden;
+  transition:height .15s ease;
+}
+.bvp-scrub:hover .bvp-scrub-track,.bvp-scrub.is-drag .bvp-scrub-track{height:6px}
+.bvp-scrub-fill{
+  position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(0);
+  background:var(--aurora);
+}
+.bvp-scrub-ticks{position:absolute;inset:0;pointer-events:none}
+.bvp-scrub-ticks i{
+  position:absolute;top:50%;width:2px;height:10px;margin:-5px 0 0 -1px;border-radius:2px;
+  background:rgba(234,242,248,.55);box-shadow:0 0 0 1px rgba(5,7,13,.5);
+}
+.bvp-scrub-thumb{
+  position:absolute;top:50%;left:0;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
+  background:#fff;box-shadow:0 0 0 3px rgba(25,211,255,.25),0 0 16px rgba(25,211,255,.7);
+  pointer-events:none;transform:scale(.85);transition:transform .15s ease;
+}
+.bvp-scrub:hover .bvp-scrub-thumb,.bvp-scrub.is-drag .bvp-scrub-thumb{transform:scale(1.1)}
+.bvp-scrub-tip{
+  position:absolute;bottom:100%;left:0;margin-bottom:8px;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:6px 10px;border-radius:10px;white-space:nowrap;pointer-events:none;
+  background:rgba(10,16,25,.92);border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 10px 30px rgba(0,0,0,.5);
+  opacity:0;transition:opacity .15s ease;
+}
+.bvp-scrub-tip b{font-family:var(--f-mono);font-weight:500;font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums}
+.bvp-scrub-tip span{font-family:var(--f-display);font-weight:600;font-size:12px;color:var(--cyan);letter-spacing:.02em}
+.bvp-scrub-tip span:empty{display:none}
+.bvp-scrub.is-hover .bvp-scrub-tip,.bvp-scrub.is-drag .bvp-scrub-tip{opacity:1}
+
+/* format toggle */
+.bvp-seg{
+  display:inline-flex;flex:none;padding:3px;gap:2px;height:40px;
+  border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.05);
+}
+.bvp-seg button{
+  border:0;background:transparent;color:var(--t2);cursor:pointer;
+  font-family:var(--f-mono);font-size:12px;font-weight:600;letter-spacing:.04em;
+  padding:0 10px;border-radius:9px;transition:background .2s ease,color .2s ease;
+}
+.bvp-seg button:hover{color:var(--t1)}
+.bvp-seg button[aria-pressed="true"]{
+  color:var(--t1);
+  background:linear-gradient(rgba(10,16,25,.85),rgba(10,16,25,.85)) padding-box,var(--aurora) border-box;
+  border:1px solid transparent;
+}
+
+/* gradient CTA */
+.bvp-cta{
+  position:relative;overflow:hidden;flex:none;isolation:isolate;
+  display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 20px;
+  border:0;border-radius:999px;cursor:pointer;
+  font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:.005em;color:#05070D;
+  background:var(--aurora);background-size:160% 100%;background-position:0 0;
+  box-shadow:0 0 0 1px rgba(255,255,255,.18) inset,0 8px 30px -6px rgba(77,141,255,.65),0 0 24px rgba(124,92,255,.35);
+  transition:transform .2s ease,box-shadow .25s ease,background-position .5s ease;
+}
+.bvp-cta::after{
+  content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;z-index:-1;
+  background:linear-gradient(105deg,transparent,rgba(255,255,255,.75),transparent);
+  transform:skewX(-18deg);animation:bvp-shine 3.6s ease-in-out infinite;
+}
+@keyframes bvp-shine{0%,62%{left:-60%}100%{left:130%}}
+.bvp-cta:hover{transform:translateY(-1px);background-position:100% 0;box-shadow:0 0 0 1px rgba(255,255,255,.25) inset,0 12px 40px -6px rgba(25,211,255,.75),0 0 36px rgba(124,92,255,.5)}
+.bvp-cta:active{transform:translateY(0) scale(.98)}
+
+/* narrow player (portrait on desktop, small screens): scrubber gets its own row */
+@container (max-width: 760px){
+  .bvp-scrub{order:-1;flex-basis:100%}
+  .bvp-controls{padding-top:56px}
+  .bvp-cta{margin-left:auto}
+}
+@container (max-width: 420px){
+  .bvp-time{min-width:0;font-size:11.5px}
+  .bvp-btn{height:36px;min-width:36px;padding:0 8px}
+  .bvp-seg{height:36px}
+  .bvp-cta{height:36px;padding:0 14px;font-size:14px}
+}
+
+/* ── 8. FINE PRINT ─────────────────────────────────────────────────────────── */
+.bvp-fine{
+  margin:0;max-width:980px;text-align:center;
+  font-size:11.5px;line-height:1.55;color:var(--t3);letter-spacing:.01em;
+}
+.bvp-noscript{text-align:center;color:var(--t2);padding:40px 20px}
+
+/* ── 9. FULLSCREEN ─────────────────────────────────────────────────────────── */
+.bvp-player:fullscreen{width:100vw;height:100vh;max-width:none;background:#000;display:flex;align-items:center;justify-content:center}
+.bvp-player:-webkit-full-screen{width:100vw;height:100vh;max-width:none;background:#000}
+.bvp-player:fullscreen::before{display:none}
+.bvp-player:fullscreen .bvp-screen{width:100%;height:100%;aspect-ratio:auto;border-radius:0;box-shadow:none}
+.bvp-player:-webkit-full-screen .bvp-screen{width:100%;height:100%;border-radius:0;box-shadow:none}
+.bvp-player:fullscreen .bvp-controls{position:absolute;border-radius:0;padding-bottom:22px;clip-path:none}
+.bvp-player:fullscreen #bv-viewport,.bvp-player:-webkit-full-screen #bv-viewport{clip-path:none}
+
+/* ── 10. MOBILE ────────────────────────────────────────────────────────────── */
+@media (max-width: 720px){
+  :root{--chrome:290px}
+  body{font-size:14px}
+  .bvp-head{padding:14px 16px 4px;gap:10px}
+  .bvp-head-tag{display:none}
+  .bvp-mark{width:28px;height:26px}
+  .bvp-word b{font-size:18px}
+  .bvp-main{padding:8px 16px 20px;gap:12px;justify-content:flex-start}
+  .bvp-screen{border-radius:14px}
+  #bv-viewport{clip-path:inset(0 round 14px)}
+  .bvp-player::before{opacity:.8}
+  /* controls sit under the stage and never hide */
+  .bvp-controls{position:static;padding:12px 0 0;background:none;border-radius:0;gap:10px 8px;clip-path:none}
+  /* one tidy row of transport buttons, then a full-width CTA (replay lives on the end card / R key) */
+  #bvp-replay{display:none}
+  .bvp-time{flex:1 1 auto;min-width:0}
+  .bvp-cta{flex:1 1 100%;height:46px;margin-left:0;font-size:16px}
+  /* 9:16 on a phone: the picture is height-limited, but the controls keep the full width */
+  .bvp-player.is-portrait{width:100%}
+  .bvp-player.is-portrait:not(:fullscreen) .bvp-screen{
+    width:min(100%, calc((100vh - var(--chrome)) * 9 / 16));
+    width:min(100%, calc((100svh - var(--chrome)) * 9 / 16));
+    margin:0 auto;
+  }
+  .bvp-player.is-idle .bvp-controls{opacity:1;pointer-events:auto}
+  .bvp-player:fullscreen .bvp-controls{position:absolute;padding:48px 12px 18px;background:linear-gradient(to top,rgba(5,7,13,.92),rgba(5,7,13,0))}
+}
+
+/* ── 11. MOTION PREFERENCES ────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  .bvp-bigplay-ring::after,.bvp-cta::after{animation:none}
+  .bvp-cta::after{display:none}
+}
+
+/* ── 12. RENDER MODE (?render=1) ───────────────────────────────────────────── */
+html.bv-render,html.bv-render body{background:#000!important;margin:0!important;padding:0!important;overflow:hidden!important}
+html.bv-render .bvp-ui,
+html.bv-render .bvp-ambient,
+html.bv-render .bvp-head,
+html.bv-render .bvp-fine,
+html.bv-render .bvp-main{display:none!important}
+html.bv-render #bv-viewport{position:fixed!important;left:0!important;top:0!important;inset:auto;border-radius:0!important;clip-path:none!important;background:#000}
