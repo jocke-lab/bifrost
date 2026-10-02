@@ -41,7 +41,7 @@
   };
 
   // Buyback quote — the single source of the percentage and its basis wording.
-  const buyback = { pct: 80, basisLabel: "of the coin's stated original value" };
+  const buyback = { pct: 80, basisLabel: "of the coin’s stated original value" };
   buyback.sentence = 'Buyback quote: ' + buyback.pct + '% ' + buyback.basisLabel + '; terms apply';
 
   const chain = { name: 'Base', gasCovered: true };

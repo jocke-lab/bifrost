@@ -11,7 +11,7 @@
     // 01 hook
     hookSweep: 0.0, caughtYourEye: 0.9, hookPullBack: 1.6,
     // 02 the five (hard cuts on the half-beats)
-    five: [2.5, 3.0, 3.5, 4.0, 4.5], fiveRow: 4.3,
+    five: [2.5, 3.0, 3.5, 4.0, 4.5], fiveRow: 4.6,
     // 03 mint the one you love
     mint: 5.0, fallForOne: 5.2, tapCoin: 5.8, sheet: 6.4, mintIt: 7.0, tapMint: 7.2, confirmed: 8.2, certificate: 8.6,
     // 04 or let the box choose (the client's real opening)

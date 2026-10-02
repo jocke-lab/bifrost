@@ -7,7 +7,8 @@
    into the glow. Then (4.62–4.95) Veritas pulls back into a floating row of all
    five over one arc of light (the bridge), with floor reflections.
    Supers: EYE OF THE UNKNOWN. (from the first cut) and small caps
-   FIVE COINS IN SILVER · EDITION OF 50 EACH (edition from BV_CONFIG).
+   FIVE COINS IN SILVER · EDITION OF 50 EACH (edition from BV_CONFIG) from the second cut (3.0).
+   9:16: the row is a gentle crowned arc of five, slightly overlapping, edge to edge between the margins.
    Sits above 01-hook (z) and starts with an opaque frame = hard cut at 2.5.
    Pure function of t. No randomness.
    ========================================================================== */
@@ -21,6 +22,9 @@
   const CUT = 0.5;                          // seconds per coin
   const T_ROW = 2.08, T_ROW_END = 2.36;     // local: Veritas pulls back into the row (4.58–4.86)
   const BRIDGE = ['#67DCEA', '#7793FF', '#855CFF'];
+  // The face renders are centred opaque discs (alpha bbox 94..1506 of 1600 = 44.1 % radius), so the light layers
+  // are clipped to that circle instead of mask-image:url(...), which Chrome blocks as cross-origin on file://.
+  const CLIP = '-webkit-clip-path:circle(44.1% at 50% 50%);clip-path:circle(44.1% at 50% 50%);';
 
   const px = n => n.toFixed(2) + 'px';
   function box(el, cx, cy, size, base, rot) {
@@ -42,16 +46,19 @@
   function layout(ctx) {
     const P = ctx.portrait, W = ctx.W, H = ctx.H;
     if (P) {
-      const disc = 194, gap = 14, y = 1080;
+      // 9:16: a gentle crowned arc of five, slightly overlapping, filling the width between the 64 px margins
+      const discs = [200, 212, 228, 212, 200], ys = [1036, 1000, 982, 1000, 1036];
+      const xs = [164, 352, 540, 728, 916];
       return {
         P, W, H,
         full: { x: 540, y: 975, disc: 960 },
         title: { x: 540, y: 336, size: 116, align: 'center', text: 'EYE OF THE\nUNKNOWN.' },
         name: { x: 540, y: 1512, align: 'center', size: 34 },
-        desc: { x: 540, y: 1566, align: 'center', size: 23 },
-        row: { y, disc, xs: [0, 1, 2, 3, 4].map(i => 540 + (i - 2) * (disc + gap)) },
-        arc: 'M -60 1255 Q 470 840 1150 1010',
-        floor: y + disc / 2 + 26
+        desc: { x: 540, y: 1566, align: 'center', size: 24, tuck: 1290 },
+        row: { xs, ys, discs, order: [0, 4, 1, 3, 2] },
+        arc: 'M -60 1180 Q 540 700 1140 1180',
+        floors: ys.map((y, i) => y + discs[i] / 2 + 22),
+        glowY: 1040, glowS: [1.3, 0.62]
       };
     }
     const disc = 290, gap = 38, y = 726;
@@ -60,10 +67,11 @@
       full: { x: 1328, y: 540, disc: 920 },
       title: { x: 118, y: 196, size: 104, align: 'left', text: 'EYE OF THE\nUNKNOWN.', fit: 700 },
       name: { x: 118, y: 902, align: 'left', size: 32 },
-      desc: { x: 121, y: 478, align: 'left', size: 22 },
-      row: { y, disc, xs: [0, 1, 2, 3, 4].map(i => 960 + (i - 2) * (disc + gap)) },
+      desc: { x: 121, y: 462, align: 'left', size: 26 },
+      row: { xs: [0, 1, 2, 3, 4].map(i => 960 + (i - 2) * (disc + gap)), ys: [y, y, y, y, y], discs: [disc, disc, disc, disc, disc], order: [4, 3, 2, 1, 0] },
       arc: 'M -60 990 Q 820 400 1980 650',
-      floor: y + disc / 2 + 30
+      floors: [0, 1, 2, 3, 4].map(() => y + disc / 2 + 30),
+      glowY: y + disc * 0.15, glowS: [1.9, 0.62]
     };
   }
 
@@ -93,7 +101,7 @@
       // specular sweep, masked to the active coin
       st.spec = coins.map(c => {
         const s = layer(st.cut, 'display:none;width:1600px;height:1600px;transform-origin:50% 50%;overflow:hidden;mix-blend-mode:screen;' +
-          '-webkit-mask-image:url("' + c.src + '");mask-image:url("' + c.src + '");-webkit-mask-size:100% 100%;mask-size:100% 100%;');
+          CLIP);
         s._band = layer(s, 'left:-50%;width:200%;height:100%;' +
           'background:linear-gradient(100deg,rgba(255,255,255,0) 41%,rgba(220,226,255,.2) 47%,rgba(255,255,255,.5) 50%,rgba(220,226,255,.2) 53%,rgba(255,255,255,0) 59%);');
         return s;
@@ -119,19 +127,17 @@
       st.arcLen = st.arcs[0].getTotalLength ? st.arcs[0].getTotalLength() : 2400;
       st.arcs.forEach(p => p.setAttribute('stroke-dasharray', st.arcLen.toFixed(1) + ' ' + (st.arcLen + 10).toFixed(1)));
       // floor glow pools, reflections, coins
-      const rd = L.row.disc, rF = rd / DISC;
-      st.rowF = rF;
       st.pool = coins.map(c => layer(st.rowWrap, 'width:400px;height:100px;transform-origin:50% 50%;border-radius:50%;' +
         'background:radial-gradient(closest-side,' + hexA(c.enamel, 0.42) + ',' + hexA(c.enamel, 0.1) + ' 55%,rgba(0,0,0,0));'));
       st.refl = coins.map(c => img(st.rowWrap, c.src, 1600, 'opacity:.24;' +
         '-webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 50%,rgba(0,0,0,.95) 100%);' +
         'mask-image:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,0) 50%,rgba(0,0,0,.95) 100%);'));
       st.rowCoin = coins.map(c => img(st.rowWrap, c.src, 1600, 'filter:drop-shadow(0 18px 22px rgba(0,0,0,.6));'));
-      st.rowCoin.reverse().forEach(e => st.rowWrap.appendChild(e)); st.rowCoin.reverse();   // Silence at the back, Dominion in front
+      L.row.order.forEach(i => st.rowWrap.appendChild(st.rowCoin[i]));      // stacking order of the (overlapping) row
       // one light sweep that travels across the settled row (per-coin, masked to each coin)
       st.rowSpec = coins.map(c => {
         const s = layer(st.rowWrap, 'width:1600px;height:1600px;transform-origin:50% 50%;overflow:hidden;mix-blend-mode:screen;opacity:0;' +
-          '-webkit-mask-image:url("' + c.src + '");mask-image:url("' + c.src + '");-webkit-mask-size:100% 100%;mask-size:100% 100%;');
+          CLIP);
         s._band = layer(s, 'left:0;width:100%;height:100%;');
         return s;
       });
@@ -160,9 +166,10 @@
         return d;
       });
       // descriptor (small caps)
-      st.desc = K.superText(root, 'FIVE COINS IN SILVER · EDITION OF ' + edition + ' EACH', {
-        cls: 'tag', x: L.desc.x, y: L.desc.y, size: L.desc.size, align: L.desc.align, font: K.FONT.display, weight: 600,
-        letterSpacing: L.P ? '0.24em' : '0.2em', color: '#B4BFD1', split: 'words'
+      // 16:9: two stacked lines so the 26 px caps clear the full-frame coin; 9:16: one line under the row
+      st.desc = K.superText(root, L.P ? 'FIVE COINS IN SILVER · EDITION OF ' + edition + ' EACH' : 'FIVE COINS IN SILVER\nEDITION OF ' + edition + ' EACH', {
+        cls: 'tag', x: L.desc.x, y: L.desc.y, size: L.desc.size, align: L.desc.align, font: K.FONT.display, weight: 600, lineHeight: 1.7, valign: L.P ? 'middle' : 'top',
+        letterSpacing: L.P ? '0.22em' : '0.2em', color: '#C9D1E0', split: 'words'
       });
       return st;
     },
@@ -185,8 +192,8 @@
       let fd = L.full.disc * s;
       if (k === 4 && inRow) {                       // Veritas becomes the row's last coin
         fx = lerp(fx, L.row.xs[4], rowE);
-        fy = lerp(fy, L.row.y, rowE);
-        fd = lerp(fd, L.row.disc, rowE);
+        fy = lerp(fy, L.row.ys[4], rowE);
+        fd = lerp(fd, L.row.discs[4], rowE);
       }
       const F = fd / DISC;
       st.full.forEach((e, i) => { const on = i === k && !(inRow && rowP >= 1); if (e._on !== on) { e.style.display = on ? '' : 'none'; e._on = on; } });
@@ -224,9 +231,10 @@
       const rowVis = local >= T_ROW - 0.02;
       if (st._rv !== rowVis) { st.rowWrap.style.display = rowVis ? '' : 'none'; st._rv = rowVis; }
       if (rowVis) {
-        const rd = L.row.disc, rF = st.rowF, floorY = L.floor;
+        const R = L.row;
         for (let i = 0; i < 5; i++) {
-          let x, y = L.row.y, o = 1;
+          const rd = R.discs[i], rF = rd / DISC, floorY = L.floors[i];
+          let x, y = R.ys[i], o = 1;
           if (i === 4) {
             x = L.row.xs[4];
             o = rowP >= 1 ? 1 : 0;                // the full-frame Veritas element flies in; hand off on landing
@@ -235,7 +243,7 @@
             const d0 = T_ROW + 0.03 + (3 - i) * 0.02;
             const p = ease.outExpo(range(local, d0, d0 + 0.36));
             x = lerp(fx, L.row.xs[i], p);
-            y = lerp(fy, L.row.y, p);
+            y = lerp(fy, R.ys[i], p);
             o = range(local, d0, d0 + 0.04);
           }
           const bob = Math.sin((local - T_ROW) * 2.4 + i * 1.3) * 4 * range(local, T_ROW_END - 0.1, T_ROW_END + 0.2);
@@ -245,7 +253,7 @@
           // the sweep: a diagonal band at stage x = bandX crossing every coin in turn
           const sp = st.rowSpec[i];
           box(sp, x, cy, rF, 1600);
-          const bandX = lerp(L.row.xs[0] - rd * 1.2, L.row.xs[4] + rd * 1.2, ease.inOutSine(range(local, T_ROW_END - 0.06, 2.6)));
+          const bandX = lerp(R.xs[0] - R.discs[0] * 1.2, R.xs[4] + R.discs[4] * 1.2, ease.inOutSine(range(local, T_ROW_END - 0.06, 2.6)));
           const rel = (bandX - (x - rd / 2 / DISC)) / (rd / DISC) * 100;      // band position in the coin box, %
           if (rel > -40 && rel < 140 && local > T_ROW_END - 0.06) {
             sp.style.opacity = '0.9';
@@ -259,8 +267,8 @@
           st.pool[i].style.transform = 'translate3d(' + px(x - 200) + ',' + px(floorY - 50) + ',0) scale(' + (rd * 1.4 / 400).toFixed(4) + ',' + (rd * 0.3 / 100).toFixed(4) + ')';
           st.pool[i].style.opacity = (o * settled).toFixed(3);
         }
-        box(st.rowGlow, L.W / 2, L.row.y + rd * 0.15, 1000, 1000);
-        st.rowGlow.style.transform += ' scale(' + (L.P ? 1.25 : 1.9) + ',' + (L.P ? 0.55 : 0.62) + ')';
+        box(st.rowGlow, L.W / 2, L.glowY, 1000, 1000);
+        st.rowGlow.style.transform += ' scale(' + L.glowS[0] + ',' + L.glowS[1] + ')';
         st.rowGlow.style.opacity = ease.outCubic(range(local, T_ROW, T_ROW_END)).toFixed(3);
         // the arc of light draws through behind the row
         const ap = ease.inOutCubic(range(local, T_ROW, T_ROW + 0.36));
@@ -270,8 +278,8 @@
 
       // ── type ────────────────────────────────────────────────────────────────
       K.animText(st.title, local, 0.0, Infinity, { style: 'scale', stagger: 0.012, dur: 0.32 });
-      K.animText(st.desc, local, 1.0, Infinity, { style: 'rise', stagger: 0.05, dur: 0.5 });
-      if (L.P) st.desc.el.style.transform = 'translate3d(0,' + (lerp(0, 1330 - L.desc.y, ease.outCubic(range(local, T_ROW + 0.2, T_ROW + 0.42)))).toFixed(2) + 'px,0)';   // 9:16: tuck under the row
+      K.animText(st.desc, local, 0.5, Infinity, { style: 'rise', stagger: 0.025, dur: 0.34 });
+      if (L.P) st.desc.el.style.transform = 'translate3d(0,' + (lerp(0, L.desc.tuck - L.desc.y, ease.outCubic(range(local, T_ROW + 0.2, T_ROW + 0.42)))).toFixed(2) + 'px,0)';   // 9:16: tuck under the row
       // coin name: swaps on every cut with a short tracking-in; holds Veritas through the pull-back
       const nameOut = 1 - ease.inCubic(range(local, T_ROW + 0.1, T_ROW + 0.22));
       st.names.forEach((n, i) => {

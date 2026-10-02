@@ -43,7 +43,7 @@
     // 01 hook
     hookSweep: 0.0, caughtYourEye: 0.9, hookPullBack: 1.6,
     // 02 the five (hard cuts on the half-beats), pitched per coin
-    five: [2.5, 3.0, 3.5, 4.0, 4.5], fivePitch: [74, 77, 81, 84, 86], fiveRow: 4.3,
+    five: [2.5, 3.0, 3.5, 4.0, 4.5], fivePitch: [74, 77, 81, 84, 86], fiveRow: 4.6,   // the row snaps together 4.58-4.86 (02-five T_ROW)
     // 03 mint the one you love (premium groove 5.0-10.0)
     mint: 5.0, tapCoin: 5.8, sheet: 6.4, tapMint: 7.2, confirmed: 8.2, certificate: 8.6,
     // 04 or let the box choose
@@ -754,7 +754,7 @@
         whoosh(2.1, 0.42, 900, 4500, 0.1, 0.4, -0.2, { peak: 0.95 });                  // into the first cut
       }
 
-      // ---- 02 THE FIVE 2.5-5.0: one hit per half-beat cut, pitched per coin; 4.3 the chord (row of five)
+      // ---- 02 THE FIVE 2.5-5.0: one hit per half-beat cut, pitched per coin; 4.6 the chord as Veritas pulls back into the row of five
       await slice();
       {
         pad(2.5, 4.98, [50, 57, 62, 65, 69], 0.028, { a: 0.5, r: 0.04 });
@@ -769,7 +769,7 @@
         const t = C.fiveRow;
         chord(t, C.fivePitch, 0.085, { spread: 0.8, strum: 0.005, dec: 1.8, huge: 0.2 });   // the five coins' own notes, fanned L -> R like the row
         choir(t, 5.0, [50, 57, 62, 65, 69], 0.06, { a: 0.18, r: 0.25, huge: 0.4 });
-        whoosh(t - 0.15, 0.6, 3000, 10000, 0.05, -0.7, 0.7, { type: 'highpass', peak: 0.3, rev: 0.4 }); // light along the arc
+        whoosh(t + 0.02, 0.5, 3000, 10000, 0.05, -0.7, 0.7, { type: 'highpass', peak: 0.4, rev: 0.4 }); // light along the arc (arc draws 4.58-4.94, band sweeps 4.80-)
       }
 
       // ---- 03 MINT 5.0-10.0: premium groove (soft low pulse, warm pad, glass arp), UI taps, confirm chime

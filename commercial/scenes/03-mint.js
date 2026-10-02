@@ -18,6 +18,7 @@
   const COIN = S.ROLES.minted;                 // 'veritas'
   const ED = S.ROLES.mintedEdition || 7;
   const T0 = 4.85, T1 = 10.1;                  // scene window (overlaps 02 / 04)
+  const CUT_IN = 5.0;                         // hard cut on the downbeat out of the five-coin row (02 owns every frame before it)
   const CUT_OUT = 10.0;                        // hard cut on the downbeat into the sealed case
   const { clamp, lerp, range, ease } = K;
   const oq = ease.outQuint, oc = ease.outCubic, ioc = ease.inOutCubic, ios = ease.inOutSine;
@@ -32,7 +33,7 @@
 
   // Timeline (global seconds)
   const TL = {
-    phoneIn: [4.88, 5.6],
+    phoneIn: [5.0, 5.62],
     sheetUp: [5.08, 5.55],
     scroll: [5.38, 5.72],
     tapCoin: C.tapCoin,                        // 5.8
@@ -66,12 +67,14 @@
         L,
         // coin landing (over the receding phone) + chip under it
         coin: { x: 540, y: 742, D: 740 },
-        chipY: 1172, nameY: 1114,
+        chipY: 1184, nameY: 1104,
         // supers in the 9:16 top band (220 .. 450)
         sup: { x: 540, y: 335, align: 'center', size: 112, sizeSm: 34, w: 952 },
         smallY: 335,
         arc: { d: `M -120 1560 C 120 420, 900 300, 1200 980`, w: W, h: H },
-        phoneOut: { y: 720, s: 0.94, dim: 0.72 }
+        phoneOut: { y: 820, s: 0.92, dim: 0.78, o: 0.5 },
+        fadeY: [1330, 1560],                   // receded phone fades to nothing above the 1600 safe line
+        tag: { x: 64, y: 1596, size: 24 }      // disclosure micro-tag (same spot/style as 04)
       };
     }
     return {
@@ -81,7 +84,9 @@
       sup: { x: 1075, y: 520, align: 'left', size: 142, sizeSm: 24, w: 760 },
       smallY: 884,
       arc: { d: `M -140 1080 C 260 160, 1320 -60, 2060 700`, w: W, h: H },
-      phoneOut: { y: 30, s: 0.95, dim: 0.5 }
+      phoneOut: { y: 30, s: 0.95, dim: 0.5, o: 1 },
+      fadeY: null,
+      tag: { x: 116, y: 1012, size: 20 }
     };
   }
 
@@ -125,14 +130,23 @@
       [pulse, pulseG].forEach(p => { p.style.strokeDasharray = plen + ' ' + arcLen * 2; });
 
       /* ── the phone with the real app ─────────────────────────────────────── */
-      const ph = G.L.phone;
+      // The device rect: the shared layout's phone, sized/placed so the disclosure micro-tag (bottom-left,
+      // same spot as 04's) never touches it — in 9:16 the phone ends above the 1600 safe line.
+      const PH = P ? 1090 : G.L.phone.h, PW = Math.round(PH * 0.4615);
+      const PCX = P ? 540 : G.L.phone.cx + 44, PTOP = P ? 462 : G.L.phone.y;
+      const ph = { x: PCX - PW / 2, y: PTOP, w: PW, h: PH, cx: PCX, cy: PTOP + PH / 2 };
       const floor = K.el('div', { parent: root, style: `position:absolute;left:${ph.cx - ph.w * 0.95}px;top:${ph.y + ph.h - ph.h * 0.16}px;width:${ph.w * 1.9}px;height:${ph.h * 0.32}px;
         border-radius:50%;background:radial-gradient(closest-side,rgba(133,92,255,.34),rgba(119,147,255,.12) 55%,transparent);opacity:0;pointer-events:none` });
 
-      const phone = A.phone(root, ctx, { time: '9:41' });
+      const phone = A.phone(root, ctx, { time: '9:41', rect: ph });
       const scr = phone.screen;
-      const chooser = A.chooser(scr, { coins: S.ORDER, edition: 50 });
-      const checkout = A.checkout(scr, { coinId: COIN, edition: 50, button: 'Mint' });
+      const MINTAGE = (ctx.cfg && ctx.cfg.collection && ctx.cfg.collection.edition) || 50;
+      const COIN_NAME = (A.coin(COIN) && A.coin(COIN).name) || 'Veritas';
+      // illustrative, even counts (no "only 9 left" scarcity read); Veritas matches the checkout's "19 of 50"
+      const chooser = A.chooser(scr, { coins: S.ORDER, edition: MINTAGE,
+        leftCounts: { silence: 21, ametherion: 24, cycle: 23, dominion: 22, veritas: 19 } });
+      const checkout = A.checkout(scr, { coinId: COIN, edition: MINTAGE, button: 'Mint' });
+      const legal = checkout.sheet.querySelector('.bva-legal');
       const dim = K.el('div', { parent: scr, style: 'position:absolute;inset:0;background:#05060c;opacity:0;pointer-events:none;z-index:30' });
       const glassWrap = K.el('div', { parent: scr, style: 'position:absolute;inset:0;pointer-events:none;z-index:44;overflow:hidden' });
       const glass = K.el('div', { parent: glassWrap, style: `position:absolute;left:0;top:-50%;width:55%;height:200%;opacity:0;will-change:transform,opacity;
@@ -153,7 +167,18 @@
       const vcard = chooser.cards[COIN].card;
       const vbox = A.pos(vcard, chooser.sheet);
       const needScroll = Math.max(0, (vbox.y + vbox.h + 22 * k - sheetBox.h) / k);
-      const scrollPx = Math.min(needScroll, chooser.maxScroll ? chooser.maxScroll() + 4 : needScroll);
+      // never stop with a line of the header/intro half-sliced at the sheet's top edge: scroll to exactly
+      // the top of the card grid (header + intro fully gone), as long as Veritas stays fully in view
+      const sheetIn = chooser.sheet.querySelector('.bva-sheet-in');
+      const grid = chooser.sheet.querySelector('.bva-grid');
+      const headEls = [chooser.sheet.querySelector('.bva-ch-head'), chooser.sheet.querySelector('.bva-intro')].filter(Boolean);
+      const gridTop = grid ? (A.pos(grid, chooser.sheet).y / k) - 10 : needScroll;
+      const maxS = chooser.maxScroll ? chooser.maxScroll() : Infinity;
+      const scrollPx = Math.min(Math.max(needScroll, gridTop), Math.max(needScroll, maxS));
+
+      // 9:16: as the phone recedes it sinks into the dark well before the 1600 safe line
+      const fadeOv = G.fadeY ? K.el('div', { parent: root, style: `position:absolute;left:0;right:0;top:${G.fadeY[0]}px;bottom:0;pointer-events:none;opacity:0;
+        background:linear-gradient(180deg,rgba(8,10,18,0) 0px,rgba(8,10,18,.82) ${(G.fadeY[1] - G.fadeY[0]) * 0.6}px,#080A12 ${G.fadeY[1] - G.fadeY[0]}px)` }) : null;
 
       /* ── coin flight (canvas over everything) ───────────────────────────── */
       const coinGlow = K.el('div', { parent: root, style: `position:absolute;left:0;top:0;width:${G.coin.D * 1.6}px;height:${G.coin.D * 1.6}px;margin:${-G.coin.D * 0.8}px 0 0 ${-G.coin.D * 0.8}px;
@@ -176,12 +201,12 @@
       });
 
       /* ── name + certificate chip under the coin ─────────────────────────── */
-      const chipK = P ? 1.62 : 1.38;
-      const name = K.el('div', { parent: root, html: 'VERITAS', style: `position:absolute;left:${G.coin.x}px;top:${G.nameY}px;transform:translate(-50%,-50%);
-        font:600 ${P ? 26 : 21}px 'Geist',system-ui,sans-serif;letter-spacing:.34em;padding-left:.34em;color:${SEC};white-space:nowrap;opacity:0` });
+      const chipK = P ? 2.15 : 1.38;
+      const name = K.el('div', { parent: root, text: COIN_NAME.toUpperCase(), style: `position:absolute;left:${G.coin.x}px;top:${G.nameY}px;transform:translate(-50%,-50%);
+        font:600 ${P ? 34 : 21}px 'Geist',system-ui,sans-serif;letter-spacing:.34em;padding-left:.34em;color:${SEC};white-space:nowrap;opacity:0` });
       const chipWrap = K.el('div', { parent: root, style: `position:absolute;left:${G.coin.x}px;top:${G.chipY}px;width:0;height:0` });
       const chipIn = K.el('div', { parent: chipWrap, style: 'position:absolute;left:0;top:0;transform:translate(-50%,-50%)' });
-      const chip = A.record(chipIn, { coinId: COIN, edition: ED, mintage: 50, variant: 'chip', scale: chipK });
+      const chip = A.record(chipIn, { coinId: COIN, edition: ED, mintage: MINTAGE, variant: 'chip', scale: chipK });
       chip.show(0);
 
       /* ── supers ─────────────────────────────────────────────────────────── */
@@ -210,7 +235,12 @@
           tw: 6 + R() * 14, ph: R() * 6, col: (i % 7 === 6) ? 2 : (i % 4 === 3) ? 1 : 0 });
       }
 
-      return { G, P, a0, trail, sprites, glass, svg, glowG, core, halo, pulse, pulseG, arcLen, floor, phone, chooser, checkout, dim, touch, flow,
+      // disclosure micro-tag: same style/position/size as 04's, so the hand-off at 10.0 is seamless
+      const tag = K.el('div', { parent: root, text: 'Dramatisation · app screens illustrative',
+        style: `position:absolute;left:0;top:0;transform-origin:0 0;white-space:nowrap;z-index:60;
+          font:500 ${G.tag.size}px 'Geist',system-ui,sans-serif;letter-spacing:.04em;color:${K.rgba(SEC, 0.78)};opacity:0` });
+
+      return { tag, fadeOv, legal, headEls, G, P, a0, trail, sprites, glass, svg, glowG, core, halo, pulse, pulseG, arcLen, floor, phone, chooser, checkout, dim, touch, flow,
         pieceArt, pieceImg, scrollPx, coinGlow, bloom, cv, cx2, glitter, dust, name, chipWrap, chip, sFall, sMint, sSmall, bg };
     },
 
@@ -219,11 +249,13 @@
       const root = s.svg.parentNode;
 
       /* scene in / out */
-      const vin = range(t, 4.95, 5.0);            // near-hard cut on the downbeat (no double exposure with 02)
-      root.style.opacity = t >= CUT_OUT ? 0 : vin;
+      root.style.opacity = (t < CUT_IN || t >= CUT_OUT) ? 0 : 1;   // hard cuts on both downbeats
+      // 9:16: wait until the rising phone has cleared the tag's line, then the same 0.2 s fade
+      const tagIn = P ? 5.32 : CUT_IN;
+      s.tag.style.opacity = (0.95 * ios(range(t, tagIn, tagIn + 0.2))).toFixed(3);
 
       /* ── arc of light: draws in across the frame, then breathes ─────────── */
-      const draw = oq(range(t, 4.95, 5.85));
+      const draw = oq(range(t, CUT_IN, 5.85));
       const off = s.arcLen * (1 - draw);
       s.core.style.strokeDashoffset = off; s.halo.style.strokeDashoffset = off;
       s.glowG.setAttribute('opacity', (draw * (0.75 + 0.25 * Math.sin((t - 5) * 2.2)) + 0.35 * K.env(t, 8.18, 8.3, 8.6, 9.4)).toFixed(3));
@@ -244,7 +276,8 @@
       const pS = (0.9 + 0.1 * pin) * (1 - (1 - G.phoneOut.s) * prc);
       const pRx = (1 - pin) * 22;
       const pRy = (P ? 0 : -6 * (1 - pin)) + (P ? 0 : 3.5 * ios(range(t, 5.4, 9.5)));
-      s.phone.set({ x: P ? 0 : -prc * 40, y: pY, s: pS, rx: pRx, ry: pRy, o: 1, glow: 0.2 + 0.25 * pin - 0.1 * prc });
+      s.phone.set({ x: P ? 0 : -prc * 40, y: pY, s: pS, rx: pRx, ry: pRy, o: 1 - (1 - G.phoneOut.o) * prc, glow: 0.2 + 0.25 * pin - 0.1 * prc });
+      if (s.fadeOv) s.fadeOv.style.opacity = oc(range(t, 8.2, 8.62)).toFixed(3);
       s.floor.style.opacity = (0.9 * pin * (1 - 0.4 * prc)).toFixed(3);
       s.dim.style.opacity = (G.phoneOut.dim * prc).toFixed(3);
 
@@ -258,7 +291,11 @@
 
       /* ── screen: chooser -> tap Veritas -> checkout -> tap Mint -> rail ── */
       s.chooser.open(range(t, TL.sheetUp[0], TL.sheetUp[1]));
-      s.chooser.scroll(s.scrollPx * ioc(range(t, TL.scroll[0], TL.scroll[1])));
+      const scp = ioc(range(t, TL.scroll[0], TL.scroll[1]));
+      s.chooser.scroll(s.scrollPx * scp);
+      // the header + intro dissolve as they scroll under the top edge (never a half-cut line)
+      const hf = (1 - ios(range(scp, 0.0, 0.42))).toFixed(3);
+      s.headEls.forEach(e => { e.style.opacity = hf; });
       s.chooser.press(COIN, range(t, TL.tapCoin - 0.1, TL.tapCoin + 0.32));
       s.chooser.highlight(COIN, oc(range(t, TL.lift[0], TL.lift[1])));
       const focus = oc(range(t, 5.86, 6.25));
@@ -268,6 +305,12 @@
       s.checkout.press(range(t, TL.tapMint - 0.08, TL.tapMint + 0.42));
       const sv = t < TL.stage[0] ? -1 : 5.3 * range(t, TL.stage[0], TL.stage[1] + 0.05);
       s.checkout.stage(sv);
+      // "You haven't been charged." belongs to the review step only: gone from the Mint tap on
+      if (s.legal) {
+        const lg = 1 - range(t, TL.tapMint + 0.05, TL.tapMint + 0.15);
+        s.legal.style.opacity = lg.toFixed(3);
+        s.legal.style.visibility = lg > 0.001 ? '' : 'hidden';
+      }
 
       // touch ring: Veritas card, then the gold Mint button
       const scr = s.phone.screen;
@@ -349,11 +392,32 @@
       /* ── camera: slow push across the beat ──────────────────────────────── */
       BV.camera.s *= 1 + 0.025 * ios(range(t, 5.0, 10.0));
       // push in on the checkout while it works, release as the coin flies out
-      BV.camera.s *= 1 + 0.045 * ios(range(t, 6.3, 8.1)) * (1 - oc(range(t, 8.15, 8.9)));
+      // (16:9 only: in 9:16 the push would drive the phone's bottom edge into the micro-tag / bottom safe zone)
+      if (!P) BV.camera.s *= 1 + 0.045 * ios(range(t, 6.3, 8.1)) * (1 - oc(range(t, 8.15, 8.9)));
       // into the cut: the coin leans in, the frame darkens around it
       if (t >= 9.7) BV.fx.vignette(0.55 * ease.inCubic(range(t, 9.7, CUT_OUT)));
+
+      // keep the micro-tag rock-steady on screen (cancel the camera push / shake, like 04's type layer)
+      steady(s.tag, G.tag.x, G.tag.y, W, H);
     }
   });
+
+  // Place el so its bottom-left lands at stage (px, py) on screen at scale 1, whatever BV.camera does
+  // (mirrors film.js applyCamera: world transform-origin 50% 50%, translate then scale, over-scan).
+  function steady(el, px, py, W, H) {
+    const c = BV.camera || {};
+    const x = +c.x || 0, y = +c.y || 0, r = +c.r || 0;
+    let sc = c.s == null ? 1 : +c.s;
+    if (!isFinite(sc) || sc <= 0) sc = 1;
+    if (c.overscan !== false && (x || y || r)) {
+      const rr = Math.abs(r) * Math.PI / 180;
+      const asp = Math.max(W / H, H / W);
+      const cover = Math.max(1 + 2 * Math.abs(x) / W, 1 + 2 * Math.abs(y) / H) * (Math.cos(rr) + asp * Math.sin(rr));
+      sc = sc >= 1 ? Math.max(sc, cover) : sc * cover;
+    }
+    const qx = W / 2 + (px - W / 2 - x) / sc, qy = H / 2 + (py - H / 2 - y) / sc;
+    el.style.transform = `translate(${qx.toFixed(2)}px,${qy.toFixed(2)}px) scale(${(1 / sc).toFixed(5)}) translateY(-100%)`;
+  }
 
   // Flight path (pure function of global time): out of the screen, towards camera, landing on its float spot.
   function flight(s, t) {

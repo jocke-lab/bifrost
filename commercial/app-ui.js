@@ -602,7 +602,9 @@
     const busy = h('div', 'bva-busy', `<span class="bva-spin"></span><span>Confirming your purchase…</span>`, btn.el);
     const spin = busy.firstChild;
     const okl = h('div', 'bva-busy', `<span style="width:calc(20*var(--u));height:calc(20*var(--u));border-radius:50%;background:${T.onGold};color:${T.gold};display:grid;place-items:center">${icons.check.replace('<svg ', '<svg style="width:calc(12*var(--u));height:calc(12*var(--u))" ')}</span><span>Payment confirmed</span>`, btn.el);
-    h('p', 'bva-legal', 'You haven’t been charged.', action);
+    // Real CheckoutFlow shows this line on the review step only: it must never sit under
+    // "Confirming your purchase…" / "Payment confirmed" (stage(v) hides it for v >= 0).
+    const legal = h('p', 'bva-legal', 'You haven’t been charged.', action);
     let openP = 1;
     function applyOpen() {
       const e = oQuint(openP);
@@ -618,6 +620,7 @@
         if (v == null || v < 0) {
           prog.el.style.opacity = 0; optWrap.style.opacity = ''; optWrap.style.transform = '';
           btn.label.style.opacity = ''; busy.style.opacity = 0; okl.style.opacity = 0; btn.el.style.opacity = '';
+          legal.style.opacity = ''; legal.style.visibility = '';
           return;
         }
         const a = oCubic(range(v, 0, 0.35));
@@ -628,6 +631,9 @@
         btn.label.style.opacity = 1 - a;
         busy.style.opacity = a * (1 - done);
         okl.style.opacity = done;
+        const lg = 1 - oCubic(range(v, 0, 0.18));   // gone before the busy label reads
+        legal.style.opacity = lg;
+        legal.style.visibility = lg > 0.001 ? '' : 'hidden';
         spin.style.transform = `rotate(${v * 400}deg)`;
         btn.el.style.opacity = 1 - 0.38 * a * (1 - done);
       },

@@ -17,12 +17,32 @@
      BV.scene(def)  BV.ready  BV.seek(t)  BV.play()  BV.pause()  BV.playing
      BV.on(evt, fn)  (events: 'time', 'play', 'pause', 'end', 'format')
      BV.setFormat('landscape'|'portrait')  BV.chapters [{t,label}]
+                       A chapter's t is the scene's VISIBLE cut, not its registration start:
+                       def.chapterAt when given; otherwise, for a scene that cross-fades in over
+                       the previous chaptered scene, the first BVShared.CUES time inside that
+                       overlap (03 4.85 -> 5.0, 04 9.9 -> 10.0, 05 19.9 -> 20.0, 06 24.75 -> 25.0).
 
    ADDITIONS (documented, non-breaking)
-     BV.preload(x)     x = Promise | <img> | array of those. BV.ready (and the promise
-                       returned by setFormat) wait for every registered preload.
-                       Every <img> inside the stage is also decoded automatically.
-                       Timeout: 120 s in render mode, 30 s on the page (then a console warning).
+     BV.preload(x)     x = Promise | <img> | array of those. A preload made while a scene's
+                       build() runs belongs to THAT scene (as does every <img> in its root,
+                       decoded automatically); any other preload is global.
+                       Render mode (?render=1): every scene is built and BV.ready waits for
+                       every preload, exactly as before (timeout 120 s).
+                       Page mode (staged loading): BV.ready waits only for the global preloads
+                       and the scenes that start within the first FILM.readyLead (9.5) s of the
+                       start time (01-03 from 0), so autoplay starts after ~a third of the bytes.
+                       The other scenes are then built and loaded in the background, one at a
+                       time in film order (each waits for the previous one's assets, so the next
+                       cut always gets the bandwidth first). Playback never draws a frame whose
+                       scenes are still loading: it holds on the last complete frame instead
+                       (BV.waiting) and resumes by itself. A paused seek into a loading scene
+                       builds it at once and covers the picture with a loading veil until its
+                       assets are decoded. Page timeout per scene: 30 s (then a console warning).
+     BV.waiting        true while playback is held for assets. BV.playing stays true (the
+                       viewer's intent, like <video> 'waiting'); the engine emits
+                       'waiting'(true) + 'pause' (so the soundtrack stops in step) and, when the
+                       assets land, 'waiting'(false) + 'play' and carries on from the held frame.
+                       BV.pause() during a hold cancels it.
      BV.fx             film finish, RESET BY THE ENGINE AT THE START OF EVERY SEEK, then
                        driven by scenes inside update() (so it stays deterministic):
                          fx.flash(intensity 0..1, color='white'|'aurora'|'gold'|css)  (max wins)
@@ -72,8 +92,14 @@
   let sorted = [];                 // by z, then registration order
   let order = 0;
   const listeners = {};
-  let pending = [];                // preload promises
+  const G = { id: '(global)', pend: [] };   // preloads made outside any scene build
+  let building = null;             // scene whose build() is running (preload attribution)
+  let pumping = false;             // background builder busy
   let built = false, booted = false;
+  // Page mode: BV.ready covers the scenes that start within this lead of the start time.
+  const READY_LEAD = RENDER ? Infinity : (isFinite(+FILM.readyLead) && +FILM.readyLead > 0 ? +FILM.readyLead : 9.5);
+  let drawnComplete = true;        // page mode: the last drawn frame had all its scenes loaded
+  let stallT = 0;                  // page mode: the time playback is waiting to draw
   let viewport = null, stage = null, world = null, fxRoot = null;
   const fxEl = {};
   let rafId = 0, clockT0 = 0, clockW0 = 0;
@@ -85,7 +111,7 @@
     duration: +FILM.duration || 30,
     fps: +FILM.fps || 30,
     render: RENDER,
-    t: 0, frame: 0, playing: false, scale: 1,
+    t: 0, frame: 0, playing: false, waiting: false, scale: 1,
     chapters: [], scenes: defs,
     root: null, world: null, params,
     clock: null,
@@ -134,7 +160,8 @@
       end: def.end == null ? BV.duration : +def.end,
       z: def.z == null ? defs.length : +def.z,
       order: order++,
-      root: null, state: undefined, ctx: null, vis: false, broken: false
+      root: null, state: undefined, ctx: null, vis: false, broken: false,
+      pend: [], loadP: null, loaded: false, warm: false   // per-scene preloads (see BV.preload)
     };
     const dup = defs.findIndex(d => d.id === s.id);
     if (dup >= 0) {
@@ -144,18 +171,40 @@
     }
     defs.push(s);
     sortScenes();
-    BV.chapters = defs.filter(d => d.def.chapter)
-      .map(d => ({ t: d.start, label: String(d.def.chapter), id: d.id }))
-      .sort((a, b) => a.t - b.t);
+    buildChapters();
     if (built) {                   // late registration: build now, keep DOM in z order
-      buildScene(s, makeCtx());
-      placeRoot(s);
-      queueImages(s.root);
+      buildOne(s);
       apply(BV.t);
     }
     return s;
   }
   function sortScenes() { sorted = defs.slice().sort((a, b) => (a.z - b.z) || (a.order - b.order)); }
+
+  // Chapter marks sit on each scene's VISIBLE cut. Scenes cross-fade in, so a scene's
+  // registration start (4.85) can precede its cut (5.0) while the previous scene is still on
+  // screen; def.chapterAt wins, else the first shared cue inside the overlap, else its middle.
+  function cueTimes() {
+    const C = (window.BVShared && window.BVShared.CUES) || {};
+    const out = [];
+    Object.keys(C).forEach(k => [].concat(C[k]).forEach(v => { if (typeof v === 'number' && isFinite(v)) out.push(v); }));
+    return out.sort((a, b) => a - b);
+  }
+  function chapterTime(s, chaptered, cues) {
+    const at = s.def.chapterAt;
+    if (at != null && at !== '' && isFinite(+at)) return clamp(+at, 0, BV.duration);
+    let prevEnd = -Infinity;
+    chaptered.forEach(o => { if (o !== s && o.start < s.start && o.end > s.start) prevEnd = Math.max(prevEnd, o.end); });
+    if (!(prevEnd > s.start)) return s.start;
+    const cue = cues.find(v => v >= s.start - 1e-6 && v <= prevEnd + 1e-6);
+    return cue != null ? cue : Math.round((s.start + prevEnd) * 10) / 20;
+  }
+  function buildChapters() {
+    const chaptered = defs.filter(d => d.def.chapter);
+    const cues = cueTimes();
+    BV.chapters = chaptered
+      .map(d => ({ t: chapterTime(d, chaptered, cues), label: String(d.def.chapter), id: d.id }))
+      .sort((a, b) => a.t - b.t);
+  }
 
   function makeCtx() {
     return {
@@ -170,57 +219,134 @@
     root.className = 'bv-scene';
     root.setAttribute('data-scene', s.id);
     root.style.cssText = 'position:absolute;left:0;top:0;width:' + BV.W + 'px;height:' + BV.H + 'px;z-index:' + s.z + ';';
-    world.appendChild(root);       // displayed during build so layout can be measured
-    s.root = root; s.vis = true; s.broken = false; s.state = undefined;
-    s.ctx = Object.assign({}, baseCtx);
-    if (typeof s.def.build === 'function') {
-      try { s.state = s.def.build(root, s.ctx); }
-      catch (e) { s.broken = true; report(s, e, 'build'); }
-    }
-  }
-  function placeRoot(s) {
+    // Insert in z order (before the next built scene), displayed during build so layout can be measured.
     const i = sorted.indexOf(s);
     const next = sorted.slice(i + 1).find(o => o.root && o.root.parentNode === world);
-    world.insertBefore(s.root, next ? next.root : null);
+    world.insertBefore(root, next ? next.root : null);
+    s.root = root; s.vis = true; s.broken = false; s.state = undefined;
+    s.ctx = Object.assign({}, baseCtx);
+    const prev = building;
+    building = s;                  // preloads made during build() belong to this scene
+    try {
+      if (typeof s.def.build === 'function') {
+        try { s.state = s.def.build(root, s.ctx); }
+        catch (e) { s.broken = true; report(s, e, 'build'); }
+      }
+      queueImages(root, s);
+    } finally { building = prev; }
   }
 
-  function buildAll() {
+  // Build one scene into the live world (late registration, background builder, on-demand).
+  function buildOne(s) {
+    buildScene(s, makeCtx());
+    s.root.style.display = 'none'; s.vis = false;
+    track(s);
+  }
+
+  // (Re)build: clears the world, builds `list` (all scenes in render mode), leaves the rest unbuilt.
+  function buildSet(list) {
     world.textContent = '';
     errs.clear();
-    const ctx = makeCtx();
     sortScenes();
-    sorted.forEach(s => buildScene(s, ctx));
-    sorted.forEach(s => { s.root.style.display = 'none'; s.vis = false; });
-    queueImages(world);
+    defs.forEach(s => { s.root = null; s.vis = false; s.state = undefined; s.loaded = false; });
+    const ctx = makeCtx();
+    sorted.forEach(s => { if (list.indexOf(s) >= 0) buildScene(s, ctx); });
+    sorted.forEach(s => { if (s.root) { s.root.style.display = 'none'; s.vis = false; track(s); } });
     built = true;
   }
 
-  /* ── Preload ─────────────────────────────────────────────────────────────── */
-  function preload(x) {
-    if (!x) return;
-    if (Array.isArray(x)) { x.forEach(preload); return; }
-    if (typeof x.decode === 'function' && x.tagName === 'IMG') {
-      pending.push(x.decode().catch(() => {}));
-    } else if (typeof x.then === 'function') {
-      pending.push(Promise.resolve(x).catch(e => console.warn('[BV] preload failed:', e)));
-    }
+  // Scenes BV.ready / setFormat wait for: render mode all; page mode those that start within
+  // READY_LEAD of t (01-03 from 0) plus whatever is on screen at t.
+  function headScenes(t) {
+    if (RENDER) return defs.slice();
+    return defs.filter(s => (s.start < t + READY_LEAD && s.end > t) || visibleAt(s, t, remaps.length ? evalTime(t) : t));
   }
-  function queueImages(rootEl) {
+
+  /* ── Preload ─────────────────────────────────────────────────────────────── */
+  function preload(x, owner) {
+    if (!x) return;
+    const o = owner && Array.isArray(owner.pend) ? owner : (building || G);   // (forEach(BV.preload) passes an index)
+    if (Array.isArray(x)) { x.forEach(v => preload(v, o)); return; }
+    let p = null;
+    if (typeof x.decode === 'function' && x.tagName === 'IMG') p = x.decode().catch(() => {});
+    else if (typeof x.then === 'function') p = Promise.resolve(x).catch(e => console.warn('[BV] preload failed:', e));
+    if (p) o.pend.push(p);
+  }
+  function queueImages(rootEl, owner) {
     if (!rootEl) return;
-    rootEl.querySelectorAll('img').forEach(img => { if (img.src) preload(img); });
+    rootEl.querySelectorAll('img').forEach(img => { if (img.src) preload(img, owner); });
   }
   // Render mode must never start capturing before assets are decoded; the page gives up sooner.
   const PRELOAD_TIMEOUT = RENDER ? 120000 : 30000;
-  async function settle(timeout = PRELOAD_TIMEOUT) {
-    for (let round = 0; round < 4 && pending.length; round++) {
-      const list = pending; pending = [];
+  async function settle(h, timeout = PRELOAD_TIMEOUT) {
+    for (let round = 0; round < 4 && h.pend.length; round++) {
+      const list = h.pend; h.pend = [];
       let done = false, timer = 0;
       await Promise.race([
         Promise.all(list).then(() => { done = true; }),
-        new Promise(r => { timer = setTimeout(() => { if (!done) console.warn('[BV] preload timeout after ' + timeout + 'ms'); r(); }, timeout); })
+        new Promise(r => { timer = setTimeout(() => { if (!done) console.warn('[BV] preload timeout after ' + timeout + 'ms (' + h.id + ')'); r(); }, timeout); })
       ]);
       clearTimeout(timer);
     }
+  }
+  // Start (or extend) a scene's load. Loads chain, so `loaded` only turns true once every preload
+  // the scene ever registered has settled (a rebuild may not re-register module-cached images).
+  function track(s) {
+    const cur = settle(s);
+    const p = s.loadP = (s.loadP ? Promise.all([s.loadP, cur]) : cur).then(() => {
+      if (s.loadP !== p) return;
+      s.loaded = s.warm = true;
+      onLoaded(s);
+    });
+    s.loaded = false;
+    return p;
+  }
+  function settleScenes(list) {
+    return Promise.all([settle(G)].concat(list.map(s => s.loadP))).then(() => settle(G));
+  }
+
+  // Scenes on screen at t that may not be drawn yet: unbuilt, or never fully loaded. (A rebuild
+  // after a format switch reuses decoded/cached assets — `warm` — and does not hold playback.)
+  function visibleAt(s, t, te) {
+    const ts = s.def.noRemap ? t : te;
+    return !s.broken && ((ts >= s.start && ts < s.end) || (ts >= BV.duration && s.end >= BV.duration && ts >= s.start));
+  }
+  function blockers(t) {
+    t = clamp(+t || 0, 0, BV.duration);
+    const te = remaps.length ? evalTime(t) : t;
+    const out = [];
+    for (let i = 0; i < defs.length; i++) {
+      const s = defs[i];
+      if (visibleAt(s, t, te) && !(s.root && (s.loaded || s.warm))) out.push(s);
+    }
+    return out;
+  }
+  function ensureBuilt(list) { list.forEach(s => { if (!s.root) buildOne(s); }); }
+
+  function onLoaded() {
+    if (RENDER || !booted) return;
+    if (BV.waiting) { if (!blockers(stallT).length) resume(); else refreshCover(); }
+    else if (!BV.playing && !drawnComplete && !blockers(BV.t).length) apply(BV.t);   // paused on a veiled frame
+  }
+
+  // Background builder (page mode): builds the remaining scenes one at a time, the next cut first,
+  // each waiting (bounded) for the previous one's assets so bandwidth goes where playback needs it.
+  const idle = fn => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 250 }) : setTimeout(fn, 32));
+  function nextUnbuilt() {
+    const rest = defs.filter(s => !s.root);
+    if (!rest.length) return null;
+    const ahead = rest.filter(s => s.end > BV.t).sort((a, b) => a.start - b.start);
+    return ahead[0] || rest.sort((a, b) => a.start - b.start)[0];
+  }
+  function pump() {
+    if (RENDER || pumping || !nextUnbuilt()) return;
+    pumping = true;
+    idle(() => {
+      const s = nextUnbuilt();
+      if (!s) { pumping = false; return; }
+      buildOne(s);
+      Promise.race([s.loadP, delay(PRELOAD_TIMEOUT)]).then(() => { pumping = false; pump(); });
+    });
   }
 
   /* ── DOM ─────────────────────────────────────────────────────────────────── */
@@ -270,10 +396,50 @@
     sizeStage();
 
     if (!RENDER) {
+      setupCover();
       if (typeof ResizeObserver === 'function') new ResizeObserver(fit).observe(viewport);
       window.addEventListener('resize', fit);
       document.addEventListener('fullscreenchange', fit);
     }
+  }
+
+  // Page-only loading veil (never in render mode, outside the stage): 'cover' hides a frame whose
+  // scenes are still loading (paused seek); 'stall' shows a spinner over the held frame, after a
+  // short grace so a quick hold does not flash.
+  const cover = { el: null, spin: null, mode: 'none', timer: 0 };
+  function setupCover() {
+    const el = document.createElement('div');
+    el.className = 'bv-wait';
+    el.setAttribute('aria-hidden', 'true');
+    el.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;z-index:4;pointer-events:none;display:none;';
+    const spin = document.createElement('div');
+    spin.style.cssText = 'position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;box-sizing:border-box;' +
+      'border-radius:50%;border:2px solid rgba(255,255,255,.10);border-top-color:var(--cyan,#19D3FF);border-right-color:var(--violet,#7C5CFF);';
+    el.appendChild(spin);
+    viewport.appendChild(el);
+    if (typeof spin.animate === 'function') {
+      try { spin.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], { duration: 900, iterations: Infinity }); } catch (e) { /* static ring */ }
+    }
+    cover.el = el; cover.spin = spin;
+  }
+  function showCover(mode) {
+    const el = cover.el; if (!el) return;
+    if (mode === 'cover') {
+      el.style.background = 'radial-gradient(60% 50% at 50% 55%,rgba(77,141,255,.14),transparent 70%),#05070D';
+      el.style.display = '';
+    } else if (mode === 'stall') {
+      el.style.background = 'rgba(5,7,13,.38)';
+      el.style.display = '';
+    } else el.style.display = 'none';
+  }
+  function refreshCover() {
+    if (!cover.el) return;
+    const mode = !booted ? 'none' : !drawnComplete ? 'cover' : BV.waiting ? 'stall' : 'none';
+    if (mode === cover.mode) return;
+    cover.mode = mode;
+    clearTimeout(cover.timer);
+    if (mode === 'stall') cover.timer = setTimeout(() => { if (cover.mode === 'stall') showCover('stall'); }, 350);
+    else showCover(mode);
   }
 
   // Deterministic grain tile (256px, fixed seed). Grain is the most expensive thing in the
@@ -435,12 +601,17 @@
     BV.frame = Math.floor(t * BV.fps + 1e-6);
     resetFx();
     const te = remaps.length ? evalTime(t) : t;          // scene-evaluation time (remapped)
+    let complete = true;
     for (let i = 0; i < sorted.length; i++) {
       const s = sorted[i];
-      if (!s.root) continue;
-      const ts = s.def.noRemap ? t : te;
       // Visible iff start <= t < end; the final frame holds scenes that run to the end.
-      const vis = !s.broken && ((ts >= s.start && ts < s.end) || (ts >= BV.duration && s.end >= BV.duration && ts >= s.start));
+      const ts = s.def.noRemap ? t : te;
+      const vis = visibleAt(s, t, te);
+      if (!s.root) {
+        if (!vis || !built) continue;
+        buildOne(s);                                      // page mode: not built yet -> build on demand
+      }
+      if (vis && !s.loaded && !s.warm) complete = false;
       if (vis !== s.vis) { s.root.style.display = vis ? '' : 'none'; s.vis = vis; }
       if (vis && typeof s.def.update === 'function') {
         try { s.def.update(s.state, ts - s.start, ts, s.ctx); }
@@ -448,13 +619,50 @@
       }
     }
     if (stage) { applyFx(); applyCamera(); }
+    if (!RENDER) { drawnComplete = complete; refreshCover(); }
     emit('time', t);
     return t;
   }
 
+  // Page mode: can playback draw t? Builds what is missing; false = hold (assets still loading).
+  function canDraw(t) {
+    if (RENDER || !built) return true;
+    const b = blockers(t);
+    if (!b.length) return true;
+    ensureBuilt(b);
+    return !blockers(t).length;
+  }
+  // Hold playback on the last drawn (complete) frame until the scenes at t have loaded.
+  function stall(t) {
+    stallT = t;
+    cancelAnimationFrame(rafId);
+    if (!BV.waiting) {
+      BV.waiting = true;
+      emit('waiting', true);
+      emit('pause');            // BV.playing stays true: media listeners stop, the UI keeps 'playing'
+    }
+    refreshCover();
+  }
+  function resume() {
+    if (!BV.waiting) return;
+    BV.waiting = false;
+    emit('waiting', false);
+    refreshCover();
+    if (!BV.playing) return;
+    clockT0 = BV.t; clockW0 = performance.now();
+    emit('play');
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(tick);
+  }
+
   function seek(t) {
     apply(t);
-    if (BV.playing) { clockT0 = BV.t; clockW0 = performance.now(); }
+    if (BV.playing) {
+      clockT0 = BV.t; clockW0 = performance.now();
+      if (BV.waiting) {         // re-aim the hold at the new time (or resume if it is ready)
+        if (canDraw(BV.t)) resume(); else stall(BV.t);
+      }
+    }
     return BV.t;
   }
 
@@ -463,6 +671,7 @@
     if (BV.t >= BV.duration - 1e-3) apply(0);
     BV.playing = true;
     clockT0 = BV.t; clockW0 = performance.now();
+    if (!canDraw(BV.t)) { stall(BV.t); return; }
     emit('play');
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(tick);
@@ -472,23 +681,26 @@
     if (!BV.playing) return;
     BV.playing = false;
     cancelAnimationFrame(rafId);
+    if (BV.waiting) { BV.waiting = false; emit('waiting', false); refreshCover(); }
     emit('pause');
   }
 
   function toggle() { if (BV.playing) pause(); else play(); }
 
   function tick() {
-    if (!BV.playing) return;
+    if (!BV.playing || BV.waiting) return;
     let t = NaN;
     if (typeof BV.clock === 'function') { try { t = +BV.clock(); } catch (e) { t = NaN; } }
     if (!isFinite(t)) t = clockT0 + Math.max(0, performance.now() - clockW0) / 1000;
     if (t >= BV.duration) {
+      if (!canDraw(BV.duration)) { stall(BV.duration); return; }
       apply(BV.duration);
       BV.playing = false;
       emit('pause');
       emit('end');
       return;
     }
+    if (!canDraw(t)) { stall(t); return; }
     apply(t);
     rafId = requestAnimationFrame(tick);
   }
@@ -506,10 +718,12 @@
     sizeStage();
     resetFx();
     applyCamera();
-    buildAll();
+    const head = headScenes(BV.t);   // render: every scene; page: the next ~10 s, rest in the background
+    buildSet(head);
     apply(BV.t);
     emit('format', BV.format);
-    return settle().then(() => { apply(BV.t); return nextPaint(); }).then(() => BV);
+    pump();
+    return settleScenes(head).then(() => { apply(BV.t); return nextPaint(); }).then(() => BV);
   }
 
   function nextPaint() {
@@ -545,10 +759,13 @@
     try {
       setupDOM();
       await fontsReady();
-      buildAll();
-      await settle();
-      const t0 = parseFloat(params.get('t'));
-      apply(isFinite(t0) ? t0 : 0);
+      buildChapters();               // BVShared (cue sheet) is loaded by now
+      let t0 = parseFloat(params.get('t'));
+      t0 = isFinite(t0) ? clamp(t0, 0, BV.duration) : 0;
+      const head = headScenes(t0);   // render mode: every scene (unchanged contract)
+      buildSet(head);
+      await settleScenes(head);
+      apply(t0);
       await nextPaint();
     } catch (e) {
       console.error('[BV] boot failed:', e);
@@ -556,6 +773,8 @@
     booted = true;
     readyResolve(BV);
     emit('ready', BV);
+    refreshCover();
+    pump();                          // page mode: build + load the remaining scenes in film order
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });

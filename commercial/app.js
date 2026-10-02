@@ -1,7 +1,7 @@
 /* ============================================================================
    app.js — page wiring around the film (no global)
    Play/pause, sound (BVAudio), scrubber with chapter ticks + hover labels,
-   time readout, 16:9 / 9:16 toggle, replay, fullscreen, "Rip a pack" CTA
+   time readout, 16:9 / 9:16 toggle, replay, fullscreen, "Open a case" CTA
    (BVPlay), muted autoplay behind a "Play with sound" overlay, keyboard
    shortcuts, auto-hiding controls, end-of-film -> epilogue.
    Every optional module (BVAudio, BVPlay) is feature-checked: a missing file
