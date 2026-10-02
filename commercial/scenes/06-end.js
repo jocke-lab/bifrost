@@ -7,15 +7,18 @@
    the head passes), then the light lifts off the coins and condenses into the
    real Bifrost Vault mark (BVApp.mark: the bridge stroke lands, the gold ring
    draws around it — the ONE gold accent of the view), and the lockup reveals:
-     25.00  final impact: flash + shake; Dominion holds the 05 pose 3 frames, then the coins fan out of it
+     25.00  final impact: punch + shake, match cut on 05's lit Dominion (05's turn render, grade, key light,
+            glow and backdrop at 05's last screen pose; no flash on the cut frame); it holds 3 frames, then the
+            coins fan out of it (soft flash on the burst, 25.10) and our backdrop bloom rises
      25.25  the arc of light draws through the coins (head flare + glitter trail)
      25.68  the light condenses into the mark's bridge stroke; 25.80 ring draws (CUES.logo)
      26.00  the mark lands (bloom + glitter burst); "BIFROST VAULT" + bifrostvault.io
      26.60  REAL COINS. A NEW WAY TO COLLECT.
      27.30  BY INVITATION.  27.55 "Your invitation is your way in."
      28.80  glint (CUES.glint): a white-gold glint runs the ring, a light sweep crosses the coins
-   Fine print band (BV_CONFIG.finePrint.long) + 18+ badge on screen 24.75–30.0 in 16:9 (fades in over 05), 25.0–30.0 in 9:16,
-   20 px (16:9) / 24 px (9:16), inside the 6 % margin / the 220/320 px 9:16 safe zones.
+   Fine print band (BV_CONFIG.finePrint.long) + 18+ badge on screen 25.0–30.0 in both formats (on with the cut,
+   after 07's short line has faded, so the two never stack), on a counter-camera layer (rock-steady through the
+   impact punch / shake), 20 px (16:9) / 24 px (9:16), inside the 6 % margin / the 220/320 px 9:16 safe zones.
    Pure function of t: no timers, no randomness (hash-seeded analytic glitter),
    every image preloaded with BV.preload.
    ========================================================================== */
@@ -33,12 +36,12 @@
   const T_LOGO = C.logo || 25.8;            // ring starts drawing (audio: the full chord)
   const T_GLINT = C.glint || 28.8;
   const T0 = 24.75, T1 = C.filmEnd || 30.0;
-  // fine print fades in before the cut in 16:9 (5.25 s on screen); in 9:16 05's buyback subline
-  // sits exactly where the band goes, so there it starts on the cut
-  const FINE_IN_L = 24.75, FINE_IN_P = T_END;
+  // fine print: comes on with the cut in both formats (07's short legal line has faded out by 25.0, so the two
+  // never stack; in 9:16 05's buyback subline sits exactly where the band goes); 5.0 s on screen
+  const FINE_IN = T_END, FINE_RAMP = 0.15;
 
   // timings (global seconds)
-  const HOLD = 25.083;                      // Dominion holds the 05 pose for 3 frames under the flash
+  const HOLD = 25.083;                      // Dominion holds the 05 pose for 3 frames
   const HERO_DUR = 0.6;                     // then eases (outExpo, soft start) into its arch slot
   const FAN0 = 25.1, FAN_DUR = 0.5;         // the other four emerge from behind Dominion
   const DRAW = [25.25, 25.7];               // arc of light draws through the coins
@@ -55,6 +58,30 @@
   const BRIDGE = ['#67DCEA', '#7793FF', '#855CFF'];
   const GLIT = ['#e4d9ff', '#e4d9ff', '#e4d9ff', '#cff8ff', '#e4d9ff', '#e4d9ff', '#fff1d2'];
   const FLASH = 'radial-gradient(ellipse 70% 70% at 50% 45%,rgba(255,255,255,.95) 0%,rgba(212,195,255,.6) 35%,rgba(133,92,255,.25) 70%,rgba(133,92,255,0) 100%)';
+
+  /* match cut from 05: on the cut frame Dominion is drawn exactly as 05 draws it -- the same yaw-sweep
+     turn render (window.BVBox.turnImages(), shared with 04/05), 05's coin-layer grade and 05's key light +
+     cool rim specular -- at 05's last screen pose with our own impact camera divided out. It hands over to
+     the face render (end-card lift) while it travels into its arch slot. */
+  const TURN_DISC = 976 / 1100;             // coin disc / frame size in the turn renders (= 04/05)
+  const GRADE05 = 'brightness(1.08) contrast(1.05)';   // 04/05 coin-layer grade
+  const XF = [HOLD, HOLD + 0.28];           // turn render -> face render hand-off
+  const IMPACT_S = 0.03, IMPACT_SH = [7, 606, 8];      // impact punch / shake (amp, seed, decay)
+  // the impact camera (multiplies BV.camera) at ie seconds after the cut -- one formula for update() and geometry()
+  function impactCam(ie) {
+    if (ie < 0 || ie >= 0.5) return { x: 0, y: 0, s: 1 };
+    const sh = ie < 0.35 ? K.shake(ie, IMPACT_SH[0], IMPACT_SH[1], IMPACT_SH[2]) : { x: 0, y: 0 };
+    return { x: sh.x, y: sh.y, s: 1 + IMPACT_S * (1 - oC(range(ie, 0, 0.45))) };
+  }
+  // stage (screen) point -> world point under camera c (inverse of film.js applyCamera incl. over-scan)
+  function unCam(p, c, W, H) {
+    let sc = c.s;
+    if (c.x || c.y) {
+      const cover = Math.max(1 + 2 * Math.abs(c.x) / W, 1 + 2 * Math.abs(c.y) / H);
+      sc = sc >= 1 ? Math.max(sc, cover) : sc * cover;
+    }
+    return { x: W / 2 + (p.x - c.x - W / 2) / sc, y: H / 2 + (p.y - c.y - H / 2) / sc, k: sc };
+  }
 
   const ORDER = S.ORDER || ['silence', 'ametherion', 'cycle', 'dominion', 'veritas'];
   const HERO = (S.ROLES && S.ROLES.boxReveal) || 'dominion';
@@ -139,9 +166,96 @@
     g.bridge = { P0: mp(3, 24), C: mp(16, 2), P1: mp(29, 12) };
     g.bridgeW = 3 * sc; g.ringW = 2.4 * sc;
     g.origin = { x: W / 2, y: g.apexY };
-    const hs = g.hero, I = g.intro;
+    // 05's last screen pose -> world, with our cut-frame impact camera (punch + shake at ie = 0) divided out
+    const w0 = unCam(g.hero, impactCam(0), W, H);
+    const hs = { x: w0.x, y: w0.y, disc: g.hero.disc / w0.k }, I = g.intro;
     g.heroG = { x: g.origin.x + (hs.x - g.origin.x) / I.s, y: g.origin.y + (hs.y - g.origin.y - I.dy) / I.s, disc: hs.disc / I.s };
     return g;
+  }
+
+  /* ── 05's Dominion, drawn the way 05 draws it (match cut) ─────────────── */
+  const TURN_SRC = i => 'assets/coins3d/' + HERO + '-turn/' + String(i).padStart(2, '0') + '.webp';
+  let turn = null;
+  function turnImages() {
+    if (!turn) {
+      const shared = window.BVBox && typeof window.BVBox.turnImages === 'function' ? window.BVBox.turnImages() : null;
+      turn = shared && shared.length === 41 ? shared
+        : Array.from({ length: 41 }, (_, i) => { const im = new Image(); im.decoding = 'sync'; im.src = TURN_SRC(i); return im; });
+    }
+    return turn;
+  }
+  const imgOk = im => !!im && im.complete && im.naturalWidth > 0;
+  function turnFrames(yaw) {
+    const f = clamp((yaw + 40) / 2, 0, 40), a = Math.floor(f);
+    return { a, b: Math.min(40, a + 1), u: f - a };
+  }
+  // the turn render at (x, y), frame box D, two neighbouring frames cross-faded (05 drawCoin, no sheen)
+  function drawTurn(c, x, y, D, yaw) {
+    const fr = turnFrames(yaw), im = turn && turn[fr.a], ib = turn && turn[fr.b];
+    if (!imgOk(im)) return false;
+    c.drawImage(im, x - D / 2, y - D / 2, D, D);
+    if (fr.u > 0.02 && imgOk(ib)) { c.globalAlpha = fr.u; c.drawImage(ib, x - D / 2, y - D / 2, D, D); c.globalAlpha = 1; }
+    return true;
+  }
+  // 05's keyLight(): soft white falloff from the upper left masked to the coin (screen) + thin cool rim specular
+  let kl = null, klC = null, klKey = '';
+  function keyLight(c, x, y, D, yaw) {
+    const fr = turnFrames(yaw), im = turn && turn[fr.a];
+    if (!imgOk(im)) return;
+    const Nk = Math.max(64, Math.ceil(D / 8) * 8);
+    if (!kl) { kl = document.createElement('canvas'); klC = kl.getContext('2d'); }
+    const key = fr.a + '|' + Nk;
+    if (klKey !== key) {
+      klKey = key;
+      if (kl.width !== Nk) { kl.width = Nk; kl.height = Nk; }
+      klC.setTransform(1, 0, 0, 1, 0, 0);
+      klC.globalCompositeOperation = 'source-over'; klC.globalAlpha = 1;
+      klC.clearRect(0, 0, Nk, Nk);
+      klC.drawImage(im, 0, 0, Nk, Nk);
+      klC.globalCompositeOperation = 'source-in';
+      const g = klC.createRadialGradient(Nk * 0.3, Nk * 0.24, 0, Nk * 0.3, Nk * 0.24, Nk * 0.72);
+      g.addColorStop(0, 'rgba(255,255,255,.3)'); g.addColorStop(0.3, 'rgba(238,242,255,.16)');
+      g.addColorStop(0.65, 'rgba(220,226,250,.06)'); g.addColorStop(1, 'rgba(220,226,250,0)');
+      klC.fillStyle = g;
+      klC.fillRect(0, 0, Nk, Nk);
+    }
+    c.save();
+    c.globalCompositeOperation = 'screen';
+    c.globalAlpha = 1;
+    c.drawImage(kl, x - D / 2, y - D / 2, D, D);
+    const ry = D * TURN_DISC * 0.5 - Math.max(1.5, D * 0.004), rx = ry * Math.max(0.05, Math.cos(yaw * Math.PI / 180));
+    c.globalCompositeOperation = 'lighter';
+    c.lineCap = 'round';
+    const W1 = Math.max(1.2, D * 0.0045);
+    [[W1 * 3.2, 0.1], [W1, 0.5]].forEach(([w, al]) => {
+      c.lineWidth = w;
+      c.strokeStyle = 'rgba(236,240,255,1)';
+      c.globalAlpha = al;
+      c.beginPath(); c.ellipse(x, y, rx, ry, 0, Math.PI * 1.02, Math.PI * 1.5); c.stroke();
+      c.globalAlpha = al * 0.45;
+      c.beginPath(); c.ellipse(x, y, rx, ry, 0, Math.PI * 0.86, Math.PI * 1.02); c.stroke();
+      c.beginPath(); c.ellipse(x, y, rx, ry, 0, Math.PI * 1.5, Math.PI * 1.64); c.stroke();
+    });
+    c.restore();
+  }
+
+  /* inverse of film.js applyCamera on a full-stage layer (same as 07-legal.js): keeps the fine print
+     rock-steady on screen through the impact punch / shake */
+  function counterCamera(el, W, H) {
+    const c = BV.camera || {};
+    const x = +c.x || 0, y = +c.y || 0, r = +c.r || 0;
+    let sc = c.s == null ? 1 : +c.s;
+    if (!isFinite(sc) || sc <= 0) sc = 1;
+    if (c.overscan !== false && (x || y || r)) {
+      const rr = Math.abs(r) * Math.PI / 180;
+      const asp = Math.max(W / H, H / W);
+      const cover = Math.max(1 + 2 * Math.abs(x) / W, 1 + 2 * Math.abs(y) / H) * (Math.cos(rr) + asp * Math.sin(rr));
+      sc = sc >= 1 ? Math.max(sc, cover) : sc * cover;
+    }
+    const tr = (x || y || r || sc !== 1)
+      ? `scale(${(1 / sc).toFixed(5)})${r ? ` rotate(${(-r).toFixed(3)}deg)` : ''} translate(${(-x).toFixed(2)}px,${(-y).toFixed(2)}px)`
+      : '';
+    if (el.style.transform !== tr) el.style.transform = tr;
   }
 
   /* ── sprites for glitter / flares ─────────────────────────────────────── */
@@ -192,11 +306,10 @@
     c.globalAlpha = 1;
   }
 
-  /* ── fine print band: fades in 24.75 (over 05's last frames), holds to 30.0 ── */
+  /* ── fine print band: on with the cut (73 % on the cut frame, full by 25.15), holds to 30.0 ── */
   function fineUpdate(st, t, ctx) {
     const G = st.G, H = ctx.H, P = ctx.portrait;
-    const fin = P ? FINE_IN_P : FINE_IN_L;
-    const fA = oC(range(t, fin, fin + 0.3));
+    const fA = t >= FINE_IN ? oC(0.35 + 0.65 * range(t, FINE_IN, FINE_IN + FINE_RAMP)) : 0;
     st.fine.style.opacity = fA.toFixed(3);
     st.fineShade.style.opacity = fA.toFixed(3);
     st.fineRule.style.opacity = (fA * 0.9).toFixed(3);
@@ -207,6 +320,23 @@
       st.fineRule.style.top = (top - (P ? 22 : 16)) + 'px';
       st.fineShade.style.height = (H - top + (P ? 120 : 90)) + 'px';
     }
+    counterCamera(st.steady, ctx.W, H);
+  }
+
+  /* 05's Dominion over the face render: fully on through the hold, hands over (opacity) during XF */
+  function drawHero05(st, t, x, y, disc, W, H) {
+    const a = 1 - ioS(range(t, XF[0], XF[1]));
+    if (a <= 0.001) { st.heroCv.style.display = 'none'; return; }
+    const c = st.heroCx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+    c.clearRect(0, 0, W, H);
+    const yaw = 4 * Math.sin((t - 20) * 1.3);   // 05's live yaw wobble, continued
+    const D = disc / TURN_DISC;
+    const ok = drawTurn(c, x, y, D, yaw);
+    if (ok) keyLight(c, x, y, D, yaw);
+    st.heroCv.style.display = ok ? '' : 'none';
+    st.heroCv.style.opacity = a.toFixed(3);
   }
 
   /* ── the scene ────────────────────────────────────────────────────────── */
@@ -221,10 +351,15 @@
       root.style.background = 'transparent';
       root.style.overflow = 'hidden';
 
-      // backdrop: a soft violet bloom under the arch + deep vignette (static gradients)
+      // backdrop: deep obsidian + vignette (on from the cut), and a soft violet bloom under the arch that
+      // rises after the cut (so the cut frame keeps 05's dark surround around the coin: no lavender wash)
       st.bg = layer(root, `width:${W}px;height:${H}px;` +
-        `background:radial-gradient(ellipse ${P ? '75% 34%' : '52% 46%'} at 50% ${P ? '30%' : '40%'},rgba(133,92,255,.20),rgba(119,147,255,.07) 48%,rgba(8,10,18,0) 78%),` +
-        `radial-gradient(ellipse 120% 90% at 50% 45%,rgba(8,10,18,0) 55%,rgba(3,4,8,.65) 100%) #080A12;`);
+        `background:radial-gradient(ellipse 120% 90% at 50% 45%,rgba(8,10,18,0) 55%,rgba(3,4,8,.65) 100%) #080A12;`);
+      // 05's own backdrop (05-decide.js), on at the cut so the surround matches too, then handing over to ours
+      st.bg05 = layer(st.bg, `width:${W}px;height:${H}px;` +
+        `background:radial-gradient(${P ? '95% 48% at 50% 47%' : '62% 74% at 34% 50%'},#130f28 0%,#0b0c18 48%,#080A12 80%);`);
+      st.bgBloom = layer(st.bg, `width:${W}px;height:${H}px;opacity:0;` +
+        `background:radial-gradient(ellipse ${P ? '75% 34%' : '52% 46%'} at 50% ${P ? '30%' : '40%'},rgba(133,92,255,.20),rgba(119,147,255,.07) 48%,rgba(8,10,18,0) 78%);`);
 
       // everything but the fine print lives in `world` (gets the slow push)
       st.world = layer(root, `width:${W}px;height:${H}px;transform-origin:50% ${P ? '40%' : '45%'};`);
@@ -265,6 +400,11 @@
       st.flyG = svg.querySelector('.fly');
       st.fly = ['.f0', '.f1', '.f2'].map(s => svg.querySelector(s));
 
+      // 05's coin glow + floor light under Dominion (05-decide.js), carried across the cut, then released
+      st.glow05 = layer(st.arch, 'width:1000px;height:1000px;border-radius:50%;transform-origin:0 0;' +
+        'background:radial-gradient(closest-side,rgba(190,170,255,.42),rgba(133,92,255,.2) 42%,rgba(119,147,255,.07) 64%,transparent);');
+      st.floor05 = layer(st.arch, 'width:1000px;height:220px;border-radius:50%;transform-origin:0 0;' +
+        'background:radial-gradient(closest-side,rgba(133,92,255,.42),rgba(119,147,255,.14) 55%,transparent);');
       // coin glows (enamel colour bleeding into the dark), coins, sweeps
       st.glows = COINS.map((c, i) => layer(st.arch, 'width:400px;height:400px;border-radius:50%;opacity:0;' +
         'background:radial-gradient(closest-side,' + K.rgba(GLOWC[i], 0.55) + ',' + K.rgba(GLOWC[i], 0.18) + ' 45%,' + K.rgba(GLOWC[i], 0) + ' 100%);'));
@@ -279,9 +419,16 @@
       });
       // z-order: Dominion (the hero we cut from) on top during the fan-out
       st.arch.appendChild(st.coins[HERO_I]);
+      // ...and over it, 05's Dominion (turn render + 05 grade + key light) for the match cut
+      turnImages().forEach(im => BV.preload(im));
+      st.heroCv = K.el('canvas', { parent: st.arch, attrs: { width: W, height: H },
+        style: `position:absolute;left:0;top:0;width:${W}px;height:${H}px;pointer-events:none;filter:${GRADE05};` });
+      st.heroCx = st.heroCv.getContext('2d');
       st.sweeps = COINS.map(c => {
         const s = layer(st.arch, 'width:100px;height:100px;overflow:hidden;mix-blend-mode:screen;opacity:0;' +
-          '-webkit-clip-path:circle(44.1% at 50% 50%);clip-path:circle(44.1% at 50% 50%);');   // face disc 94-1506 of 1600 (clip-path, not a url() mask: file:// CORS)
+          '-webkit-mask-image:radial-gradient(closest-side,#000 calc(88.25% - .5px),rgba(0,0,0,0) calc(88.25% + .5px));mask-image:radial-gradient(closest-side,#000 calc(88.25% - .5px),rgba(0,0,0,0) calc(88.25% + .5px));');
+        // ^ the face render's disc (alpha edge r~706 of 800) as a generated gradient mask: same AA rim as the
+        //   old url() alpha mask, but nothing is fetched, so no file:// CORS error
         s._band = layer(s, 'width:100%;height:100%;');
         return s;
       });
@@ -338,9 +485,11 @@
         style: `position:absolute;left:${W / 2}px;top:${G.invSub.y}px;transform:translate(-50%,-50%);white-space:nowrap;` +
           `font:500 ${G.invSub.size}px 'Geist',system-ui,sans-serif;letter-spacing:.005em;color:${SEC};opacity:0` });
 
-      // fine print band (outside the push so it never moves) + 18+ badge
+      // fine print band (outside the push, and on a counter-camera layer so neither the push nor the
+      // impact punch / shake ever moves it) + 18+ badge
       const F = G.fine;
-      st.fine = layer(root, `left:${F.l}px;width:${F.r - F.l}px;top:auto;bottom:${H - F.b}px;display:flex;align-items:center;gap:${P ? 22 : 22}px;opacity:0;`);
+      st.steady = layer(root, `width:${W}px;height:${H}px;transform-origin:50% 50%;`);
+      st.fine = layer(st.steady, `left:${F.l}px;width:${F.r - F.l}px;top:auto;bottom:${H - F.b}px;display:flex;align-items:center;gap:${P ? 22 : 22}px;opacity:0;`);
       st.badge = K.el('div', { parent: st.fine, text: '18+',
         style: `flex:none;width:${F.badge}px;height:${F.badge}px;border-radius:50%;border:2px solid rgba(246,247,252,.86);` +
           `display:flex;align-items:center;justify-content:center;font:700 ${Math.round(F.badge * 0.36)}px 'Geist',system-ui,sans-serif;` +
@@ -348,11 +497,11 @@
       st.fineTx = K.el('div', { parent: st.fine, text: FINE,
         style: `flex:1;font:500 ${F.size}px/${F.lh} 'Geist',system-ui,sans-serif;letter-spacing:.005em;color:rgba(196,204,220,.9);` +
           `text-align:left;text-wrap:pretty;` });
-      st.fineRule = layer(root, `left:${F.l}px;width:${F.r - F.l}px;height:1px;opacity:0;` +
+      st.fineRule = layer(st.steady, `left:${F.l}px;width:${F.r - F.l}px;height:1px;opacity:0;` +
         'background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.14) 20%,rgba(255,255,255,.14) 80%,rgba(255,255,255,0));');
-      st.fineShade = layer(root, `width:${W}px;top:auto;bottom:0;opacity:0;` +
+      st.fineShade = layer(st.steady, `width:${W}px;top:auto;bottom:0;opacity:0;` +
         'background:linear-gradient(180deg,rgba(8,10,18,0),rgba(5,6,11,.82) 45%,rgba(5,6,11,.92));');
-      root.insertBefore(st.fineShade, st.fine);
+      st.steady.insertBefore(st.fineShade, st.fine);
 
       // glitter sets (positions known at build time)
       const arcAt = u => qPt(G.E0, G.C, G.E1, G.arcU(u));
@@ -400,16 +549,19 @@
       root.style.opacity = 1;
       st.bg.style.opacity = on ? 1 : 0;
       st.world.style.opacity = on ? 1 : 0;
-      fineUpdate(st, t, ctx);
-      if (!on) return;
+      if (!on) { fineUpdate(st, t, ctx); return; }
 
-      /* impact at the cut: flash + shake (camera = whole stage, very short) */
+      /* impact at the cut: punch + shake (camera = whole stage, very short). No flash on the cut frame --
+         it is a match cut on 05's lit coin (same rule as the 20.0 cut); the flash rides the fan-out burst. */
       const ie = t - T_END;
-      if (ie < 0.5) {
-        BV.fx.flash(0.32 * Math.exp(-ie * 10), FLASH);
-        if (ie < 0.35) { const sh = K.shake(ie, 7, 606, 8); BV.camera.x += sh.x; BV.camera.y += sh.y; }
-        BV.camera.s *= 1 + 0.03 * (1 - oC(range(ie, 0, 0.45)));
-      }
+      const ic = impactCam(ie);
+      BV.camera.x += ic.x; BV.camera.y += ic.y; BV.camera.s *= ic.s;
+      const fe = t - FAN0;
+      if (fe >= 0 && fe < 0.5) BV.fx.flash(0.1 * Math.exp(-fe * 9), FLASH);
+      const bgX = ioS(range(t, T_END + 0.05, T_END + 0.6));
+      st.bgBloom.style.opacity = bgX.toFixed(3);
+      st.bg05.style.opacity = (1 - bgX).toFixed(3);
+      fineUpdate(st, t, ctx);   // after our camera change, so the counter-camera cancels the final value
       /* mark landing: a softer bloom flash */
       const le = t - LAND;
       if (le >= 0 && le < 0.6) BV.fx.flash(0.16 * Math.exp(-le * 8), FLASH);
@@ -457,7 +609,7 @@
         // always opaque once spawned; the reveal is scale + a brightness ramp, never a cross-fade
         c.style.opacity = hero || t >= s0 ? 1 : 0;
         if (hero) {
-          // under the flash the hero matches 05 exactly, then takes the end-card lift
+          // under 05's turn render (heroCv) the face render takes the end-card lift as it travels
           const k = oC(range(t, HOLD, HOLD + 0.4));
           c.style.filter = 'brightness(' + lerp(1, LIFT_B, k).toFixed(3) + ') contrast(' + lerp(1, LIFT_C, k).toFixed(3) + ') saturate(' + lerp(1, LIFT_S, k).toFixed(3) + ') ' + SHADOW;
         } else {
@@ -465,6 +617,18 @@
           c.style.filter = 'brightness(' + lerp(2.2, LIFT_B, k).toFixed(3) + ') contrast(' + LIFT_C + ') saturate(' + LIFT_S + ') ' + SHADOW;
         }
         c._x = x; c._y = y; c._d = disc;
+        if (hero) {
+          drawHero05(st, t, x, y, disc, W, H);
+          // 05's glow + floor light ride with Dominion and fade out as it leaves the pose
+          const g5 = 1 - ioS(range(t, HOLD, HOLD + 0.45));
+          st.glow05.style.opacity = (0.85 * g5).toFixed(3);
+          st.floor05.style.opacity = (0.8 * g5).toFixed(3);
+          if (g5 > 0) {
+            const gk = disc * 1.9 / 1000, fk = disc * 1.5 / 1000;
+            st.glow05.style.transform = 'translate3d(' + f2(x - 500 * gk) + 'px,' + f2(y - 500 * gk) + 'px,0) scale(' + gk.toFixed(4) + ')';
+            st.floor05.style.transform = 'translate3d(' + f2(x - 500 * fk) + 'px,' + f2(y + disc * 0.6 - 110 * fk) + 'px,0) scale(' + fk.toFixed(4) + ')';
+          }
+        }
 
         // light passes this coin: enamel glow flares then settles
         const pass = clamp(1 - Math.abs(headU - sl.u) / 0.12);

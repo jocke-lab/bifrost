@@ -91,8 +91,9 @@
       st.trail1 = img(st.world, FACE, 1600, 'opacity:0;mix-blend-mode:screen;');
       st.coin = img(st.world, FACE, 1600, 'filter:drop-shadow(0 30px 40px rgba(0,0,0,.55));');
       // specular sweep masked to the coin
-      st.spec = layer(st.world, 'width:1600px;height:1600px;transform-origin:50% 50%;overflow:hidden;mix-blend-mode:screen;opacity:0;' +
-        '-webkit-clip-path:circle(44.1% at 50% 50%);clip-path:circle(44.1% at 50% 50%);');   // face disc 94-1506 of 1600 (clip-path, not a url() mask: file:// CORS)
+      st.spec = layer(st.world, 'width:1600px;height:1600px;transform-origin:50% 50%;overflow:hidden;mix-blend-mode:screen;opacity:0;');
+      // ^ masked to the face disc by a generated radial-gradient mask set in update() (AA rim ~1 screen px),
+      //   not a url() alpha mask of the face render: that fetch fails CORS from file://
       st.specBand = layer(st.spec, 'left:-50%;width:200%;height:100%;' +
         'background:linear-gradient(105deg,rgba(255,255,255,0) 40%,rgba(220,226,255,.22) 47%,rgba(255,255,255,.55) 50%,rgba(220,226,255,.22) 53%,rgba(255,255,255,0) 60%);');
       // gold glint along the rim (SVG in face-render units)
@@ -263,6 +264,9 @@
       box(st.spec, cx, cy, F, 1600);
       if (sw > 0 && sw < 1) {
         st.spec.style.opacity = Math.sin(Math.PI * sw).toFixed(3);
+        const ee = (0.5 * 1600 / F).toFixed(2);     // 0.5 screen px of edge in the 1600-unit box
+        const mk = 'radial-gradient(closest-side,#000 calc(88.25% - ' + ee + 'px),rgba(0,0,0,0) calc(88.25% + ' + ee + 'px))';
+        st.spec.style.webkitMaskImage = mk; st.spec.style.maskImage = mk;
         st.specBand.style.transform = 'translate3d(' + lerp(-55, 55, ease.inOutSine(sw)).toFixed(2) + '%,0,0)';
       } else st.spec.style.opacity = '0';
 

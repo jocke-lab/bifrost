@@ -20,7 +20,7 @@
    Supers: OR LET THE BOX CHOOSE. (10.2–12.0) · "A little anticipation." (11.4) ·
            "Here it comes." (12.4) · YOURS TO DISCOVER. (17.2)
    Result: "Revealed from the vault" / Dominion / "Silver · № 07 of 50" (17.0; small lines 28 / 23 px)
-   Micro-tag 10–20: "Dramatisation · chances shown before you buy"
+   Disclosure: the persistent legal line (scenes/07-legal.js) covers this beat.
    Layout: 16:9 trucks the case + coin left after the reveal (16.4–17.6) so the type sits
    on a right-hand rail at x 1090 (the same rail 05 uses); 9:16 stacks super / coin over
    the case / result inside the 220 / 320 px safe zones.
@@ -253,10 +253,9 @@
               : { x: 960, y: 184, size: 124, text: 'OR LET THE\nBOX CHOOSE.', fit: 1500, align: 'center' },
       sup2: P ? { x: 540, y: 336, size: 116, text: 'YOURS TO\nDISCOVER.', fit: 952, align: 'center' }
               : { x: 1090, y: 322, size: 120, text: 'YOURS TO\nDISCOVER.', fit: 700, align: 'left' },
-      anti: P ? { x: 540, y: 1492, size: 58, bar: 180 } : { x: 960, y: 974, size: 52, bar: 160 },
+      anti: P ? { x: 540, y: 1412, size: 58, bar: 180 } : { x: 960, y: 974, size: 52, bar: 160 },
       // result block: eyebrow -> name -> edition (PackOpening order); small lines sized for a phone
-      res: P ? { x: 540, y: 1314, k: 1.8, small: 28, align: 'center' } : { x: 1094, y: 512, k: 1.75, small: 23, align: 'left' },
-      tag: P ? { x: 64, y: 1596, size: 24 } : { x: 116, y: 1012, size: 20 }
+      res: P ? { x: 540, y: 1314, k: 1.8, small: 28, align: 'center' } : { x: 1094, y: 512, k: 1.75, small: 23, align: 'left' }
     };
   }
 
@@ -441,12 +440,6 @@
       st.resParts = [rEb, rName, rMt];
       rEl.style.textShadow = '0 2px 24px rgba(0,0,0,.65)';
       resultShow(st.resParts, 0);
-
-      // micro-tag (disclosure), bottom-left inside the safe area
-      st.tag = K.el('div', { parent: st.type, text: 'Dramatisation · chances shown before you buy',
-        style: `position:absolute;left:${G.tag.x}px;top:${G.tag.y}px;transform:translateY(-100%);white-space:nowrap;
-          font:500 ${G.tag.size}px 'Geist',system-ui,sans-serif;letter-spacing:.04em;color:rgba(196,204,220,.9);
-          text-shadow:0 1px 10px rgba(0,0,0,.8);opacity:0` });
 
       // offscreen buffer for the specular sweep over the coin relief
       st.off = document.createElement('canvas');
@@ -657,8 +650,6 @@
 
       resultShow(st.resParts, range(t, RESULT, RESULT + 0.85));
       K.animText(st.sup2, t, SUP2, Infinity, { style: 'rise', stagger: 0.022, dur: 0.55 });
-
-      st.tag.style.opacity = (0.95 * E_CSS(range(t, CUT_IN + 0.15, CUT_IN + 0.6))).toFixed(3);
 
       if (live) BV.fx.vignette(0.18 + 0.12 * range(t, RISE, DONE));
     }

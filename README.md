@@ -15,6 +15,9 @@ notifications) and an immutable audit log of everything.
 - Public client config lives in `assets/bifrost.config.js` (publishable key only — RLS-protected).
 - **Secrets** (service_role, Stripe, Fortnox, Slack, etc.) live in Vercel env vars — never in this repo.
 
+## Commercial
+- `commercial/`: the 30 s Bifrost Vault commercial (Eye of the Unknown), served at `/commercial`, with rendered MP4s in `commercial/dist/`. See `commercial/SCRIPT.md`.
+
 ## Docs
 - `APIS-AND-CREDENTIALS.md` — every API/service + env var + webhook (Sweden-first).
 - `BUILD-PLAN.md` — architecture + data model (maps 1:1 to the Supabase tables).

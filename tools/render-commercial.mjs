@@ -6,7 +6,8 @@
  * BV.ready, then for every frame i calls BV.seek(i / fps), captures the 1:1 logical stage as a
  * JPEG (q94) and pipes the frames, in order, into ffmpeg (libx264, yuv420p, BT.709, +faststart).
  * The soundtrack comes from BVAudio.wav() (offline render, base64 transfer) and is muxed as
- * AAC 192k / 48 kHz. Frames are captured by several independent Chromium instances in parallel
+ * AAC 192k / 48 kHz behind a -3 dBFS lookahead limiter (decoded true peak <= -1 dBTP, measured and
+ * logged after every encode). Frames are captured by several independent Chromium instances in parallel
  * (worker k takes frames k, k+N, ...); seek is a pure function of t, so the result is identical
  * to a single-worker render, just faster.
  *
@@ -25,6 +26,8 @@
  *   --crf N                            x264 CRF (default 18)
  *   --preset NAME                      x264 preset (default slow)
  *   --no-audio                         render a silent video
+ *   --remux-audio                      re-encode only the soundtrack of the existing full-length MP4s in --out
+ *                                      (video stream copied; for audio-only fixes)
  *   --no-poster                        skip poster-16x9.jpg / poster-9x16.jpg (end card, t = duration - 1.5)
  *   --workers N                        parallel Chromium instances (default: ~3/4 of CPU cores, max 4)
  *   --image jpeg|png                   frame transport: jpeg q94 (default) or lossless png (slower)
@@ -118,7 +121,7 @@ function pageMsg(tag, text) {
 
 const USAGE = `Usage: node tools/render-commercial.mjs [--format landscape|portrait|both] [--fps 30]
        [--out commercial/dist] [--from S] [--to S] [--stills "1.5,12"] [--crf 18] [--preset slow]
-       [--no-audio] [--no-poster] [--workers N] [--image jpeg|png] [--quality 94] [--frames]
+       [--no-audio] [--remux-audio] [--no-poster] [--workers N] [--image jpeg|png] [--quality 94] [--frames]
        [--verbose] [--url URL]`;
 
 function defaultWorkers() {
@@ -131,7 +134,7 @@ function parseArgs(argv) {
   const o = {
     format: 'both', fps: null, out: null, from: null, to: null, stills: null, crf: 18, preset: 'slow',
     audio: true, poster: true, image: 'jpeg', quality: 94, frames: false, verbose: false, url: null,
-    workers: null, help: false,
+    workers: null, help: false, remuxAudio: false,
   };
   const valued = new Set(['format', 'fps', 'out', 'from', 'to', 'stills', 'crf', 'preset', 'image', 'quality', 'url', 'workers']);
   for (let i = 0; i < argv.length; i++) {
@@ -179,6 +182,7 @@ function parseArgs(argv) {
       }
       case 'url': o.url = val; break;
       case 'no-audio': o.audio = false; break;
+      case 'remux-audio': o.remuxAudio = true; break;
       case 'no-poster': o.poster = false; break;
       case 'frames': o.frames = true; break;
       case 'verbose': o.verbose = true; break;
@@ -189,7 +193,8 @@ function parseArgs(argv) {
   o.out = o.out || DEFAULT_OUT;
   o.formats = o.format === 'both' ? ['landscape', 'portrait'] : [o.format];
   o.preview = o.from != null || o.to != null;
-  o.workers = o.stills ? 1 : (o.workers || defaultWorkers());
+  if (o.remuxAudio && (o.preview || o.stills || !o.audio)) throw new UsageError('--remux-audio cannot be combined with --from/--to, --stills or --no-audio');
+  o.workers = o.stills || o.remuxAudio ? 1 : (o.workers || defaultWorkers());
   return o;
 }
 
@@ -537,6 +542,17 @@ function parseWav(buf) {
   return { ...fmt, duration: fmt.byteRate ? dataLen / fmt.byteRate : 0 };
 }
 
+// AAC 192k overshoots the source's sample peak by ~1.8 dB on transients (measured +0.3 dBTP from
+// a -1.5 dBFS WAV), so a lookahead limiter at -3 dBFS sits in front of the encoder to keep the
+// decoded MP4 at <= -1 dBTP. Resample to 48 kHz first so the limiter sees the samples the encoder
+// gets; latency=1 compensates the lookahead so A/V sync is unchanged; level=0 = no auto make-up.
+const AAC_PRE_LIMIT = 0.708; // -3.0 dBFS
+function audioFilter(segDur) {
+  return 'aresample=48000:resampler=soxr:precision=28,' +
+    `alimiter=limit=${AAC_PRE_LIMIT}:attack=1:release=50:level=0:latency=1,` +
+    `apad=whole_dur=${segDur.toFixed(6)}`;
+}
+
 // ---------------------------------------------------------------------------------------------
 // ffmpeg sink (frames on stdin, backpressure-aware)
 
@@ -600,6 +616,61 @@ function ffprobe(file) {
     '-of', 'json', file], { encoding: 'utf8' });
   if (r.error || r.status !== 0) return null;
   try { return JSON.parse(r.stdout); } catch { return null; }
+}
+
+// Decode the muxed audio and measure it (EBU R128 integrated loudness + 4x-oversampled true peak).
+const MAX_DBTP = -1.0;
+function measureAudio(file) {
+  const r = spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-nostdin', '-i', file, '-map', '0:a:0',
+    '-af', 'ebur128=peak=true+sample', '-f', 'null', '-'], { encoding: 'utf8', maxBuffer: 64 * 1048576 });
+  if (r.error || r.status !== 0) return null;
+  const s = r.stderr || '';
+  const sum = s.slice(s.lastIndexOf('Summary:'));
+  const grab = (re) => { const m = sum.match(re); return m ? Number(m[1]) : NaN; };
+  return {
+    lufs: grab(/I:\s*(-?[\d.]+|-inf)\s*LUFS/),
+    samplePeak: grab(/Sample peak:\s*Peak:\s*(-?[\d.]+|-inf)\s*dBFS/),
+    truePeak: grab(/True peak:\s*Peak:\s*(-?[\d.]+|-inf)\s*dBFS/),
+  };
+}
+function reportAudio(label, file) {
+  const m = measureAudio(file);
+  if (!m) { warn(`[${label}] could not measure the audio loudness/true peak`); return; }
+  log(`[${label}] audio: ${m.lufs.toFixed(1)} LUFS integrated, sample peak ${m.samplePeak.toFixed(1)} dBFS, ` +
+    `true peak ${m.truePeak.toFixed(1)} dBTP`);
+  if (!(m.truePeak <= MAX_DBTP)) warn(`[${label}] audio true peak ${m.truePeak.toFixed(1)} dBTP is above the ${MAX_DBTP} dBTP spec`);
+}
+
+// --remux-audio: replace the soundtrack of an already-rendered MP4 (video stream copied untouched).
+async function remuxAudio(film, opts, wav) {
+  const name = `bifrost-vault-commercial-${film.spec.tag}.mp4`;
+  const src = path.join(opts.out, name);
+  if (!existsSync(src)) throw new Error(`--remux-audio: ${rel(src)} does not exist (render it first)`);
+  const probe = ffprobe(src);
+  const v = probe && probe.streams.find((s) => s.codec_type === 'video');
+  if (!v) throw new Error(`--remux-audio: no video stream in ${rel(src)}`);
+  const dur = Number(v.duration) > 0 ? Number(v.duration) : Number(probe.format.duration);
+  const part = path.join(opts.out, `.${name.replace(/\.mp4$/, '')}.remux-${process.pid}.mp4`);
+  const args = ['-hide_banner', '-nostdin', '-loglevel', 'warning', '-y', '-i', src, '-t', dur.toFixed(6), '-i', wav.file,
+    '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-af', audioFilter(dur),
+    '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-t', dur.toFixed(6),
+    '-map_metadata', '0', '-movflags', '+faststart', '-f', 'mp4', part];
+  const undefer = defer(() => fsp.rm(part, { force: true }));
+  try {
+    const r = spawnSync(FFMPEG, args, { encoding: 'utf8' });
+    if (r.error || r.status !== 0) throw new Error(`ffmpeg remux failed: ${r.error ? r.error.message : (r.stderr || '').trim().split('\n').slice(-5).join(' | ')}`);
+    const p2 = ffprobe(part);
+    const v2 = p2 && p2.streams.find((s) => s.codec_type === 'video');
+    const a2 = p2 && p2.streams.find((s) => s.codec_type === 'audio');
+    if (!v2 || !a2 || v2.nb_read_packets !== v.nb_read_packets) throw new Error(`remuxed ${name} failed validation`);
+    await fsp.rename(part, src);
+  } finally {
+    undefer();
+    await fsp.rm(part, { force: true });
+  }
+  log(`[${film.format}] remuxed audio into ${rel(src)} (video copied, ${v.nb_read_packets} frames)`);
+  reportAudio(film.format, src);
+  return src;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -707,7 +778,7 @@ async function renderVideo(films, opts, fps, wav) {
   if (wav) args.push('-map', '1:a:0');
   args.push('-vf', vf, '-c:v', 'libx264', '-preset', opts.preset, '-crf', String(opts.crf), '-pix_fmt', 'yuv420p',
     '-r', String(fps), '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv');
-  if (wav) args.push('-af', `apad=whole_dur=${segDur.toFixed(6)}`, '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2');
+  if (wav) args.push('-af', audioFilter(segDur), '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2');
   else args.push('-an');
   args.push('-movflags', '+faststart', '-f', 'mp4', partPath);
 
@@ -758,6 +829,7 @@ async function renderVideo(films, opts, fps, wav) {
     if (!v || Number(v.nb_read_packets) !== total) throw new Error(`encoded frame count ${v ? v.nb_read_packets : 0} != ${total}`);
     if (wav && !a) throw new Error('audio stream missing from output');
   }
+  if (wav) reportAudio(film.format, finalPath);
   return finalPath;
 }
 
@@ -836,6 +908,11 @@ async function main() {
         } else {
           warn('window.BVAudio.wav is not available - rendering SILENT video');
         }
+      }
+      if (opts.remuxAudio) {
+        if (!wav) throw new Error('--remux-audio: the page has no BVAudio.wav()');
+        outputs.push(await remuxAudio(film, opts, wav));
+        continue;
       }
       outputs.push(await renderVideo(films, opts, fps, wav));
       if (opts.poster) await renderPoster(film, opts);

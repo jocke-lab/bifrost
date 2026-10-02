@@ -73,8 +73,7 @@
         smallY: 335,
         arc: { d: `M -120 1560 C 120 420, 900 300, 1200 980`, w: W, h: H },
         phoneOut: { y: 820, s: 0.92, dim: 0.78, o: 0.5 },
-        fadeY: [1330, 1560],                   // receded phone fades to nothing above the 1600 safe line
-        tag: { x: 64, y: 1596, size: 24 }      // disclosure micro-tag (same spot/style as 04)
+        fadeY: [1250, 1480]                    // receded phone fades to nothing above the 9:16 legal block (1540)
       };
     }
     return {
@@ -85,8 +84,7 @@
       smallY: 884,
       arc: { d: `M -140 1080 C 260 160, 1320 -60, 2060 700`, w: W, h: H },
       phoneOut: { y: 30, s: 0.95, dim: 0.5, o: 1 },
-      fadeY: null,
-      tag: { x: 116, y: 1012, size: 20 }
+      fadeY: null
     };
   }
 
@@ -130,9 +128,9 @@
       [pulse, pulseG].forEach(p => { p.style.strokeDasharray = plen + ' ' + arcLen * 2; });
 
       /* ── the phone with the real app ─────────────────────────────────────── */
-      // The device rect: the shared layout's phone, sized/placed so the disclosure micro-tag (bottom-left,
-      // same spot as 04's) never touches it — in 9:16 the phone ends above the 1600 safe line.
-      const PH = P ? 1090 : G.L.phone.h, PW = Math.round(PH * 0.4615);
+      // The device rect: the shared layout's phone, sized/placed so the disclosure line (bottom-left,
+      // 07-legal.js) never touches it — in 9:16 the phone ends at y 1472, clear of the legal block (1540-1595).
+      const PH = P ? 1010 : G.L.phone.h, PW = Math.round(PH * 0.4615);
       const PCX = P ? 540 : G.L.phone.cx + 44, PTOP = P ? 462 : G.L.phone.y;
       const ph = { x: PCX - PW / 2, y: PTOP, w: PW, h: PH, cx: PCX, cy: PTOP + PH / 2 };
       const floor = K.el('div', { parent: root, style: `position:absolute;left:${ph.cx - ph.w * 0.95}px;top:${ph.y + ph.h - ph.h * 0.16}px;width:${ph.w * 1.9}px;height:${ph.h * 0.32}px;
@@ -235,12 +233,8 @@
           tw: 6 + R() * 14, ph: R() * 6, col: (i % 7 === 6) ? 2 : (i % 4 === 3) ? 1 : 0 });
       }
 
-      // disclosure micro-tag: same style/position/size as 04's, so the hand-off at 10.0 is seamless
-      const tag = K.el('div', { parent: root, text: 'Dramatisation · app screens illustrative',
-        style: `position:absolute;left:0;top:0;transform-origin:0 0;white-space:nowrap;z-index:60;
-          font:500 ${G.tag.size}px 'Geist',system-ui,sans-serif;letter-spacing:.04em;color:${K.rgba(SEC, 0.78)};opacity:0` });
-
-      return { tag, fadeOv, legal, headEls, G, P, a0, trail, sprites, glass, svg, glowG, core, halo, pulse, pulseG, arcLen, floor, phone, chooser, checkout, dim, touch, flow,
+      // (the disclosure is the persistent legal line, scenes/07-legal.js)
+      return { ph, fadeOv, legal, headEls, G, P, a0, trail, sprites, glass, svg, glowG, core, halo, pulse, pulseG, arcLen, floor, phone, chooser, checkout, dim, touch, flow,
         pieceArt, pieceImg, scrollPx, coinGlow, bloom, cv, cx2, glitter, dust, name, chipWrap, chip, sFall, sMint, sSmall, bg };
     },
 
@@ -250,9 +244,6 @@
 
       /* scene in / out */
       root.style.opacity = (t < CUT_IN || t >= CUT_OUT) ? 0 : 1;   // hard cuts on both downbeats
-      // 9:16: wait until the rising phone has cleared the tag's line, then the same 0.2 s fade
-      const tagIn = P ? 5.32 : CUT_IN;
-      s.tag.style.opacity = (0.95 * ios(range(t, tagIn, tagIn + 0.2))).toFixed(3);
 
       /* ── arc of light: draws in across the frame, then breathes ─────────── */
       const draw = oq(range(t, CUT_IN, 5.85));
@@ -272,11 +263,19 @@
       const pin = oq(range(t, TL.phoneIn[0], TL.phoneIn[1]));
       const prc = oc(range(t, 8.22, 9.0));
       const drift = (t - 5.6) * (P ? -3 : -4);   // slow float
-      const pY = (1 - pin) * (P ? 900 : 820) + prc * G.phoneOut.y + drift;
+      // short rise (not a slide in from the frame edge): the phone never travels up through the legal line
+      const pY = (1 - pin) * (P ? 240 : 200) + prc * G.phoneOut.y + drift;
       const pS = (0.9 + 0.1 * pin) * (1 - (1 - G.phoneOut.s) * prc);
       const pRx = (1 - pin) * 22;
       const pRy = (P ? 0 : -6 * (1 - pin)) + (P ? 0 : 3.5 * ios(range(t, 5.4, 9.5)));
-      s.phone.set({ x: P ? 0 : -prc * 40, y: pY, s: pS, rx: pRx, ry: pRy, o: 1 - (1 - G.phoneOut.o) * prc, glow: 0.2 + 0.25 * pin - 0.1 * prc });
+      // entrance opacity gated on clearance: while the device's bottom edge still overlaps the disclosure
+      // line (07-legal.js: 9:16 top 1540, 16:9 line ~1032-1053) it stays invisible, fading up as it clears
+      const legalTop = P ? 1534 : 1026;
+      const pBot = s.ph.cy + pY + (s.ph.h / 2) * pS;
+      const oIn = t >= TL.phoneIn[1] ? 1 : ios(range(legalTop - pBot, -30, 10));
+      // receded: 16:9 keeps the phone in frame; 9:16 dissolves it fully by 9.0 (no leftover status bar under the chip)
+      const oOut = P ? 1 - (1 - G.phoneOut.o) * prc - G.phoneOut.o * ioc(range(t, 8.55, 8.98)) : 1 - (1 - G.phoneOut.o) * prc;
+      s.phone.set({ x: P ? 0 : -prc * 40, y: pY, s: pS, rx: pRx, ry: pRy, o: Math.max(0, oIn * oOut), glow: 0.2 + 0.25 * pin - 0.1 * prc });
       if (s.fadeOv) s.fadeOv.style.opacity = oc(range(t, 8.2, 8.62)).toFixed(3);
       s.floor.style.opacity = (0.9 * pin * (1 - 0.4 * prc)).toFixed(3);
       s.dim.style.opacity = (G.phoneOut.dim * prc).toFixed(3);
@@ -392,32 +391,12 @@
       /* ── camera: slow push across the beat ──────────────────────────────── */
       BV.camera.s *= 1 + 0.025 * ios(range(t, 5.0, 10.0));
       // push in on the checkout while it works, release as the coin flies out
-      // (16:9 only: in 9:16 the push would drive the phone's bottom edge into the micro-tag / bottom safe zone)
+      // (16:9 only: in 9:16 the push would drive the phone's bottom edge into the legal line / bottom safe zone)
       if (!P) BV.camera.s *= 1 + 0.045 * ios(range(t, 6.3, 8.1)) * (1 - oc(range(t, 8.15, 8.9)));
       // into the cut: the coin leans in, the frame darkens around it
       if (t >= 9.7) BV.fx.vignette(0.55 * ease.inCubic(range(t, 9.7, CUT_OUT)));
-
-      // keep the micro-tag rock-steady on screen (cancel the camera push / shake, like 04's type layer)
-      steady(s.tag, G.tag.x, G.tag.y, W, H);
     }
   });
-
-  // Place el so its bottom-left lands at stage (px, py) on screen at scale 1, whatever BV.camera does
-  // (mirrors film.js applyCamera: world transform-origin 50% 50%, translate then scale, over-scan).
-  function steady(el, px, py, W, H) {
-    const c = BV.camera || {};
-    const x = +c.x || 0, y = +c.y || 0, r = +c.r || 0;
-    let sc = c.s == null ? 1 : +c.s;
-    if (!isFinite(sc) || sc <= 0) sc = 1;
-    if (c.overscan !== false && (x || y || r)) {
-      const rr = Math.abs(r) * Math.PI / 180;
-      const asp = Math.max(W / H, H / W);
-      const cover = Math.max(1 + 2 * Math.abs(x) / W, 1 + 2 * Math.abs(y) / H) * (Math.cos(rr) + asp * Math.sin(rr));
-      sc = sc >= 1 ? Math.max(sc, cover) : sc * cover;
-    }
-    const qx = W / 2 + (px - W / 2 - x) / sc, qy = H / 2 + (py - H / 2 - y) / sc;
-    el.style.transform = `translate(${qx.toFixed(2)}px,${qy.toFixed(2)}px) scale(${(1 / sc).toFixed(5)}) translateY(-100%)`;
-  }
 
   // Flight path (pure function of global time): out of the screen, towards camera, landing on its float spot.
   function flight(s, t) {

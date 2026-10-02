@@ -13,7 +13,11 @@
    Continuity: starts on 04's live hand-off pose (window.BVBox.pose(ctx, 20.0): same coin, same turn
    frame, same size and screen position incl. 04's truck), our 20.0 punch divided out, then the hit
    whips it into the beat. Beat 1: visible velvet bed + slot with a lit upper lip, coin sinks 8 %;
-   the lid line sweeps down over the coin and is gone by 20.86 (one arc of light remains). Pure function of t: no timers, no randomness
+   the lid line sweeps down over the coin and is gone by 20.86 (one arc of light remains).
+   Lighting continuity with 04: the shared turn frames (window.BVBox.turnImages()), 04's coin-layer grade
+   (filter brightness(1.08) contrast(1.05)), 04's key light + cool rim specular, frames cross-faded like 04,
+   and no flash on the 20.0 hit, so the coin's mean luminance holds across the cut (within ~3 %).
+   Pure function of t: no timers, no randomness
    (seeded BVKit.rng only), every image preloaded with BV.preload.
    ========================================================================== */
 (function () {
@@ -44,18 +48,26 @@
 
   // Real 3D renders of the client's Dominion GLB: yaw = -40 + 2*i (frame 20 = face-on).
   const TURN = Array.from({ length: 41 }, (_, i) => 'assets/coins3d/' + COIN + '-turn/' + String(i).padStart(2, '0') + '.webp');
-  const DISC = 0.887;                     // coin disc / frame size in the turn renders
+  const DISC = 976 / 1100;                // coin disc / frame size in the turn renders (= 04's TURN_DISC)
+  const GRADE = 'brightness(1.08) contrast(1.05)';   // 04-box.js coin-layer grade (continuity across the cut)
   const PHOTO = (A.coin(COIN) || {}).file || ('assets/coins/' + COIN + '.webp');
 
   const pad2 = n => String(n).padStart(2, '0');
   const coinName = ((A.coin(COIN) || {}).name || 'Dominion');
 
+  // The 41 turn frames are shared with 04-box (window.BVBox.turnImages(): same URLs, one Image set);
+  // our own set only if 04 is absent. Preloaded under this scene either way, so 05 never draws a gap.
   let images = null;
   function loadTurn() {
-    if (images) return images;
-    images = TURN.map(src => { const im = new Image(); im.decoding = 'sync'; im.src = src; BV.preload(im); return im; });
+    if (!images) {
+      const shared = window.BVBox && typeof window.BVBox.turnImages === 'function' ? window.BVBox.turnImages() : null;
+      images = shared && shared.length === TURN.length ? shared
+        : TURN.map(src => { const im = new Image(); im.decoding = 'sync'; im.src = src; return im; });
+    }
+    images.forEach(im => BV.preload(im));
     return images;
   }
+  const ok = im => !!im && im.complete && im.naturalWidth > 0;
 
   /* ── geometry per format ──────────────────────────────────────────────── */
   function geometry(ctx) {
@@ -79,14 +91,15 @@
         L, P, W, H, start,
         pose: [
           { x: 540, y: 900, D: 790, yaw: 0, s: SINK },
-          { x: 540, y: 880, D: 770, yaw: -26, s: 1 },
+          { x: 540, y: 860, D: 770, yaw: -26, s: 1 },
           { x: 540, y: 830, D: 740, yaw: 22, s: 1 },
           { x: 540, y: 905, D: 690, yaw: 0, s: 1 }
         ],
         head: { x: 540, y: 372, align: 'center', valign: 'middle', size: 118, fit: 952 },
         ui: { x: 540, y: 1452 },          // centre of the beat's UI element (below the coin)
+        cardY: 1335,                      // beat 2's taller LIST IT card: raised 27 px so its bottom edge (punch incl.) stays above the 1600 safe line
         sub: { x: 540, y: 1350 },         // buyback subtitle
-        chipK: 2.1, cardK: 1.95,
+        chipK: 2.1, cardK: 1.82,
         arc: `M -160 1500 C 80 520, 1000 420, 1240 1180`
       };
     }
@@ -265,7 +278,9 @@
         border:3px solid rgba(214,200,255,.9);box-shadow:0 0 30px rgba(178,154,255,.7),inset 0 0 30px rgba(133,92,255,.45);opacity:0;pointer-events:none;will-change:transform,opacity` });
 
       /* ── canvas: coin + glitter ──────────────────────────────────────── */
-      const cv = K.el('canvas', { parent: root, style: 'position:absolute;left:0;top:0;pointer-events:none' });
+      // the coin layer carries 04's static grade (brightness 1.08 / contrast 1.05, never animated) so the
+      // Dominion's exposure is continuous across the 20.0 hard cut
+      const cv = K.el('canvas', { parent: root, style: 'position:absolute;left:0;top:0;pointer-events:none;filter:' + GRADE });
       cv.width = W; cv.height = H; cv.style.width = W + 'px'; cv.style.height = H + 'px';
       const cx2 = cv.getContext('2d');
       const dust = K.emitter(cv, {
@@ -331,7 +346,7 @@
         if (i === 0) uh = chip1.el.offsetHeight; else if (i === 1) uh = card.offsetHeight; else if (i === 2) uh = chip3.el.offsetHeight; else uh = 40;
         const gap = P ? 0 : (i === 3 ? 30 : 46);
         if (P) {
-          lay.push({ headY: hd.y, uiY: G.ui.y });
+          lay.push({ headY: hd.y, uiY: i === 1 && G.cardY ? G.cardY : G.ui.y });
         } else {
           const cy = G.pose[i].y;
           const total = hh + gap + uh;
@@ -362,7 +377,9 @@
       for (let i = 0; i < 4; i++) { const d = t - HITS[i]; if (d >= 0 && d < 0.6) { hb = i; hitE = d; } }
       if (live && hb >= 0) {
         const fl = Math.exp(-hitE * 14);
-        BV.fx.flash((hb === 3 ? 0.14 : 0.1) * fl, FLASH);
+        // the 20.0 hit is a continuity cut on the same lit coin: no flash there (even a 0.02 one lifts the
+        // coin ~7 % on the cut frame); the punch, shake, arc pulse and burst carry that hit
+        if (hb > 0) BV.fx.flash((hb === 3 ? 0.14 : 0.1) * fl, FLASH);
         BV.camera.s *= 1 + (hb === 3 ? 0.045 : PUNCH0 - 1) * (1 - oc(range(hitE, 0, 0.42)));
         if (hitE < 0.32) { const sh = K.shake(hitE, hb === 3 ? 6 : 4, 71 + hb, 9); BV.camera.x += sh.x; BV.camera.y += sh.y; }
       }
@@ -491,6 +508,8 @@
       }
       if (t >= CONFIRM) { const u = range(t, CONFIRM, CONFIRM + 0.5); if (u > 0 && u < 1) sheen = { u, a: 0.9, gold: true }; }
       drawCoin(c, cx, cy, D, q.yaw + yawLive, 1, sheen);
+      // 04's key light (soft white from the upper left, masked to the coin) + thin cool rim specular
+      keyLight(c, cx, cy, D, q.yaw + yawLive, 1);
       // seated in the slot: the upper wall of the recess shades the coin's top edge (reads as sunk in)
       const sinkA = ios(range(t, 20.22, 20.62)) * trA;
       if (sinkA > 0.002) {
@@ -531,16 +550,22 @@
     }
   });
 
-  /* coin from the yaw-sweep renders, with an optional specular sweep masked by the coin */
+  /* coin from the yaw-sweep renders (two neighbouring frames cross-faded, exactly as 04 draws it),
+     with an optional specular sweep masked by the coin */
+  function coinFrames(yaw) {
+    const f = clamp((yaw + 40) / 2, 0, 40), a = Math.floor(f);
+    return { a, b: Math.min(40, a + 1), u: f - a };
+  }
   let off = null, offC = null;
   function drawCoin(c, x, y, D, yaw, alpha, sheen) {
-    const fi = clamp(Math.round((yaw + 40) / 2), 0, 40);
-    const im = images && images[fi];
-    if (!im || !im.complete || !im.naturalWidth) return;
+    const fr = coinFrames(yaw);
+    const im = images && images[fr.a], ib = images && images[fr.b];
+    if (!ok(im)) return;
     c.save();
     c.globalAlpha = alpha;
     c.translate(x, y);
     c.drawImage(im, -D / 2, -D / 2, D, D);
+    if (fr.u > 0.02 && ok(ib)) { c.globalAlpha = alpha * fr.u; c.drawImage(ib, -D / 2, -D / 2, D, D); c.globalAlpha = alpha; }
     if (sheen) {
       const Np = Math.max(64, Math.ceil(D));
       if (!off) { off = document.createElement('canvas'); offC = off.getContext('2d'); }
@@ -565,6 +590,51 @@
       c.globalAlpha = alpha * sheen.a * Math.sin(Math.PI * sheen.u);
       c.drawImage(off, -D / 2, -D / 2, D, D);
     }
+    c.restore();
+  }
+
+  /* key light, identical to 04-box.js keyLight(): a broad white falloff from the upper left, masked by
+     the coin's alpha and screened on, plus a thin cool specular along the upper-left of the rim.
+     The lit mask depends only on the turn frame and the (quantised) size, so it is cached. */
+  let kl = null, klC = null, klKey = '';
+  function keyLight(c, x, y, D, yaw, amt) {
+    const fr = coinFrames(yaw);
+    const im = images && images[fr.a];
+    if (!ok(im)) return;
+    const Nk = Math.max(64, Math.ceil(D / 8) * 8);
+    if (!kl) { kl = document.createElement('canvas'); klC = kl.getContext('2d'); }
+    const key = fr.a + '|' + Nk;
+    if (klKey !== key) {
+      klKey = key;
+      if (kl.width !== Nk) { kl.width = Nk; kl.height = Nk; }
+      klC.setTransform(1, 0, 0, 1, 0, 0);
+      klC.globalCompositeOperation = 'source-over'; klC.globalAlpha = 1;
+      klC.clearRect(0, 0, Nk, Nk);
+      klC.drawImage(im, 0, 0, Nk, Nk);
+      klC.globalCompositeOperation = 'source-in';
+      const g = klC.createRadialGradient(Nk * 0.3, Nk * 0.24, 0, Nk * 0.3, Nk * 0.24, Nk * 0.72);
+      g.addColorStop(0, 'rgba(255,255,255,.3)'); g.addColorStop(0.3, 'rgba(238,242,255,.16)');
+      g.addColorStop(0.65, 'rgba(220,226,250,.06)'); g.addColorStop(1, 'rgba(220,226,250,0)');
+      klC.fillStyle = g;
+      klC.fillRect(0, 0, Nk, Nk);
+    }
+    c.save();
+    c.globalCompositeOperation = 'screen';
+    c.globalAlpha = amt;
+    c.drawImage(kl, x - D / 2, y - D / 2, D, D);
+    const ry = D * DISC * 0.5 - Math.max(1.5, D * 0.004), rx = ry * Math.max(0.05, Math.cos(yaw * Math.PI / 180));
+    c.globalCompositeOperation = 'lighter';
+    c.lineCap = 'round';
+    const W1 = Math.max(1.2, D * 0.0045);
+    [[W1 * 3.2, 0.1], [W1, 0.5]].forEach(([w, al]) => {
+      c.lineWidth = w;
+      c.strokeStyle = 'rgba(236,240,255,1)';
+      c.globalAlpha = amt * al;
+      c.beginPath(); c.ellipse(x, y, rx, ry, 0, Math.PI * 1.02, Math.PI * 1.5); c.stroke();
+      c.globalAlpha = amt * al * 0.45;
+      c.beginPath(); c.ellipse(x, y, rx, ry, 0, Math.PI * 0.86, Math.PI * 1.02); c.stroke();
+      c.beginPath(); c.ellipse(x, y, rx, ry, 0, Math.PI * 1.5, Math.PI * 1.64); c.stroke();
+    });
     c.restore();
   }
 })();

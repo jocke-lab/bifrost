@@ -51,10 +51,10 @@
       const xs = [164, 352, 540, 728, 916];
       return {
         P, W, H,
-        full: { x: 540, y: 975, disc: 960 },
+        full: { x: 540, y: 922, disc: 880 },        // lifted/trimmed so name + descriptor clear the coin and end above y 1500
         title: { x: 540, y: 336, size: 116, align: 'center', text: 'EYE OF THE\nUNKNOWN.' },
-        name: { x: 540, y: 1512, align: 'center', size: 34 },
-        desc: { x: 540, y: 1566, align: 'center', size: 24, tuck: 1290 },
+        name: { x: 540, y: 1436, align: 'center', size: 34 },
+        desc: { x: 540, y: 1488, align: 'center', size: 24, tuck: 1290 },   // ends ~1500: the 9:16 legal block sits at 1540-1595
         row: { xs, ys, discs, order: [0, 4, 1, 3, 2] },
         arc: 'M -60 1180 Q 540 700 1140 1180',
         floors: ys.map((y, i) => y + discs[i] / 2 + 22),
