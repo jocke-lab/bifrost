@@ -281,7 +281,7 @@
       st.arch.appendChild(st.coins[HERO_I]);
       st.sweeps = COINS.map(c => {
         const s = layer(st.arch, 'width:100px;height:100px;overflow:hidden;mix-blend-mode:screen;opacity:0;' +
-          '-webkit-mask-image:url("' + c.src + '");mask-image:url("' + c.src + '");-webkit-mask-size:100% 100%;mask-size:100% 100%;');
+          '-webkit-clip-path:circle(44.1% at 50% 50%);clip-path:circle(44.1% at 50% 50%);');   // face disc 94-1506 of 1600 (clip-path, not a url() mask: file:// CORS)
         s._band = layer(s, 'width:100%;height:100%;');
         return s;
       });
